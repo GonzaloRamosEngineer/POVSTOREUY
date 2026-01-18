@@ -1,12 +1,15 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
 import ProductGallery from './ProductGallery';
 import ProductInfo from './ProductInfo';
 import ProductSpecs from './ProductSpecs';
 import AddToCartSection from './AddToCartSection';
 import CustomerReviews from './CustomerReviews';
 import RelatedProducts from './RelatedProducts';
+import { supabase } from '@/lib/supabaseClient';
+import { upsertCartItem, incrementItem, readCart } from '@/lib/cart';
 
 interface GalleryImage {
   id: string;
@@ -42,165 +45,208 @@ interface RelatedProduct {
   rating: number;
 }
 
-interface ProductModel {
-  id: string;
+interface ProductRow {
+  id: string; // uuid
   name: string;
+  model: string | null;
+  description: string | null;
   price: number;
+  original_price: number | null;
+  image_url: string | null;
+  stock_count: number | null;
+  features: any;
+  is_active?: boolean | null;
+}
+
+function normalizeFeatures(v: unknown): string[] {
+  if (Array.isArray(v)) return v.filter(Boolean).map(String);
+  if (typeof v === 'string') {
+    try {
+      const parsed = JSON.parse(v);
+      if (Array.isArray(parsed)) return parsed.filter(Boolean).map(String);
+    } catch {}
+  }
+  return [];
 }
 
 export default function ProductDetailsInteractive() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const productId = searchParams.get('id'); // <- UUID real
+
   const [isHydrated, setIsHydrated] = useState(false);
+
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [product, setProduct] = useState<ProductRow | null>(null);
 
   useEffect(() => {
     setIsHydrated(true);
   }, []);
 
-  const galleryImages: GalleryImage[] = [
-  {
-    id: '1',
-    url: "https://images.unsplash.com/photo-1687313217063-0f1e74b04139",
-    alt: 'Cámara POV 4K mini negra con lente gran angular sobre superficie blanca con iluminación profesional',
-    type: 'image'
-  },
-  {
-    id: '2',
-    url: "https://images.unsplash.com/photo-1576530934139-64e185cec9f2",
-    alt: 'Vista lateral de cámara POV mostrando botones de control y puerto de carga USB-C',
-    type: 'image'
-  },
-  {
-    id: '3',
-    url: "https://images.unsplash.com/photo-1594063435209-c6effa6430e8",
-    alt: 'Cámara POV montada en casco de ciclista con correa de seguridad ajustable',
-    type: 'image'
-  },
-  {
-    id: '4',
-    url: "https://img.rocket.new/generatedImages/rocket_gen_img_111891fc3-1768293369748.png",
-    alt: 'Pantalla LCD de cámara POV mostrando interfaz de grabación 4K con indicadores de batería',
-    type: 'video'
-  }];
+  useEffect(() => {
+    let mounted = true;
 
+    async function load() {
+      if (!productId) {
+        setError('Falta el id del producto en la URL.');
+        setLoading(false);
+        return;
+      }
 
+      setLoading(true);
+      setError(null);
+
+      const { data, error } = await supabase
+        .from('products')
+        .select('id,name,model,description,price,original_price,image_url,stock_count,features,is_active')
+        .eq('id', productId)
+        .maybeSingle();
+
+      if (!mounted) return;
+
+      if (error) {
+        console.error(error);
+        setError(error.message || 'Error cargando producto');
+        setProduct(null);
+        setLoading(false);
+        return;
+      }
+
+      if (!data) {
+        setError('Producto no encontrado.');
+        setProduct(null);
+        setLoading(false);
+        return;
+      }
+
+      // Si querés bloquear productos inactivos:
+      if (data.is_active === false) {
+        setError('Este producto no está disponible.');
+        setProduct(null);
+        setLoading(false);
+        return;
+      }
+
+      setProduct({
+        id: data.id,
+        name: data.name,
+        model: data.model ?? null,
+        description: data.description ?? null,
+        price: Number(data.price),
+        original_price: data.original_price != null ? Number(data.original_price) : null,
+        image_url: data.image_url ?? null,
+        stock_count: data.stock_count != null ? Number(data.stock_count) : 0,
+        features: data.features,
+        is_active: data.is_active ?? true,
+      });
+
+      setLoading(false);
+    }
+
+    load();
+
+    return () => {
+      mounted = false;
+    };
+  }, [productId]);
+
+  const title = useMemo(() => {
+    if (!product) return '';
+    return `${product.name}${product.model ? ` - ${product.model}` : ''}`;
+  }, [product]);
+
+  const desc = useMemo(() => {
+    if (!product) return '';
+    const f = normalizeFeatures(product.features);
+    return product.description || (f.length ? f.join(' • ') : 'Producto POV Store Uruguay');
+  }, [product]);
+
+  const stockCount = product?.stock_count ?? 0;
+
+  const stockStatus: 'in-stock' | 'low-stock' | 'out-of-stock' =
+    stockCount <= 0 ? 'out-of-stock' : stockCount <= 5 ? 'low-stock' : 'in-stock';
+
+  const galleryImages: GalleryImage[] = useMemo(() => {
+    const url = product?.image_url || '';
+    const alt = `${product?.name ?? 'Producto'} ${product?.model ?? ''}`.trim();
+    if (!url) return [];
+    return [{ id: 'main', url, alt, type: 'image' }];
+  }, [product]);
+
+  // Specs: por ahora fijo (cuando guardes specs en DB, lo mapeamos)
   const specifications: Specification[] = [
-  {
-    icon: 'VideoCameraIcon',
-    label: 'Resolución de video',
-    value: '4K a 30fps / 1080p a 60fps'
-  },
-  {
-    icon: 'CameraIcon',
-    label: 'Resolución de foto',
-    value: '12 megapíxeles'
-  },
-  {
-    icon: 'BoltIcon',
-    label: 'Batería',
-    value: '1200mAh - Hasta 90 minutos de grabación'
-  },
-  {
-    icon: 'CircleStackIcon',
-    label: 'Almacenamiento',
-    value: 'MicroSD hasta 128GB (no incluida)'
-  },
-  {
-    icon: 'WifiIcon',
-    label: 'Conectividad',
-    value: 'WiFi 2.4GHz + Bluetooth 5.0'
-  },
-  {
-    icon: 'DevicePhoneMobileIcon',
-    label: 'Dimensiones',
-    value: '59 x 41 x 30 mm - Peso: 58g'
-  },
-  {
-    icon: 'BeakerIcon',
-    label: 'Resistencia',
-    value: 'Resistente a salpicaduras IPX4'
-  },
-  {
-    icon: 'CubeIcon',
-    label: 'Accesorios incluidos',
-    value: 'Cable USB-C, manual, soporte adhesivo'
-  }];
+    { icon: 'VideoCameraIcon', label: 'Resolución de video', value: '4K a 30fps / 1080p a 60fps' },
+    { icon: 'CameraIcon', label: 'Resolución de foto', value: '12 megapíxeles' },
+    { icon: 'BoltIcon', label: 'Batería', value: '1200mAh - Hasta 90 minutos de grabación' },
+    { icon: 'CircleStackIcon', label: 'Almacenamiento', value: 'MicroSD hasta 128GB (no incluida)' },
+    { icon: 'WifiIcon', label: 'Conectividad', value: 'WiFi 2.4GHz + Bluetooth 5.0' },
+    { icon: 'DevicePhoneMobileIcon', label: 'Dimensiones', value: '59 x 41 x 30 mm - Peso: 58g' },
+    { icon: 'BeakerIcon', label: 'Resistencia', value: 'Resistente a salpicaduras IPX4' },
+    { icon: 'CubeIcon', label: 'Accesorios incluidos', value: 'Cable USB-C, manual, soporte adhesivo' },
+  ];
 
-
+  // Reviews/Related: mock por ahora
   const reviews: Review[] = [
-  {
-    id: '1',
-    author: 'Martín González',
-    authorImage: "https://images.unsplash.com/photo-1612993013894-3e0959edb6be",
-    authorImageAlt: 'Hombre joven con barba corta y camisa azul sonriendo a la cámara',
-    rating: 5,
-    date: '15/12/2025',
-    comment: 'Excelente calidad de imagen para el precio. La uso para grabar mis videos de skateboarding y la calidad 4K es impresionante. Muy fácil de usar y la batería dura bastante.',
-    verified: true
-  },
-  {
-    id: '2',
-    author: 'Carolina Rodríguez',
-    authorImage: "https://img.rocket.new/generatedImages/rocket_gen_img_109550d11-1766719301487.png",
-    authorImageAlt: 'Mujer joven con cabello castaño largo y suéter gris en ambiente natural',
-    rating: 4,
-    date: '08/12/2025',
-    comment: 'Muy buena cámara para crear contenido. La conectividad WiFi funciona perfecto con mi celular. Solo le faltaría un poco más de duración de batería para sesiones largas.',
-    verified: true
-  },
-  {
-    id: '3',
-    author: 'Diego Fernández',
-    authorImage: "https://images.unsplash.com/photo-1616100984013-d22e7f92af46",
-    authorImageAlt: 'Hombre con barba y gafas de sol en exterior con luz natural',
-    rating: 5,
-    date: '02/12/2025',
-    comment: 'Perfecta para mis vlogs de viaje. Compacta, liviana y la calidad de video es profesional. El envío fue rápido y llegó en perfecto estado. Totalmente recomendada.',
-    verified: true
-  }];
+    {
+      id: '1',
+      author: 'Martín González',
+      authorImage: 'https://images.unsplash.com/photo-1612993013894-3e0959edb6be',
+      authorImageAlt: 'Hombre joven con barba corta y camisa azul sonriendo a la cámara',
+      rating: 5,
+      date: '15/12/2025',
+      comment:
+        'Excelente calidad de imagen para el precio. La uso para grabar mis videos y la calidad 4K es impresionante.',
+      verified: true,
+    },
+  ];
 
+  const relatedProducts: RelatedProduct[] = [];
 
-  const relatedProducts: RelatedProduct[] = [
-  {
-    id: '1',
-    name: 'Cámara POV 4K Mini - Básico',
-    model: 'Básico',
-    price: 3990,
-    image: "https://img.rocket.new/generatedImages/rocket_gen_img_145aa2022-1764901074668.png",
-    imageAlt: 'Cámara POV modelo básico en color negro con diseño compacto',
-    rating: 4.5
-  },
-  {
-    id: '2',
-    name: 'Kit de Accesorios POV',
-    model: 'Accesorios',
-    price: 1490,
-    image: "https://images.unsplash.com/photo-1611488885465-3ff29ddcec53",
-    imageAlt: 'Set completo de accesorios para cámara POV incluyendo soportes y correas',
-    rating: 4.8
-  },
-  {
-    id: '3',
-    name: 'Tarjeta MicroSD 128GB',
-    model: 'Almacenamiento',
-    price: 890,
-    image: "https://img.rocket.new/generatedImages/rocket_gen_img_118fff099-1768293368607.png",
-    imageAlt: 'Tarjeta de memoria MicroSD de alta velocidad para grabación 4K',
-    rating: 4.7
-  },
-  {
-    id: '4',
-    name: 'Batería Extra POV',
-    model: 'Batería',
-    price: 690,
-    image: "https://img.rocket.new/generatedImages/rocket_gen_img_130ac41b9-1768293368741.png",
-    imageAlt: 'Batería recargable de repuesto para cámara POV con cargador USB',
-    rating: 4.6
-  }];
+  function ensureCartItemQuantity(productId: string, qty: number) {
+    if (!product) return;
 
+    const existing = readCart().find((i) => i.id === productId);
 
-  const availableModels: ProductModel[] = [
-  { id: 'basico', name: 'Básico', price: 3990 },
-  { id: 'pro', name: 'Pro', price: 5490 }];
+    if (existing) {
+      // suma qty (no 1)
+      incrementItem(productId, qty);
+      return;
+    }
 
+    // crear con qty real
+    upsertCartItem({
+      id: product.id,
+      name: title,
+      model: product.model ?? undefined,
+      price: Number(product.price),
+      quantity: qty,
+      image: product.image_url || '',
+      alt: `${product.name} ${product.model ?? ''}`.trim(),
+      stock: product.stock_count ?? 0,
+    });
+  }
+
+  const handleAddToCart = (payload: { quantity: number }) => {
+    if (!product) return;
+    if (stockStatus === 'out-of-stock') return;
+
+    const qty = Math.max(1, Math.min(10, payload.quantity || 1));
+    ensureCartItemQuantity(product.id, qty);
+
+    router.push('/shopping-cart');
+  };
+
+  const handleBuyNow = (payload: { quantity: number }) => {
+    if (!product) return;
+    if (stockStatus === 'out-of-stock') return;
+
+    const qty = Math.max(1, Math.min(10, payload.quantity || 1));
+    ensureCartItemQuantity(product.id, qty);
+
+    // ✅ manda directo a checkout, pero primero guardó el carrito
+    router.push('/checkout-payment');
+  };
 
   if (!isHydrated) {
     return (
@@ -211,60 +257,81 @@ export default function ProductDetailsInteractive() {
             <div className="h-64 bg-muted rounded-lg" />
           </div>
         </div>
-      </div>);
+      </div>
+    );
+  }
 
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background">
+        <div className="max-w-[1400px] mx-auto px-4 lg:px-6 py-8">
+          <div className="animate-pulse space-y-8">
+            <div className="h-96 bg-muted rounded-lg" />
+            <div className="h-64 bg-muted rounded-lg" />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !product) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-6">
+        <div className="max-w-md text-center">
+          <p className="text-lg font-medium text-foreground">No se pudo cargar el producto</p>
+          <p className="text-sm text-muted-foreground mt-2">{error ?? 'Error desconocido'}</p>
+          <button
+            onClick={() => router.push('/homepage')}
+            className="mt-6 px-6 py-3 bg-primary text-primary-foreground font-semibold rounded-lg"
+          >
+            Volver a la tienda
+          </button>
+        </div>
+      </div>
+    );
   }
 
   return (
     <div className="min-h-screen bg-background">
       <div className="max-w-[1400px] mx-auto px-4 lg:px-6 py-8 space-y-12">
-        {/* Product Main Section */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-          {/* Gallery */}
           <div className="lg:col-span-5">
-            <ProductGallery images={galleryImages} productName="Cámara POV 4K Mini" />
+            <ProductGallery images={galleryImages} productName={title} />
           </div>
 
-          {/* Product Info */}
           <div className="lg:col-span-4">
             <ProductInfo
-              name="Cámara POV 4K Mini - Pro"
-              model="Pro"
-              price={5490}
-              originalPrice={6990}
+              name={title}
+              model={product.model ?? ''}
+              price={Number(product.price)}
+              originalPrice={product.original_price ?? undefined}
               rating={4.8}
               reviewCount={127}
-              stockStatus="low-stock"
-              stockCount={8}
-              description="Filma en 4K lo que ven tus ojos. Cámara ultra compacta diseñada para creadores de contenido que buscan calidad profesional sin el precio de las marcas premium. Perfecta para vlogs, deportes extremos y grabación POV." />
-
+              stockStatus={stockStatus}
+              stockCount={stockCount}
+              description={desc}
+            />
           </div>
 
-          {/* Add to Cart */}
           <div className="lg:col-span-3">
             <AddToCartSection
-              productId="pov-pro"
-              productName="Cámara POV 4K Mini - Pro"
-              price={5490}
-              stockStatus="low-stock"
-              availableModels={availableModels} />
-
+              productId={product.id}
+              productName={title}
+              price={Number(product.price)}
+              stockStatus={stockStatus}
+              availableModels={[]}
+              onAddToCart={({ quantity }) => handleAddToCart({ quantity })}
+              onBuyNow={({ quantity }) => handleBuyNow({ quantity })}
+            />
           </div>
         </div>
 
-        {/* Specifications */}
         <ProductSpecs specifications={specifications} />
 
-        {/* Customer Reviews */}
-        <CustomerReviews
-          reviews={reviews}
-          averageRating={4.8}
-          totalReviews={127} />
+        <CustomerReviews reviews={reviews} averageRating={4.8} totalReviews={127} />
 
-
-        {/* Related Products */}
         <RelatedProducts products={relatedProducts} />
       </div>
-    </div>);
-
+    </div>
+  );
 }

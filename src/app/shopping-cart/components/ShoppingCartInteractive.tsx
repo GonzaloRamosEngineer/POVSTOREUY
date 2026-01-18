@@ -1,13 +1,14 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import CartItem from './CartItem';
 import OrderSummary from './OrderSummary';
 import EmptyCart from './EmptyCart';
 import PolicySection from './PolicySection';
 import StockAlert from './StockAlert';
+import { readCart, updateQty, removeItem, type CartItem as CartItemType } from '@/lib/cart';
 
-interface CartProduct {
+type CartProduct = {
   id: string;
   name: string;
   price: number;
@@ -15,36 +16,43 @@ interface CartProduct {
   image: string;
   alt: string;
   stock: number;
+};
+
+function toCartProduct(i: CartItemType): CartProduct {
+  return {
+    id: i.id,
+    name: i.name,
+    price: i.price,
+    quantity: i.quantity,
+    image: i.image,
+    alt: i.alt,
+    stock: i.stock ?? 99, // si no viene stock en carrito, no bloquees
+  };
 }
-
-const mockCartData: CartProduct[] = [
-{
-  id: '1',
-  name: 'Cámara POV 4K Básico',
-  price: 3500,
-  quantity: 1,
-  image: "https://images.unsplash.com/photo-1701120285912-889e5e4210ba",
-  alt: 'Cámara POV 4K compacta negra con lente gran angular sobre fondo blanco',
-  stock: 3
-},
-{
-  id: '2',
-  name: 'Cámara POV 4K Pro',
-  price: 5200,
-  quantity: 2,
-  image: "https://images.unsplash.com/photo-1614699582062-2c42cecdc792",
-  alt: 'Cámara POV 4K profesional plateada con pantalla táctil y accesorios incluidos',
-  stock: 8
-}];
-
 
 export default function ShoppingCartInteractive() {
   const [isHydrated, setIsHydrated] = useState(false);
-  const [cartItems, setCartItems] = useState<CartProduct[]>(mockCartData);
+  const [cartItems, setCartItems] = useState<CartProduct[]>([]);
 
   useEffect(() => {
     setIsHydrated(true);
+    setCartItems(readCart().map(toCartProduct));
   }, []);
+
+  const subtotal = useMemo(
+    () => cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0),
+    [cartItems]
+  );
+  const shipping = useMemo(() => (subtotal >= 2000 ? 0 : 250), [subtotal]);
+  const total = useMemo(() => subtotal + shipping, [subtotal, shipping]);
+  const itemCount = useMemo(
+    () => cartItems.reduce((sum, item) => sum + item.quantity, 0),
+    [cartItems]
+  );
+  const lowestStock = useMemo(
+    () => (cartItems.length ? Math.min(...cartItems.map((i) => i.stock)) : 99),
+    [cartItems]
+  );
 
   if (!isHydrated) {
     return (
@@ -61,27 +69,27 @@ export default function ShoppingCartInteractive() {
             </div>
           </div>
         </div>
-      </div>);
-
+      </div>
+    );
   }
 
   const handleQuantityChange = (id: string, newQuantity: number) => {
-    setCartItems((prevItems) =>
-    prevItems.map((item) =>
-    item.id === id ? { ...item, quantity: newQuantity } : item
-    )
+    // 1) estado UI
+    setCartItems((prev) =>
+      prev.map((it) => (it.id === id ? { ...it, quantity: newQuantity } : it))
     );
+
+    // 2) storage
+    updateQty(id, newQuantity);
   };
 
   const handleRemoveItem = (id: string) => {
-    setCartItems((prevItems) => prevItems.filter((item) => item.id !== id));
-  };
+    // 1) estado UI
+    setCartItems((prev) => prev.filter((it) => it.id !== id));
 
-  const subtotal = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
-  const shipping = subtotal >= 2000 ? 0 : 250;
-  const total = subtotal + shipping;
-  const itemCount = cartItems.reduce((sum, item) => sum + item.quantity, 0);
-  const lowestStock = Math.min(...cartItems.map((item) => item.stock));
+    // 2) storage
+    removeItem(id);
+  };
 
   if (cartItems.length === 0) {
     return (
@@ -89,14 +97,13 @@ export default function ShoppingCartInteractive() {
         <div className="max-w-[1400px] mx-auto px-4 lg:px-6 py-8">
           <EmptyCart />
         </div>
-      </div>);
-
+      </div>
+    );
   }
 
   return (
     <div className="min-h-screen bg-background">
       <div className="max-w-[1400px] mx-auto px-4 lg:px-6 py-8">
-        {/* Header */}
         <div className="mb-8">
           <h1 className="text-3xl lg:text-4xl font-heading font-bold text-foreground mb-2">
             Carrito de Compras
@@ -106,27 +113,23 @@ export default function ShoppingCartInteractive() {
           </p>
         </div>
 
-        {/* Stock Alert */}
-        {lowestStock <= 5 &&
-        <div className="mb-6">
+        {lowestStock <= 5 && (
+          <div className="mb-6">
             <StockAlert stock={lowestStock} />
           </div>
-        }
+        )}
 
-        {/* Main Content */}
         <div className="grid lg:grid-cols-3 gap-8">
-          {/* Cart Items */}
           <div className="lg:col-span-2 space-y-4">
-            {cartItems.map((item) =>
-            <CartItem
-              key={item.id}
-              {...item}
-              onQuantityChange={handleQuantityChange}
-              onRemove={handleRemoveItem} />
+            {cartItems.map((item) => (
+              <CartItem
+                key={item.id}
+                {...item}
+                onQuantityChange={handleQuantityChange}
+                onRemove={handleRemoveItem}
+              />
+            ))}
 
-            )}
-
-            {/* Policy Section - Mobile */}
             <div className="lg:hidden mt-8">
               <h2 className="text-xl font-heading font-semibold text-foreground mb-4">
                 Información Importante
@@ -135,18 +138,16 @@ export default function ShoppingCartInteractive() {
             </div>
           </div>
 
-          {/* Order Summary */}
           <div>
             <OrderSummary
               subtotal={subtotal}
               shipping={shipping}
               total={total}
-              itemCount={itemCount} />
-
+              itemCount={itemCount}
+            />
           </div>
         </div>
 
-        {/* Policy Section - Desktop */}
         <div className="hidden lg:block mt-12">
           <h2 className="text-2xl font-heading font-semibold text-foreground mb-6">
             Información Importante
@@ -154,6 +155,6 @@ export default function ShoppingCartInteractive() {
           <PolicySection />
         </div>
       </div>
-    </div>);
-
+    </div>
+  );
 }

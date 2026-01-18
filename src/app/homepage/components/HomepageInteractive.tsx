@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Header from '@/components/common/Header';
 import MarqueeBanner from './MarqueeBanner';
@@ -13,9 +13,18 @@ import TestimonialsSection from './TestimonialsSection';
 import NewsletterSection from './NewsletterSection';
 import SocialMediaSection from './SocialMediaSection';
 import FooterSection from './FooterSection';
+import { supabase } from '@/lib/supabaseClient';
+
+// ✅ carrito unificado (helper)
+import {
+  readCart,
+  upsertCartItem,
+  incrementItem,
+  type CartItem as CartItemType,
+} from '@/lib/cart';
 
 interface Product {
-  id: string;
+  id: string; // UUID
   name: string;
   price: number;
   originalPrice?: number;
@@ -26,65 +35,116 @@ interface Product {
   badge?: string;
 }
 
-interface CartItem {
-  id: string;
-  name: string;
-  price: number;
-  quantity: number;
-  image: string;
+function normalizeFeatures(v: unknown): string[] {
+  if (Array.isArray(v)) return v.filter(Boolean).map(String);
+  if (typeof v === 'string') {
+    try {
+      const parsed = JSON.parse(v);
+      if (Array.isArray(parsed)) return parsed.filter(Boolean).map(String);
+    } catch {
+      // ignore
+    }
+  }
+  return [];
+}
+
+function pickProductByType(products: Product[], type: 'basic' | 'pro'): Product | undefined {
+  const needles = type === 'basic' ? ['basico', 'básico', 'basic'] : ['pro', 'profesional'];
+
+  const byName = products.find((p) => needles.some((n) => p.name?.toLowerCase().includes(n)));
+  if (byName) return byName;
+
+  if (products.length === 0) return undefined;
+
+  if (type === 'pro') {
+    return [...products].sort((a, b) => (b.price ?? 0) - (a.price ?? 0))[0];
+  }
+  return [...products].sort((a, b) => (a.price ?? 0) - (b.price ?? 0))[0];
 }
 
 const HomepageInteractive = () => {
   const router = useRouter();
-  const [isHydrated, setIsHydrated] = useState(false);
-  const [cartItems, setCartItems] = useState<CartItem[]>([]);
 
+  // avoid localStorage before hydration
+  const [isHydrated, setIsHydrated] = useState(false);
+
+  // products
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loadingProducts, setLoadingProducts] = useState(true);
+  const [productsError, setProductsError] = useState<string | null>(null);
+
+  // cart
+  const [cartItems, setCartItems] = useState<CartItemType[]>([]);
+
+  // 1) hydration + cart load
   useEffect(() => {
     setIsHydrated(true);
-    const savedCart = localStorage.getItem('povstore_cart');
-    if (savedCart) {
-      setCartItems(JSON.parse(savedCart));
-    }
+    setCartItems(readCart());
   }, []);
 
-  const products: Product[] = [
-  {
-    id: 'pov-basico',
-    name: 'POV Básico',
-    price: 3990,
-    originalPrice: 5990,
-    image: "https://images.unsplash.com/photo-1589510881541-07f400e5f100",
-    alt: 'Compact black POV mini camera with 4K recording capability on white background',
-    features: [
-    'Grabación 4K Ultra HD',
-    'Batería 3 horas',
-    'Peso 45g ultra ligero',
-    'Resistencia IPX4',
-    'Estabilización digital'],
+  // 2) load products
+  useEffect(() => {
+    let mounted = true;
 
-    stockCount: 3,
-    badge: 'MÁS VENDIDO'
-  },
-  {
-    id: 'pov-pro',
-    name: 'POV Pro',
-    price: 5990,
-    originalPrice: 8990,
-    image: "https://images.unsplash.com/photo-1643110496205-b28072026c62",
-    alt: 'Premium black POV Pro camera with advanced stabilization and extended battery on dark surface',
-    features: [
-    'Grabación 4K 60fps',
-    'Batería 5 horas extendida',
-    'Peso 50g',
-    'Resistencia IPX6',
-    'Estabilización avanzada',
-    'Modo nocturno mejorado'],
+    const loadProducts = async () => {
+      setLoadingProducts(true);
+      setProductsError(null);
 
-    stockCount: 5,
-    badge: 'PROFESIONAL'
-  }];
+      const { data, error } = await supabase
+        .from('products')
+        .select(
+          'id,name,model,description,price,original_price,image_url,stock_count,features,badge,is_active,created_at'
+        )
+        .eq('is_active', true)
+        .order('created_at', { ascending: false });
 
-  const totalStock = products.reduce((sum, p) => sum + p.stockCount, 0);
+      if (!mounted) return;
+
+      if (error) {
+        console.error('Error loading products:', error);
+        setProducts([]);
+        setProductsError(error.message || 'Error cargando productos desde Supabase.');
+        setLoadingProducts(false);
+        return;
+      }
+
+      const mapped: Product[] = (data ?? []).map((p: any) => ({
+        id: p.id,
+        name: p.name,
+        price: Number(p.price),
+        originalPrice: p.original_price != null ? Number(p.original_price) : undefined,
+        image: p.image_url,
+        alt: `${p.name} ${p.model ?? ''}`.trim(),
+        features: normalizeFeatures(p.features),
+        stockCount: Number(p.stock_count ?? 0),
+        badge: p.badge ?? undefined,
+      }));
+
+      setProducts(mapped);
+      setLoadingProducts(false);
+    };
+
+    loadProducts();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const totalStock = useMemo(
+    () => products.reduce((sum, p) => sum + (Number.isFinite(p.stockCount) ? p.stockCount : 0), 0),
+    [products]
+  );
+
+  const basicProduct = useMemo(() => pickProductByType(products, 'basic'), [products]);
+  const proProduct = useMemo(() => pickProductByType(products, 'pro'), [products]);
+
+  const basicStock = basicProduct?.stockCount ?? 0;
+  const proStock = proProduct?.stockCount ?? 0;
+
+  const refreshCartState = () => {
+    setCartItems(readCart());
+  };
 
   const handleAddToCart = (productId: string) => {
     if (!isHydrated) return;
@@ -92,28 +152,28 @@ const HomepageInteractive = () => {
     const product = products.find((p) => p.id === productId);
     if (!product) return;
 
-    const existingItem = cartItems.find((item) => item.id === productId);
-    let updatedCart: CartItem[];
+    const existing = cartItems.find((i) => i.id === productId);
 
-    if (existingItem) {
-      updatedCart = cartItems.map((item) =>
-      item.id === productId ? { ...item, quantity: item.quantity + 1 } : item
-      );
-    } else {
-      updatedCart = [
-      ...cartItems,
-      {
-        id: product.id,
-        name: product.name,
-        price: product.price,
-        quantity: 1,
-        image: product.image
-      }];
+    // opcional: si querés bloquear cuando no hay stock
+    if ((product.stockCount ?? 0) <= 0) return;
 
+    if (existing) {
+      incrementItem(productId, 1);
+      refreshCartState();
+      return;
     }
 
-    setCartItems(updatedCart);
-    localStorage.setItem('povstore_cart', JSON.stringify(updatedCart));
+    upsertCartItem({
+      id: product.id,
+      name: product.name,
+      price: product.price,
+      quantity: 1,
+      image: product.image,
+      alt: product.alt,
+      stock: product.stockCount,
+    });
+
+    refreshCartState();
   };
 
   const handleViewDetails = (productId: string) => {
@@ -122,65 +182,19 @@ const HomepageInteractive = () => {
 
   const handleHeroCtaClick = () => {
     const productsSection = document.getElementById('productos');
-    if (productsSection) {
-      productsSection.scrollIntoView({ behavior: 'smooth' });
-    }
+    if (productsSection) productsSection.scrollIntoView({ behavior: 'smooth' });
   };
-
-  if (!isHydrated) {
-    return (
-      <div className="min-h-screen bg-gray-950">
-        <Header cartItems={[]} />
-        <main>
-          <MarqueeBanner />
-          <HeroSection onCtaClick={() => {}} basicStock={3} proStock={5} />
-          <section id="productos" className="py-16 px-4 bg-gray-950">
-            <div className="max-w-7xl mx-auto">
-              <div className="text-center mb-12">
-                <h2 className="text-4xl md:text-5xl font-heading font-bold text-foreground mb-4">
-                  Nuestros Modelos
-                </h2>
-                <p className="text-lg text-muted-foreground">
-                  Elegí la cámara perfecta para tu estilo de creación
-                </p>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                {products.map((product) =>
-                <ProductCard
-                  key={product.id}
-                  {...product}
-                  onAddToCart={() => {}}
-                  onViewDetails={() => {}} />
-
-                )}
-              </div>
-            </div>
-          </section>
-          <ComparisonTable />
-          <TargetAudienceSection />
-          <TestimonialsSection />
-          <NewsletterSection />
-          <SocialMediaSection />
-          <FooterSection />
-        </main>
-      </div>);
-
-  }
 
   return (
     <div className="min-h-screen bg-gray-950">
-      <Header cartItems={cartItems} />
+      <Header cartItems={isHydrated ? cartItems : []} />
+
       <main>
         <MarqueeBanner />
-        <HeroSection 
-          onCtaClick={handleHeroCtaClick} 
-          basicStock={products[0].stockCount}
-          proStock={products[1].stockCount}
-        />
-        <MobileStickyCTA 
-          onCtaClick={handleHeroCtaClick}
-          totalStock={totalStock}
-        />
+
+        <HeroSection onCtaClick={handleHeroCtaClick} basicStock={basicStock} proStock={proStock} />
+
+        <MobileStickyCTA onCtaClick={handleHeroCtaClick} totalStock={totalStock} />
 
         <section id="productos" className="py-16 px-4 bg-gray-950">
           <div className="max-w-7xl mx-auto">
@@ -193,16 +207,41 @@ const HomepageInteractive = () => {
               </p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              {products.map((product) =>
-              <ProductCard
-                key={product.id}
-                {...product}
-                onAddToCart={handleAddToCart}
-                onViewDetails={handleViewDetails} />
-
-              )}
-            </div>
+            {loadingProducts ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div className="rounded-2xl border border-white/10 bg-white/5 h-[520px]" />
+                <div className="rounded-2xl border border-white/10 bg-white/5 h-[520px]" />
+              </div>
+            ) : productsError ? (
+              <div className="rounded-2xl border border-red-500/20 bg-red-500/5 p-8 text-center">
+                <p className="text-red-200 font-medium">No se pudieron cargar los productos.</p>
+                <p className="text-red-200/80 mt-2 text-sm">{productsError}</p>
+                <p className="text-muted-foreground mt-4 text-sm">
+                  Tip rápido: revisá que{' '}
+                  <span className="font-medium">NEXT_PUBLIC_SUPABASE_URL</span> sea el dominio real
+                  de tu proyecto (no “xxxxx”) y reiniciá el dev server.
+                </p>
+              </div>
+            ) : products.length === 0 ? (
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-8 text-center">
+                <p className="text-muted-foreground">No hay productos activos para mostrar.</p>
+                <p className="text-muted-foreground mt-2 text-sm">
+                  Verificá en Supabase que existan productos con{' '}
+                  <span className="font-medium">is_active = true</span>.
+                </p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                {products.map((product) => (
+                  <ProductCard
+                    key={product.id}
+                    {...product}
+                    onAddToCart={handleAddToCart}
+                    onViewDetails={handleViewDetails}
+                  />
+                ))}
+              </div>
+            )}
           </div>
         </section>
 
@@ -213,8 +252,8 @@ const HomepageInteractive = () => {
         <SocialMediaSection />
         <FooterSection />
       </main>
-    </div>);
-
+    </div>
+  );
 };
 
 export default HomepageInteractive;
