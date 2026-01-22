@@ -13,7 +13,8 @@ import TestimonialsSection from './TestimonialsSection';
 import NewsletterSection from './NewsletterSection';
 import SocialMediaSection from './SocialMediaSection';
 import FooterSection from './FooterSection';
-import { supabase } from '@/lib/supabaseClient';
+import { getSupabaseBrowserClient } from '@/lib/supabaseClient';
+
 
 // ✅ carrito unificado (helper)
 import {
@@ -64,6 +65,8 @@ function pickProductByType(products: Product[], type: 'basic' | 'pro'): Product 
 
 const HomepageInteractive = () => {
   const router = useRouter();
+
+    const supabase = useMemo(() => getSupabaseBrowserClient(), []);
 
   // avoid localStorage before hydration
   const [isHydrated, setIsHydrated] = useState(false);

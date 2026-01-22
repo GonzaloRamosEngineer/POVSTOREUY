@@ -8,7 +8,7 @@ import ProductSpecs from './ProductSpecs';
 import AddToCartSection from './AddToCartSection';
 import CustomerReviews from './CustomerReviews';
 import RelatedProducts from './RelatedProducts';
-import { supabase } from '@/lib/supabaseClient';
+import { getSupabaseBrowserClient } from '@/lib/supabaseClient';
 import { upsertCartItem, incrementItem, readCart } from '@/lib/cart';
 
 interface GalleryImage {
@@ -73,6 +73,8 @@ export default function ProductDetailsInteractive() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const productId = searchParams.get('id'); // <- UUID real
+
+  const supabase = useMemo(() => getSupabaseBrowserClient(), []);
 
   const [isHydrated, setIsHydrated] = useState(false);
 
