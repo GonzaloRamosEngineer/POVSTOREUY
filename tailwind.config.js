@@ -18,60 +18,61 @@ module.exports = {
     },
     extend: {
       colors: {
-        border: "var(--color-border)", /* slate-600 */
-        input: "var(--color-input)", /* slate-700 */
-        ring: "var(--color-ring)", /* cyan-500 */
-        background: "var(--color-background)", /* near-black */
-        foreground: "var(--color-foreground)", /* slate-50 */
+        border: "var(--color-border)",
+        input: "var(--color-input)",
+        ring: "var(--color-ring)",
+        background: "var(--color-background)",
+        foreground: "var(--color-foreground)",
         primary: {
-          DEFAULT: "var(--color-primary)", /* cyan-500 */
-          foreground: "var(--color-primary-foreground)", /* white */
+          DEFAULT: "var(--color-primary)", /* Ahora es ROJO */
+          foreground: "var(--color-primary-foreground)",
         },
         secondary: {
-          DEFAULT: "var(--color-secondary)", /* slate-500 */
-          foreground: "var(--color-secondary-foreground)", /* white */
+          DEFAULT: "var(--color-secondary)",
+          foreground: "var(--color-secondary-foreground)",
         },
         destructive: {
-          DEFAULT: "var(--color-destructive)", /* red-500 */
-          foreground: "var(--color-destructive-foreground)", /* white */
+          DEFAULT: "var(--color-destructive)",
+          foreground: "var(--color-destructive-foreground)",
         },
         muted: {
-          DEFAULT: "var(--color-muted)", /* slate-700 */
-          foreground: "var(--color-muted-foreground)", /* slate-400 */
+          DEFAULT: "var(--color-muted)",
+          foreground: "var(--color-muted-foreground)",
         },
         accent: {
-          DEFAULT: "var(--color-accent)", /* amber-500 */
-          foreground: "var(--color-accent-foreground)", /* gray-800 */
+          DEFAULT: "var(--color-accent)",
+          foreground: "var(--color-accent-foreground)",
         },
         popover: {
-          DEFAULT: "var(--color-popover)", /* slate-800 */
-          foreground: "var(--color-popover-foreground)", /* slate-100 */
+          DEFAULT: "var(--color-popover)",
+          foreground: "var(--color-popover-foreground)",
         },
         card: {
-          DEFAULT: "var(--color-card)", /* slate-800 */
-          foreground: "var(--color-card-foreground)", /* slate-100 */
+          DEFAULT: "var(--color-card)",
+          foreground: "var(--color-card-foreground)",
         },
         success: {
-          DEFAULT: "var(--color-success)", /* emerald-500 */
-          foreground: "var(--color-success-foreground)", /* white */
+          DEFAULT: "var(--color-success)",
+          foreground: "var(--color-success-foreground)",
         },
         warning: {
-          DEFAULT: "var(--color-warning)", /* amber-500 */
-          foreground: "var(--color-warning-foreground)", /* gray-800 */
+          DEFAULT: "var(--color-warning)",
+          foreground: "var(--color-warning-foreground)",
         },
         error: {
-          DEFAULT: "var(--color-error)", /* red-500 */
-          foreground: "var(--color-error-foreground)", /* white */
+          DEFAULT: "var(--color-error)",
+          foreground: "var(--color-error-foreground)",
         },
-        'neon-cyan': '#22D3EE',
-        'neon-lime': '#84CC16',
-        'neon-orange': '#FB923C',
+        /* COLORES DE MARCA ESPECIFICOS */
+        'brand-red': '#DC2626',
+        'neon-red': '#EF4444', /* Usar para bordes brillantes */
+        'dark-gray': '#09090b',
       },
       borderRadius: {
-        lg: "var(--radius-lg)", /* 18px */
-        md: "var(--radius-md)", /* 12px */
-        sm: "var(--radius-sm)", /* 6px */
-        xl: "var(--radius-xl)", /* 24px */
+        lg: "var(--radius-lg)",
+        md: "var(--radius-md)",
+        sm: "var(--radius-sm)",
+        xl: "var(--radius-xl)",
       },
       fontFamily: {
         heading: ["var(--font-heading)"],
@@ -89,11 +90,11 @@ module.exports = {
         'caption': ['0.875rem', { lineHeight: '1.45', letterSpacing: '0.025em' }],
       },
       spacing: {
-        'xs': 'var(--spacing-xs)', /* 8px */
-        'sm': 'var(--spacing-sm)', /* 16px */
-        'md': 'var(--spacing-md)', /* 24px */
-        'lg': 'var(--spacing-lg)', /* 32px */
-        'xl': 'var(--spacing-xl)', /* 80px */
+        'xs': 'var(--spacing-xs)',
+        'sm': 'var(--spacing-sm)',
+        'md': 'var(--spacing-md)',
+        'lg': 'var(--spacing-lg)',
+        'xl': 'var(--spacing-xl)',
       },
       boxShadow: {
         'sm': 'var(--shadow-sm)',
@@ -114,11 +115,16 @@ module.exports = {
           "0%, 100%": { opacity: "1" },
           "50%": { opacity: "0.8" },
         },
+        "glow-pulse": { /* Nueva animación para el botón de compra */
+          "0%, 100%": { boxShadow: "0 0 20px rgba(239, 68, 68, 0.5)" },
+          "50%": { boxShadow: "0 0 30px rgba(239, 68, 68, 0.8)" },
+        }
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
         "pulse-subtle": "pulse-subtle 2s cubic-bezier(0.4, 0, 0.6, 1) infinite",
+        "glow-pulse": "glow-pulse 2s infinite",
       },
       transitionTimingFunction: {
         'smooth': 'cubic-bezier(0.4, 0, 0.2, 1)',

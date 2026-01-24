@@ -9,76 +9,107 @@
 
 @layer base {
   :root {
-    /* Background Colors - Charcoal/Near-Black Theme */
-    --color-background: #0A0A0A; /* near-black - Deep canvas reducing eye strain */
-    --color-foreground: #F8FAFC; /* slate-50 - Maximum readability on dark backgrounds */
+    /* --- MODO CLARO (Limpio y Corporativo) --- */
+    /* Fondo muy limpio para que el logo negro/rojo destaque */
+    --color-background: #ffffff; 
+    --color-foreground: #09090b; /* Zinc 950 - Negro casi puro */
     
     /* Surface Colors */
-    --color-card: #1A1A1A; /* charcoal - Elevated component backgrounds */
-    --color-card-foreground: #F1F5F9; /* slate-100 - On-surface text */
-    --color-popover: #1A1A1A; /* charcoal - Popover backgrounds */
-    --color-popover-foreground: #F1F5F9; /* slate-100 - Popover text */
+    --color-card: #f4f4f5; /* Zinc 100 */
+    --color-card-foreground: #09090b;
+    --color-popover: #ffffff;
+    --color-popover-foreground: #09090b;
     
-    /* Primary Brand Colors - Electric Cyan */
-    --color-primary: #06B6D4; /* cyan-500 - Electric confidence inspiring immediate action */
-    --color-primary-foreground: #FFFFFF; /* white - High contrast on primary */
+    /* --- PRIMARY BRAND COLOR: POV RED --- */
+    /* Este es el rojo exacto para incitar a la acción y combinar con el logo */
+    --color-primary: #DC2626; /* Red 600 - Rojo sólido profesional */
+    --color-primary-foreground: #FFFFFF; 
     
     /* Secondary Colors */
-    --color-secondary: #64748B; /* slate-500 - Professional restraint balancing primary energy */
-    --color-secondary-foreground: #FFFFFF; /* white - Clear contrast */
+    --color-secondary: #f4f4f5; /* Zinc 100 */
+    --color-secondary-foreground: #18181b; 
     
-    /* Accent Colors */
-    --color-accent: #F59E0B; /* amber-500 - Urgency and premium positioning */
-    --color-accent-foreground: #1F2937; /* gray-800 - Dark text on accent */
+    /* Accent Colors (Para ofertas o destaques) */
+    --color-accent: #18181b; /* Negro fuerte para contrastar con el rojo */
+    --color-accent-foreground: #ffffff; 
     
     /* Muted Colors */
-    --color-muted: #334155; /* slate-700 - Subtle backgrounds */
-    --color-muted-foreground: #94A3B8; /* slate-400 - Supporting information with clear hierarchy */
+    --color-muted: #f4f4f5;
+    --color-muted-foreground: #71717a; /* Zinc 500 */
     
     /* Border & Input */
-    --color-border: #475569; /* slate-600 - Minimal borders */
-    --color-input: #334155; /* slate-700 - Input backgrounds */
-    --color-ring: #06B6D4; /* cyan-500 - Focus ring color */
+    --color-border: #e4e4e7; /* Zinc 200 */
+    --color-input: #e4e4e7;
+    --color-ring: #DC2626; /* El anillo de enfoque ahora es rojo */
     
     /* Semantic Colors */
-    --color-success: #10B981; /* emerald-500 - Purchase confirmation and positive states */
-    --color-success-foreground: #FFFFFF; /* white */
-    --color-warning: #F59E0B; /* amber-500 - Stock scarcity and attention */
-    --color-warning-foreground: #1F2937; /* gray-800 */
-    --color-error: #EF4444; /* red-500 - Form validation and critical issues */
-    --color-error-foreground: #FFFFFF; /* white */
-    --color-destructive: #EF4444; /* red-500 - Destructive actions */
-    --color-destructive-foreground: #FFFFFF; /* white */
+    --color-success: #16a34a; /* Green 600 */
+    --color-success-foreground: #FFFFFF;
+    --color-warning: #ea580c; /* Orange 600 */
+    --color-warning-foreground: #FFFFFF;
+    --color-error: #ef4444; /* Red 500 */
+    --color-error-foreground: #FFFFFF;
+    --color-destructive: #ef4444;
+    --color-destructive-foreground: #FFFFFF;
     
-    /* Neon Accent Colors - For Urgency Elements */
-    --color-neon-cyan: #22D3EE; /* cyan-400 - Bright electric cyan */
-    --color-neon-lime: #84CC16; /* lime-500 - Neon lime accent */
-    --color-neon-orange: #FB923C; /* orange-400 - Neon orange accent */
-    
-    /* Typography Scale */
-    --font-heading: 'Outfit', sans-serif;
-    --font-body: 'Inter', sans-serif;
+    /* --- CONFIGURACIONES GLOBALES --- */
+    --font-heading: 'Outfit', sans-serif; /* Geométrica, igual que tu logo POV */
+    --font-body: 'Inter', sans-serif; /* Lectura perfecta */
     --font-caption: 'Source Sans 3', sans-serif;
     --font-mono: 'JetBrains Mono', monospace;
     
-    /* Spacing Scale (8px base) */
-    --spacing-xs: 0.5rem; /* 8px */
-    --spacing-sm: 1rem; /* 16px */
-    --spacing-md: 1.5rem; /* 24px */
-    --spacing-lg: 2rem; /* 32px */
-    --spacing-xl: 5rem; /* 80px */
+    /* Spacing Scale */
+    --spacing-xs: 0.5rem;
+    --spacing-sm: 1rem;
+    --spacing-md: 1.5rem;
+    --spacing-lg: 2rem;
+    --spacing-xl: 5rem;
     
-    /* Border Radius Scale */
-    --radius-sm: 0.375rem; /* 6px */
-    --radius-md: 0.75rem; /* 12px */
-    --radius-lg: 1.125rem; /* 18px */
-    --radius-xl: 1.5rem; /* 24px */
+    /* Border Radius - Ligeramente más cuadrado para tech, pero amigable */
+    --radius-sm: 0.5rem;   /* 8px */
+    --radius-md: 0.75rem;  /* 12px */
+    --radius-lg: 1rem;     /* 16px */
+    --radius-xl: 1.5rem;   /* 24px */
     
-    /* Shadow System */
-    --shadow-sm: 0 2px 4px rgba(15, 23, 42, 0.3);
-    --shadow-md: 0 4px 8px rgba(15, 23, 42, 0.4);
-    --shadow-lg: 0 8px 16px rgba(15, 23, 42, 0.5);
-    --shadow-xl: 0 20px 40px -8px rgba(15, 23, 42, 0.6);
+    /* Shadows */
+    --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+    --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+    --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+    --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+  }
+
+  /* --- MODO OSCURO: TECH NOIR (Aquí ocurre la magia) --- */
+  .dark {
+    /* Background: Negro Profundo (Evitamos el azul, vamos al neutro oscuro) */
+    --color-background: #09090b; /* Zinc 950 - Elegancia pura */
+    --color-foreground: #fafafa; /* Zinc 50 */
+    
+    /* Surface Colors */
+    --color-card: #18181b; /* Zinc 900 */
+    --color-card-foreground: #fafafa;
+    --color-popover: #18181b;
+    --color-popover-foreground: #fafafa;
+    
+    /* Primary: ROJO NEÓN (Vibra sobre el negro) */
+    --color-primary: #ef4444; /* Red 500 - Más brillante para modo oscuro */
+    --color-primary-foreground: #ffffff; /* Texto blanco para máximo contraste */
+    
+    /* Secondary */
+    --color-secondary: #27272a; /* Zinc 800 */
+    --color-secondary-foreground: #fafafa;
+    
+    /* Accent */
+    --color-accent: #ffffff; /* Blanco puro para detalles premium */
+    --color-accent-foreground: #09090b;
+    
+    /* Muted */
+    --color-muted: #27272a;
+    --color-muted-foreground: #a1a1aa;
+    
+    /* Border & Input */
+    --color-border: #27272a; /* Bordes sutiles */
+    --color-input: #27272a;
+    --color-ring: #ef4444; /* Red 500 */
   }
   
   * {
@@ -88,10 +119,13 @@
   body {
     @apply bg-background text-foreground font-body;
     font-feature-settings: "rlig" 1, "calt" 1;
+    /* Suavizado de fuentes para look premium en Apple/Windows */
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
   
   h1, h2, h3, h4, h5, h6 {
-    @apply font-heading;
+    @apply font-heading tracking-tight; /* tracking-tight hace los títulos más modernos */
   }
 }
 
@@ -103,8 +137,9 @@
   .transition-smooth {
     transition: all 250ms cubic-bezier(0.4, 0, 0.2, 1);
   }
-.focus-ring  {
-    @apply focus:outline-none focus:ring-primary focus:ring-offset-2 focus:ring-offset-background;
+
+  .focus-ring  {
+    @apply focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background;
   }
   
   .card-elevation {
@@ -113,20 +148,25 @@
   
   .card-elevation-hover {
     box-shadow: var(--shadow-lg);
-    transform: translateY(-1px);
+    transform: translateY(-2px); /* Un poco más de movimiento para sentir "feedback" */
+    transition: all 0.2s ease-out;
   }
   
-  /* Neon Glow Effects */
+  /* --- EFECTOS DE NEÓN ROJO (Ajustados para el logo POV) --- */
+  /* Reemplazamos los azules cyan por ROJOS (RGB: 239, 68, 68) */
+  
   .shadow-neon-glow {
-    box-shadow: 0 0 20px rgba(34, 211, 238, 0.3), 0 0 40px rgba(34, 211, 238, 0.1);
+    /* Resplandor rojo sutil */
+    box-shadow: 0 0 20px rgba(239, 68, 68, 0.25), 0 0 40px rgba(239, 68, 68, 0.1);
   }
   
   .shadow-neon-glow-strong {
-    box-shadow: 0 0 30px rgba(34, 211, 238, 0.5), 0 0 60px rgba(34, 211, 238, 0.2);
+    /* Resplandor rojo intenso para el botón de COMPRAR */
+    box-shadow: 0 0 30px rgba(239, 68, 68, 0.4), 0 0 60px rgba(239, 68, 68, 0.2);
   }
   
   .drop-shadow-glow {
-    filter: drop-shadow(0 0 8px rgba(34, 211, 238, 0.5));
+    filter: drop-shadow(0 0 8px rgba(239, 68, 68, 0.5));
   }
   
   /* Background Effects */
@@ -134,18 +174,15 @@
     background: radial-gradient(circle at center, var(--tw-gradient-stops));
   }
   
+  /* Ruido sutil para textura "High Tech" */
   .bg-noise {
-    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' /%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' /%3E%3C/svg%3E");
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitches='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.05'/%3E%3C/svg%3E");
   }
   
   /* Animations */
   @keyframes marquee {
-    0% {
-      transform: translateX(0);
-    }
-    100% {
-      transform: translateX(-50%);
-    }
+    0% { transform: translateX(0); }
+    100% { transform: translateX(-50%); }
   }
   
   .animate-marquee {
@@ -153,17 +190,11 @@
   }
   
   @keyframes fade-in {
-    from {
-      opacity: 0;
-      transform: translateY(20px);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
   }
   
   .animate-fade-in {
-    animation: fade-in 0.8s ease-out forwards;
+    animation: fade-in 0.6s ease-out forwards;
   }
 }
