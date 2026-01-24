@@ -1,46 +1,63 @@
 'use client';
 
-
-
 const MarqueeBanner = () => {
   return (
-    <div className="relative w-full bg-gradient-to-r from-neon-lime via-neon-orange to-neon-lime overflow-hidden py-2">
+    /* CAMBIO: Fondo Primary (Rojo) y texto blanco para máxima alerta */
+    <div className="relative w-full bg-primary overflow-hidden py-2.5 shadow-neon-glow">
       <div className="flex animate-marquee whitespace-nowrap">
-        <div className="flex items-center gap-8 px-8">
+        {/* Bloque 1 */}
+        <div className="flex items-center gap-12 px-8">
           <div className="flex items-center gap-2">
-            <span className="text-lg">🔥</span>
-            <span className="text-sm font-bold text-gray-900">ÚLTIMAS UNIDADES EN URUGUAY</span>
+            <span className="text-xl">🔥</span>
+            <span className="text-sm font-bold text-primary-foreground tracking-wide">
+              ÚLTIMAS UNIDADES EN URUGUAY
+            </span>
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-lg">🚚</span>
-            <span className="text-sm font-bold text-gray-900">Entrega estimada 19/01</span>
+            <span className="text-xl">🚚</span>
+            <span className="text-sm font-bold text-primary-foreground tracking-wide">
+              ENVÍO GRATIS A TODO EL PAÍS
+            </span>
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-lg">⚡</span>
-            <span className="text-sm font-bold text-gray-900">POV 4K hands-free</span>
+            <span className="text-xl">⚡</span>
+            <span className="text-sm font-bold text-primary-foreground tracking-wide">
+              POV 4K HANDS-FREE
+            </span>
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-lg">✅</span>
-            <span className="text-sm font-bold text-gray-900">MercadoPago</span>
+            <span className="text-xl">💳</span>
+            <span className="text-sm font-bold text-primary-foreground tracking-wide">
+              12 CUOTAS SIN RECARGO
+            </span>
           </div>
         </div>
-        {/* Duplicate for seamless loop */}
-        <div className="flex items-center gap-8 px-8">
+
+        {/* Bloque 2 (Duplicado para el loop infinito) */}
+        <div className="flex items-center gap-12 px-8">
           <div className="flex items-center gap-2">
-            <span className="text-lg">🔥</span>
-            <span className="text-sm font-bold text-gray-900">ÚLTIMAS UNIDADES EN URUGUAY</span>
+            <span className="text-xl">🔥</span>
+            <span className="text-sm font-bold text-primary-foreground tracking-wide">
+              ÚLTIMAS UNIDADES EN URUGUAY
+            </span>
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-lg">🚚</span>
-            <span className="text-sm font-bold text-gray-900">Entrega estimada 19/01</span>
+            <span className="text-xl">🚚</span>
+            <span className="text-sm font-bold text-primary-foreground tracking-wide">
+              ENVÍO GRATIS A TODO EL PAÍS
+            </span>
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-lg">⚡</span>
-            <span className="text-sm font-bold text-gray-900">POV 4K hands-free</span>
+            <span className="text-xl">⚡</span>
+            <span className="text-sm font-bold text-primary-foreground tracking-wide">
+              POV 4K HANDS-FREE
+            </span>
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-lg">✅</span>
-            <span className="text-sm font-bold text-gray-900">MercadoPago</span>
+            <span className="text-xl">💳</span>
+            <span className="text-sm font-bold text-primary-foreground tracking-wide">
+              12 CUOTAS SIN RECARGO
+            </span>
           </div>
         </div>
       </div>
