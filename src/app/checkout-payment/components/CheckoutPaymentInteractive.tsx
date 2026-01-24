@@ -37,9 +37,18 @@ interface CustomerInfo {
   postalCode: string;
 }
 
-function isCustomerInfoValid(ci: CustomerInfo) {
-  // mínimo viable (podés endurecerlo después)
-  return Boolean(ci.email && ci.fullName && ci.phone && ci.address && ci.city && ci.department);
+type DeliveryMethod = 'delivery' | 'pickup';
+
+const PICKUP_ADDRESS =
+  'José Enrique Rodó 2219, 11200 Montevideo, Departamento de Montevideo';
+
+function isCustomerInfoValid(ci: CustomerInfo, method: DeliveryMethod) {
+  const baseOk = Boolean(ci.email && ci.fullName && ci.phone);
+  if (!baseOk) return false;
+
+  if (method === 'pickup') return true;
+
+  return Boolean(ci.address && ci.city && ci.department);
 }
 
 export default function CheckoutPaymentInteractive() {
@@ -48,6 +57,7 @@ export default function CheckoutPaymentInteractive() {
   const [isHydrated, setIsHydrated] = useState(false);
   const [isSummaryExpanded, setIsSummaryExpanded] = useState(false);
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<'mercadopago' | 'bank_transfer'>('mercadopago');
+  const [deliveryMethod, setDeliveryMethod] = useState<DeliveryMethod>('delivery');
   const [isProcessing, setIsProcessing] = useState(false);
 
   const [cart, setCart] = useState<CartItemType[]>([]);
@@ -83,7 +93,11 @@ export default function CheckoutPaymentInteractive() {
     [orderItems]
   );
 
-  const shipping = subtotal >= 2000 ? 0 : 250;
+  const shipping = useMemo(() => {
+    if (deliveryMethod === 'pickup') return 0;
+    return subtotal >= 2000 ? 0 : 250;
+  }, [deliveryMethod, subtotal]);
+
   const total = subtotal + shipping;
 
   const referenceNumber = useMemo(() => {
@@ -118,12 +132,14 @@ export default function CheckoutPaymentInteractive() {
         customerInfo,
         items: cart.map((i) => ({ id: i.id, quantity: i.quantity })),
         paymentMethod: selectedPaymentMethod,
+        deliveryMethod,
       }),
     });
 
     const data = await res.json();
     if (!res.ok) throw new Error(data?.error || 'create-order failed');
-    return data as { ok: true; orderId: string; referenceNumber: string; total: number };
+
+    return data as { ok: true; orderId: string; orderNumber: string; total: number };
   }
 
   async function createMpPreference(orderId: string) {
@@ -135,6 +151,7 @@ export default function CheckoutPaymentInteractive() {
 
     const data = await res.json();
     if (!res.ok) throw new Error(data?.error || 'mp-preference failed');
+
     return data as { ok: true; initPoint?: string; sandboxInitPoint?: string };
   }
 
@@ -145,8 +162,8 @@ export default function CheckoutPaymentInteractive() {
         return;
       }
 
-      if (!isCustomerInfoValid(customerInfo)) {
-        alert('Completá tus datos de contacto y envío antes de pagar.');
+      if (!isCustomerInfoValid(customerInfo, deliveryMethod)) {
+        alert('Completá tus datos de contacto antes de pagar.');
         return;
       }
 
@@ -161,7 +178,6 @@ export default function CheckoutPaymentInteractive() {
       const url = pref.initPoint || pref.sandboxInitPoint;
       if (!url) throw new Error('No initPoint returned by MercadoPago');
 
-      // ⚠️ No limpiamos el carrito acá (más seguro limpiarlo al confirmar pago)
       window.location.href = url;
     } catch (e: any) {
       console.error(e);
@@ -177,8 +193,8 @@ export default function CheckoutPaymentInteractive() {
         return;
       }
 
-      if (!isCustomerInfoValid(customerInfo)) {
-        alert('Completá tus datos de contacto y envío antes de confirmar.');
+      if (!isCustomerInfoValid(customerInfo, deliveryMethod)) {
+        alert('Completá tus datos de contacto antes de confirmar.');
         return;
       }
 
@@ -186,7 +202,7 @@ export default function CheckoutPaymentInteractive() {
 
       const created = await createOrder();
 
-      // para transferencia: dejamos pedido pending y vaciamos carrito
+      // transferencia: dejamos pending y vaciamos carrito
       clearCart();
 
       router.push(`/order-confirmation?orderId=${created.orderId}&status=pending`);
@@ -239,7 +255,57 @@ export default function CheckoutPaymentInteractive() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
           <div className="lg:col-span-2 space-y-6">
             <div className="bg-card rounded-lg border border-border p-6">
-              <CustomerInfoForm onUpdate={handleCustomerInfoUpdate} initialData={customerInfo} />
+              <CustomerInfoForm
+                onUpdate={handleCustomerInfoUpdate}
+                initialData={customerInfo}
+                deliveryMethod={deliveryMethod}
+                pickupAddress={PICKUP_ADDRESS}
+              />
+            </div>
+
+            {/* Método de entrega */}
+            <div className="bg-card rounded-lg border border-border p-6">
+              <div className="flex items-center justify-between gap-4 flex-wrap">
+                <div>
+                  <p className="text-sm font-medium text-foreground">Método de entrega</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Elegí envío a domicilio o retiro sin costo
+                  </p>
+                </div>
+
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setDeliveryMethod('delivery')}
+                    className={`px-4 py-2 rounded-md border transition-smooth ${
+                      deliveryMethod === 'delivery'
+                        ? 'bg-primary text-primary-foreground border-primary'
+                        : 'bg-transparent text-foreground border-border hover:bg-muted'
+                    }`}
+                  >
+                    Envío a domicilio
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setDeliveryMethod('pickup')}
+                    className={`px-4 py-2 rounded-md border transition-smooth ${
+                      deliveryMethod === 'pickup'
+                        ? 'bg-primary text-primary-foreground border-primary'
+                        : 'bg-transparent text-foreground border-border hover:bg-muted'
+                    }`}
+                  >
+                    Retiro en local
+                  </button>
+                </div>
+              </div>
+
+              {deliveryMethod === 'pickup' && (
+                <div className="mt-4 p-4 rounded-lg bg-muted">
+                  <p className="text-sm font-medium text-foreground">Dirección de retiro</p>
+                  <p className="text-xs text-muted-foreground mt-1">{PICKUP_ADDRESS}</p>
+                </div>
+              )}
             </div>
 
             <div className="bg-card rounded-lg border border-border p-6">
@@ -268,6 +334,8 @@ export default function CheckoutPaymentInteractive() {
                 total={total}
                 isExpanded={isSummaryExpanded}
                 onToggle={() => setIsSummaryExpanded(!isSummaryExpanded)}
+                deliveryMethod={deliveryMethod}
+                pickupAddress={PICKUP_ADDRESS}
               />
             </div>
           </div>

@@ -48,19 +48,16 @@ module.exports = async (req, res) => {
     const { orderId } = body || {};
     if (!orderId) return json(res, 400, { error: 'Missing orderId' });
 
-    // 1) Load order
+    // 1) Load order (incluye shipping_cost)
     const { data: order, error: oErr } = await supabase
       .from('orders')
       .select(
-        'id, order_number, customer_email, customer_name, payment_method, payment_status, total, mp_preference_id'
+        'id, order_number, customer_email, customer_name, payment_method, payment_status, total, shipping_cost, mp_preference_id'
       )
       .eq('id', orderId)
       .single();
 
     if (oErr || !order) return json(res, 404, { error: 'Order not found' });
-
-    // Optional: if it already has a preference, you might reuse it (depends on your UX).
-    // We'll still recreate if needed, but idempotency key helps avoid duplicates.
 
     // 2) Load items
     const { data: orderItems, error: iErr } = await supabase
@@ -77,6 +74,17 @@ module.exports = async (req, res) => {
       unit_price: Number(it.unit_price),
       currency_id: 'UYU',
     }));
+
+    // Shipping como ítem (solo si > 0)
+    const shippingCost = Number(order.shipping_cost || 0);
+    if (shippingCost > 0) {
+      mpItems.push({
+        title: 'Costo de envío',
+        quantity: 1,
+        unit_price: shippingCost,
+        currency_id: 'UYU',
+      });
+    }
 
     // 3) Create preference
     const preference = {
@@ -97,13 +105,12 @@ module.exports = async (req, res) => {
         order_id: orderId,
         order_number: order.order_number,
       },
-      // binary_mode: true, // opcional (menos estados intermedios)
     };
 
     const idempotencyKey = `pref-${orderId}`;
     const mpPref = await mpCreatePreference(accessToken, preference, idempotencyKey);
 
-    // 4) Save MP fields in DB (aligned to your orders table)
+    // 4) Save MP fields in DB
     const { error: upErr } = await supabase
       .from('orders')
       .update({

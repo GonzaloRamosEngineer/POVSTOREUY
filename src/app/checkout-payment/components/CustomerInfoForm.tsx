@@ -1,7 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Icon from '@/components/ui/AppIcon';
+
+type DeliveryMethod = 'delivery' | 'pickup';
 
 interface CustomerInfo {
   email: string;
@@ -16,9 +18,16 @@ interface CustomerInfo {
 interface CustomerInfoFormProps {
   onUpdate: (data: CustomerInfo) => void;
   initialData?: Partial<CustomerInfo>;
+  deliveryMethod: DeliveryMethod;
+  pickupAddress: string;
 }
 
-export default function CustomerInfoForm({ onUpdate, initialData }: CustomerInfoFormProps) {
+export default function CustomerInfoForm({
+  onUpdate,
+  initialData,
+  deliveryMethod,
+  pickupAddress,
+}: CustomerInfoFormProps) {
   const [formData, setFormData] = useState<CustomerInfo>({
     email: initialData?.email || '',
     fullName: initialData?.fullName || '',
@@ -26,7 +35,7 @@ export default function CustomerInfoForm({ onUpdate, initialData }: CustomerInfo
     address: initialData?.address || '',
     city: initialData?.city || '',
     department: initialData?.department || 'Montevideo',
-    postalCode: initialData?.postalCode || ''
+    postalCode: initialData?.postalCode || '',
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -50,8 +59,28 @@ export default function CustomerInfoForm({ onUpdate, initialData }: CustomerInfo
     'Rocha',
     'San José',
     'Soriano',
-    'Treinta y Tres'
+    'Treinta y Tres',
   ];
+
+  useEffect(() => {
+    // Mantener sincronizado con el padre desde el inicio
+    onUpdate(formData);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    // Si cambian a retiro, limpiamos errores de campos de envío
+    if (deliveryMethod === 'pickup') {
+      setErrors((prev) => {
+        const next = { ...prev };
+        delete next.address;
+        delete next.city;
+        delete next.department;
+        delete next.postalCode;
+        return next;
+      });
+    }
+  }, [deliveryMethod]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -60,7 +89,7 @@ export default function CustomerInfoForm({ onUpdate, initialData }: CustomerInfo
     onUpdate(newData);
 
     if (errors[name]) {
-      setErrors(prev => ({ ...prev, [name]: '' }));
+      setErrors((prev) => ({ ...prev, [name]: '' }));
     }
   };
 
@@ -73,41 +102,37 @@ export default function CustomerInfoForm({ onUpdate, initialData }: CustomerInfo
 
     switch (field) {
       case 'email':
-        if (!formData.email) {
-          newErrors.email = 'Email requerido';
-        } else if (!validateEmail(formData.email)) {
-          newErrors.email = 'Email inválido';
-        } else {
-          delete newErrors.email;
-        }
+        if (!formData.email) newErrors.email = 'Email requerido';
+        else if (!validateEmail(formData.email)) newErrors.email = 'Email inválido';
+        else delete newErrors.email;
         break;
+
       case 'fullName':
-        if (!formData.fullName || formData.fullName.length < 3) {
-          newErrors.fullName = 'Nombre completo requerido';
-        } else {
-          delete newErrors.fullName;
-        }
+        if (!formData.fullName || formData.fullName.length < 3) newErrors.fullName = 'Nombre completo requerido';
+        else delete newErrors.fullName;
         break;
+
       case 'phone':
-        if (!formData.phone || formData.phone.length < 8) {
-          newErrors.phone = 'Teléfono inválido';
-        } else {
-          delete newErrors.phone;
-        }
+        if (!formData.phone || formData.phone.length < 8) newErrors.phone = 'Teléfono inválido';
+        else delete newErrors.phone;
         break;
+
       case 'address':
-        if (!formData.address || formData.address.length < 5) {
-          newErrors.address = 'Dirección requerida';
-        } else {
+        if (deliveryMethod === 'pickup') {
           delete newErrors.address;
+          break;
         }
+        if (!formData.address || formData.address.length < 5) newErrors.address = 'Dirección requerida';
+        else delete newErrors.address;
         break;
+
       case 'city':
-        if (!formData.city) {
-          newErrors.city = 'Ciudad requerida';
-        } else {
+        if (deliveryMethod === 'pickup') {
           delete newErrors.city;
+          break;
         }
+        if (!formData.city) newErrors.city = 'Ciudad requerida';
+        else delete newErrors.city;
         break;
     }
 
@@ -200,102 +225,124 @@ export default function CustomerInfoForm({ onUpdate, initialData }: CustomerInfo
         </div>
       </div>
 
-      <div className="flex items-center gap-3 pt-4">
-        <Icon name="TruckIcon" size={24} className="text-primary" />
-        <h3 className="text-lg font-heading font-semibold text-foreground">
-          Dirección de Envío
-        </h3>
-      </div>
+      {/* Dirección de envío o Retiro */}
+      {deliveryMethod === 'delivery' ? (
+        <>
+          <div className="flex items-center gap-3 pt-4">
+            <Icon name="TruckIcon" size={24} className="text-primary" />
+            <h3 className="text-lg font-heading font-semibold text-foreground">
+              Dirección de Envío
+            </h3>
+          </div>
 
-      <div className="space-y-4">
-        {/* Address */}
-        <div>
-          <label htmlFor="address" className="block text-sm font-medium text-foreground mb-2">
-            Dirección <span className="text-error">*</span>
-          </label>
-          <input
-            type="text"
-            id="address"
-            name="address"
-            value={formData.address}
-            onChange={handleChange}
-            onBlur={() => handleBlur('address')}
-            placeholder="Av. 18 de Julio 1234"
-            className={`w-full px-4 py-3 bg-input border rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary transition-smooth ${
-              errors.address ? 'border-error' : 'border-border'
-            }`}
-          />
-          {errors.address && (
-            <p className="text-xs text-error mt-1 flex items-center gap-1">
-              <Icon name="ExclamationCircleIcon" size={14} className="text-error" variant="solid" />
-              {errors.address}
+          <div className="space-y-4">
+            {/* Address */}
+            <div>
+              <label htmlFor="address" className="block text-sm font-medium text-foreground mb-2">
+                Dirección <span className="text-error">*</span>
+              </label>
+              <input
+                type="text"
+                id="address"
+                name="address"
+                value={formData.address}
+                onChange={handleChange}
+                onBlur={() => handleBlur('address')}
+                placeholder="Av. 18 de Julio 1234"
+                className={`w-full px-4 py-3 bg-input border rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary transition-smooth ${
+                  errors.address ? 'border-error' : 'border-border'
+                }`}
+              />
+              {errors.address && (
+                <p className="text-xs text-error mt-1 flex items-center gap-1">
+                  <Icon name="ExclamationCircleIcon" size={14} className="text-error" variant="solid" />
+                  {errors.address}
+                </p>
+              )}
+            </div>
+
+            {/* City & Department */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label htmlFor="city" className="block text-sm font-medium text-foreground mb-2">
+                  Ciudad <span className="text-error">*</span>
+                </label>
+                <input
+                  type="text"
+                  id="city"
+                  name="city"
+                  value={formData.city}
+                  onChange={handleChange}
+                  onBlur={() => handleBlur('city')}
+                  placeholder="Montevideo"
+                  className={`w-full px-4 py-3 bg-input border rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary transition-smooth ${
+                    errors.city ? 'border-error' : 'border-border'
+                  }`}
+                />
+                {errors.city && (
+                  <p className="text-xs text-error mt-1 flex items-center gap-1">
+                    <Icon name="ExclamationCircleIcon" size={14} className="text-error" variant="solid" />
+                    {errors.city}
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <label htmlFor="department" className="block text-sm font-medium text-foreground mb-2">
+                  Departamento <span className="text-error">*</span>
+                </label>
+                <select
+                  id="department"
+                  name="department"
+                  value={formData.department}
+                  onChange={handleChange}
+                  className="w-full px-4 py-3 bg-input border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary transition-smooth"
+                >
+                  {departments.map((dept) => (
+                    <option key={dept} value={dept}>
+                      {dept}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Postal Code */}
+            <div>
+              <label htmlFor="postalCode" className="block text-sm font-medium text-foreground mb-2">
+                Código Postal
+              </label>
+              <input
+                type="text"
+                id="postalCode"
+                name="postalCode"
+                value={formData.postalCode}
+                onChange={handleChange}
+                placeholder="11000"
+                maxLength={5}
+                className="w-full px-4 py-3 bg-input border border-border rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary transition-smooth"
+              />
+            </div>
+          </div>
+        </>
+      ) : (
+        <div className="pt-4">
+          <div className="flex items-center gap-3">
+            <Icon name="MapPinIcon" size={24} className="text-primary" />
+            <h3 className="text-lg font-heading font-semibold text-foreground">
+              Retiro en Local
+            </h3>
+          </div>
+
+          <div className="mt-4 p-4 bg-muted rounded-lg">
+            <p className="text-sm font-medium text-foreground">Dirección de retiro</p>
+            <p className="text-xs text-muted-foreground mt-1">{pickupAddress}</p>
+            <p className="text-xs text-muted-foreground mt-2">
+              Te contactamos por WhatsApp/Email para coordinar.
             </p>
-          )}
-        </div>
-
-        {/* City & Department */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <label htmlFor="city" className="block text-sm font-medium text-foreground mb-2">
-              Ciudad <span className="text-error">*</span>
-            </label>
-            <input
-              type="text"
-              id="city"
-              name="city"
-              value={formData.city}
-              onChange={handleChange}
-              onBlur={() => handleBlur('city')}
-              placeholder="Montevideo"
-              className={`w-full px-4 py-3 bg-input border rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary transition-smooth ${
-                errors.city ? 'border-error' : 'border-border'
-              }`}
-            />
-            {errors.city && (
-              <p className="text-xs text-error mt-1 flex items-center gap-1">
-                <Icon name="ExclamationCircleIcon" size={14} className="text-error" variant="solid" />
-                {errors.city}
-              </p>
-            )}
-          </div>
-
-          <div>
-            <label htmlFor="department" className="block text-sm font-medium text-foreground mb-2">
-              Departamento <span className="text-error">*</span>
-            </label>
-            <select
-              id="department"
-              name="department"
-              value={formData.department}
-              onChange={handleChange}
-              className="w-full px-4 py-3 bg-input border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary transition-smooth"
-            >
-              {departments.map((dept) => (
-                <option key={dept} value={dept}>
-                  {dept}
-                </option>
-              ))}
-            </select>
           </div>
         </div>
-
-        {/* Postal Code */}
-        <div>
-          <label htmlFor="postalCode" className="block text-sm font-medium text-foreground mb-2">
-            Código Postal
-          </label>
-          <input
-            type="text"
-            id="postalCode"
-            name="postalCode"
-            value={formData.postalCode}
-            onChange={handleChange}
-            placeholder="11000"
-            maxLength={5}
-            className="w-full px-4 py-3 bg-input border border-border rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary transition-smooth"
-          />
-        </div>
-      </div>
+      )}
 
       {/* Guest Checkout Info */}
       <div className="flex items-start gap-3 p-4 bg-muted rounded-lg">

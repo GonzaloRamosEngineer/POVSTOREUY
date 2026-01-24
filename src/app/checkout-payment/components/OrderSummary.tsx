@@ -1,5 +1,8 @@
-import AppImage from '@/components/ui/AppImage';
+'use client';
+
 import Icon from '@/components/ui/AppIcon';
+
+type DeliveryMethod = 'delivery' | 'pickup';
 
 interface OrderItem {
   id: string;
@@ -18,6 +21,8 @@ interface OrderSummaryProps {
   total: number;
   isExpanded: boolean;
   onToggle: () => void;
+  deliveryMethod: DeliveryMethod;
+  pickupAddress: string;
 }
 
 export default function OrderSummary({
@@ -26,107 +31,84 @@ export default function OrderSummary({
   shipping,
   total,
   isExpanded,
-  onToggle
+  onToggle,
+  deliveryMethod,
+  pickupAddress,
 }: OrderSummaryProps) {
   return (
-    <div className="bg-card rounded-lg border border-border overflow-hidden">
-      {/* Mobile Header */}
-      <button
-        onClick={onToggle}
-        className="lg:hidden w-full flex items-center justify-between p-4 hover:bg-muted transition-smooth"
-        aria-label="Toggle order summary"
-      >
-        <div className="flex items-center gap-3">
-          <Icon name="ShoppingBagIcon" size={20} className="text-primary" />
-          <span className="text-base font-medium text-foreground">
-            Resumen del Pedido
-          </span>
-        </div>
-        <div className="flex items-center gap-3">
-          <span className="text-lg font-mono font-semibold text-primary">
-            ${total.toLocaleString('es-UY', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-          </span>
-          <Icon
-            name={isExpanded ? 'ChevronUpIcon' : 'ChevronDownIcon'}
-            size={20}
-            className="text-muted-foreground"
-          />
-        </div>
-      </button>
-
-      {/* Desktop Header */}
-      <div className="hidden lg:flex items-center gap-3 p-6 border-b border-border">
-        <Icon name="ShoppingBagIcon" size={24} className="text-primary" />
+    <div className="bg-card rounded-lg border border-border p-6 space-y-5">
+      <div className="flex items-center justify-between">
         <h2 className="text-xl font-heading font-semibold text-foreground">
           Resumen del Pedido
         </h2>
+
+        <button
+          type="button"
+          onClick={onToggle}
+          className="text-sm text-muted-foreground hover:text-foreground transition-smooth"
+        >
+          {isExpanded ? 'Ocultar' : 'Ver detalle'}
+        </button>
       </div>
 
-      {/* Content */}
-      <div className={`${isExpanded ? 'block' : 'hidden'} lg:block`}>
-        {/* Items List */}
-        <div className="p-6 space-y-4 max-h-[400px] overflow-y-auto">
-          {items.map((item) => (
-            <div key={item.id} className="flex gap-4">
-              <div className="relative w-20 h-20 flex-shrink-0 bg-background rounded-md overflow-hidden">
-                <AppImage
-                  src={item.image}
-                  alt={item.alt}
-                  className="object-cover w-full h-full"
-                />
-                <div className="absolute -top-2 -right-2 flex items-center justify-center w-6 h-6 bg-primary text-primary-foreground text-xs font-bold rounded-full">
-                  {item.quantity}
-                </div>
+      {isExpanded && (
+        <div className="space-y-3">
+          {items.map((it) => (
+            <div key={it.id} className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-md overflow-hidden border border-border bg-muted flex-shrink-0">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={it.image} alt={it.alt} className="w-full h-full object-cover" />
               </div>
               <div className="flex-1 min-w-0">
-                <h3 className="text-sm font-medium text-foreground">
-                  {item.name}
-                </h3>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {item.model}
+                <p className="text-sm font-medium text-foreground truncate">
+                  {it.name}{it.model ? ` - ${it.model}` : ''}
                 </p>
-                <p className="text-sm font-mono font-medium text-primary mt-2">
-                  ${(item.price * item.quantity).toLocaleString('es-UY', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                <p className="text-xs text-muted-foreground">
+                  {it.quantity} x ${it.price.toLocaleString('es-UY')}
                 </p>
+              </div>
+              <div className="text-sm font-mono text-foreground">
+                ${(it.price * it.quantity).toLocaleString('es-UY')}
               </div>
             </div>
           ))}
         </div>
+      )}
 
-        {/* Pricing Breakdown */}
-        <div className="p-6 border-t border-border space-y-3">
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-muted-foreground">Subtotal</span>
+      <div className="space-y-3 pt-2">
+        <div className="flex items-center justify-between">
+          <span className="text-sm text-muted-foreground">Subtotal</span>
+          <span className="text-sm font-mono text-foreground">
+            ${subtotal.toLocaleString('es-UY')}
+          </span>
+        </div>
+
+        <div className="flex items-start justify-between gap-4">
+          <span className="text-sm text-muted-foreground">Envío</span>
+          <div className="text-right">
             <span className="text-sm font-mono text-foreground">
-              ${subtotal.toLocaleString('es-UY', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              {deliveryMethod === 'pickup'
+                ? 'Retiro (Gratis)'
+                : shipping === 0
+                  ? 'Gratis'
+                  : `$${shipping.toLocaleString('es-UY')}`}
             </span>
-          </div>
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-muted-foreground">Envío</span>
-            <span className="text-sm font-mono text-foreground">
-              {shipping === 0 ? 'Gratis' : `$${shipping.toLocaleString('es-UY', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
-            </span>
-          </div>
-          <div className="pt-3 border-t border-border flex items-center justify-between">
-            <span className="text-base font-medium text-foreground">Total</span>
-            <span className="text-xl font-mono font-semibold text-primary">
-              ${total.toLocaleString('es-UY', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            </span>
+
+            {deliveryMethod === 'pickup' && (
+              <div className="mt-1 text-xs text-muted-foreground flex items-start justify-end gap-2">
+                <Icon name="MapPinIcon" size={14} className="text-muted-foreground mt-0.5" />
+                <span className="max-w-[260px]">{pickupAddress}</span>
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Trust Indicators */}
-        <div className="p-6 bg-muted border-t border-border">
-          <div className="flex items-start gap-3">
-            <Icon name="ShieldCheckIcon" size={20} className="text-success flex-shrink-0 mt-0.5" variant="solid" />
-            <div>
-              <p className="text-sm font-medium text-foreground">
-                Compra Segura
-              </p>
-              <p className="text-xs text-muted-foreground mt-1">
-                Tus datos están protegidos con encriptación SSL
-              </p>
-            </div>
+        <div className="pt-3 border-t border-border">
+          <div className="flex items-center justify-between">
+            <span className="text-base font-medium text-foreground">Total</span>
+            <span className="text-2xl font-mono font-bold text-primary">
+              ${total.toLocaleString('es-UY')}
+            </span>
           </div>
         </div>
       </div>

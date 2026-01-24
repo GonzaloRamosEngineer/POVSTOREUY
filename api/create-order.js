@@ -24,6 +24,8 @@ const URUGUAY_DEPARTMENTS = new Set([
   'Rocha', 'San José', 'Soriano', 'Treinta y Tres',
 ]);
 
+const PICKUP_ADDRESS = 'José Enrique Rodó 2219, 11200 Montevideo, Departamento de Montevideo';
+
 module.exports = async (req, res) => {
   try {
     if (req.method !== 'POST') return json(res, 405, { error: 'Method not allowed' });
@@ -31,19 +33,29 @@ module.exports = async (req, res) => {
     const supabase = getSupabaseAdmin();
     const body = safeJsonParse(req.body) || {};
 
-    const { customerInfo, items, paymentMethod } = body;
+    const { customerInfo, items, paymentMethod, deliveryMethod } = body;
+
+    const dm = deliveryMethod === 'pickup' ? 'pickup' : 'delivery';
 
     if (!customerInfo || !items || !Array.isArray(items) || items.length === 0) {
       return json(res, 400, { error: 'Missing customerInfo or items' });
     }
 
-    const requiredCustomerFields = ['email', 'fullName', 'phone', 'address', 'city', 'department', 'postalCode'];
-    for (const f of requiredCustomerFields) {
+    // Campos mínimos siempre
+    const requiredBaseFields = ['email', 'fullName', 'phone'];
+    for (const f of requiredBaseFields) {
       if (!customerInfo[f]) return json(res, 400, { error: `Missing customerInfo.${f}` });
     }
 
-    if (!URUGUAY_DEPARTMENTS.has(customerInfo.department)) {
-      return json(res, 400, { error: `Invalid customerInfo.department: ${customerInfo.department}` });
+    // Campos de envío solo si delivery
+    if (dm === 'delivery') {
+      const requiredDeliveryFields = ['address', 'city', 'department'];
+      for (const f of requiredDeliveryFields) {
+        if (!customerInfo[f]) return json(res, 400, { error: `Missing customerInfo.${f}` });
+      }
+      if (!URUGUAY_DEPARTMENTS.has(customerInfo.department)) {
+        return json(res, 400, { error: `Invalid customerInfo.department: ${customerInfo.department}` });
+      }
     }
 
     if (!paymentMethod || !['mercadopago', 'bank_transfer'].includes(paymentMethod)) {
@@ -108,7 +120,7 @@ module.exports = async (req, res) => {
     });
 
     const subtotal = normalizedItems.reduce((sum, it) => sum + it.unit_price * it.quantity, 0);
-    const shipping_cost = subtotal >= 2000 ? 0 : 250; // tu regla actual
+    const shipping_cost = dm === 'pickup' ? 0 : (subtotal >= 2000 ? 0 : 250);
     const total = subtotal + shipping_cost;
 
     // 3) Insert order (schema REAL)
@@ -120,10 +132,10 @@ module.exports = async (req, res) => {
         customer_name: customerInfo.fullName,
         customer_phone: customerInfo.phone,
 
-        shipping_address: customerInfo.address,
-        shipping_city: customerInfo.city,
-        shipping_department: customerInfo.department,
-        shipping_postal_code: customerInfo.postalCode,
+        shipping_address: dm === 'pickup' ? '' : (customerInfo.address || ''),
+        shipping_city: dm === 'pickup' ? '' : (customerInfo.city || ''),
+        shipping_department: dm === 'pickup' ? 'Montevideo' : (customerInfo.department || 'Montevideo'),
+        shipping_postal_code: dm === 'pickup' ? '' : (customerInfo.postalCode || ''),
 
         subtotal,
         shipping_cost,
@@ -133,7 +145,10 @@ module.exports = async (req, res) => {
         payment_method: paymentMethod,
         payment_status: 'pending',
         payment_id: null,
-        notes: null,
+
+        notes: dm === 'pickup'
+          ? `Retiro en local físico: ${PICKUP_ADDRESS}`
+          : null,
       }])
       .select('id, order_number, total, payment_status, order_status')
       .single();
