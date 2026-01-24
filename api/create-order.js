@@ -17,11 +17,12 @@ function safeJsonParse(input) {
   }
 }
 
-function buildReference() {
-  const year = new Date().getFullYear();
-  const rand = String(Math.floor(Math.random() * 100000)).padStart(5, '0');
-  return `POV${year}${rand}`;
-}
+const URUGUAY_DEPARTMENTS = new Set([
+  'Montevideo', 'Canelones', 'Maldonado', 'Colonia', 'Salto',
+  'Paysandú', 'Rivera', 'Tacuarembó', 'Artigas', 'Cerro Largo',
+  'Durazno', 'Flores', 'Florida', 'Lavalleja', 'Río Negro',
+  'Rocha', 'San José', 'Soriano', 'Treinta y Tres',
+]);
 
 module.exports = async (req, res) => {
   try {
@@ -36,9 +37,13 @@ module.exports = async (req, res) => {
       return json(res, 400, { error: 'Missing customerInfo or items' });
     }
 
-    const requiredCustomerFields = ['email', 'fullName', 'phone', 'address', 'city', 'department'];
+    const requiredCustomerFields = ['email', 'fullName', 'phone', 'address', 'city', 'department', 'postalCode'];
     for (const f of requiredCustomerFields) {
       if (!customerInfo[f]) return json(res, 400, { error: `Missing customerInfo.${f}` });
+    }
+
+    if (!URUGUAY_DEPARTMENTS.has(customerInfo.department)) {
+      return json(res, 400, { error: `Invalid customerInfo.department: ${customerInfo.department}` });
     }
 
     if (!paymentMethod || !['mercadopago', 'bank_transfer'].includes(paymentMethod)) {
@@ -58,14 +63,14 @@ module.exports = async (req, res) => {
       return json(res, 400, { error: 'Each item must include valid quantity > 0' });
     }
 
-    // Dedup por id (si el carrito mete repetidos por bug)
+    // Dedup por id
     const qtyById = new Map();
     for (const it of normalizedReqItems) {
       qtyById.set(it.id, (qtyById.get(it.id) || 0) + it.quantity);
     }
     const productIds = Array.from(qtyById.keys());
 
-    // 1) Traer productos
+    // 1) Traer productos (precios SOLO DB)
     const { data: products, error: prodErr } = await supabase
       .from('products')
       .select('id,name,model,price,image_url,stock_count,is_active')
@@ -75,7 +80,7 @@ module.exports = async (req, res) => {
 
     const byId = new Map((products || []).map((p) => [p.id, p]));
 
-    // Validaciones DB (activos + stock)
+    // Validaciones DB: activos + stock
     for (const productId of productIds) {
       const p = byId.get(productId);
       const qty = Number(qtyById.get(productId) || 0);
@@ -87,66 +92,66 @@ module.exports = async (req, res) => {
       if (qty > stock) return json(res, 400, { error: `Not enough stock for ${p.name}`, stock });
     }
 
-    // 2) Totales (precios solo DB)
+    // 2) Normalizar items para order_items
     const normalizedItems = productIds.map((pid) => {
       const p = byId.get(pid);
       const qty = Number(qtyById.get(pid));
       return {
         product_id: p.id,
-        name: p.name,
-        model: p.model || '',
+        product_name: p.name,
+        product_model: p.model || '',
+        product_image_url: p.image_url || '',
         unit_price: Number(p.price),
         quantity: qty,
-        image_url: p.image_url || '',
+        total_price: Number(p.price) * qty,
       };
     });
 
     const subtotal = normalizedItems.reduce((sum, it) => sum + it.unit_price * it.quantity, 0);
-    const shipping = subtotal >= 2000 ? 0 : 250; // consistente con tu UI
-    const total = subtotal + shipping;
+    const shipping_cost = subtotal >= 2000 ? 0 : 250; // tu regla actual
+    const total = subtotal + shipping_cost;
 
-    const referenceNumber = buildReference();
-
-    // 3) Insert order
+    // 3) Insert order (schema REAL)
     const { data: orderInserted, error: orderErr } = await supabase
       .from('orders')
-      .insert([
-        {
-          customer_email: customerInfo.email,
-          customer_name: customerInfo.fullName,
-          customer_phone: customerInfo.phone,
-          address: customerInfo.address,
-          city: customerInfo.city,
-          department: customerInfo.department,
-          postal_code: customerInfo.postalCode || null,
+      .insert([{
+        user_id: null, // checkout sin login
+        customer_email: customerInfo.email,
+        customer_name: customerInfo.fullName,
+        customer_phone: customerInfo.phone,
 
-          payment_method: paymentMethod,
-          payment_status: 'pending',
-          status: 'created',
+        shipping_address: customerInfo.address,
+        shipping_city: customerInfo.city,
+        shipping_department: customerInfo.department,
+        shipping_postal_code: customerInfo.postalCode,
 
-          subtotal,
-          shipping,
-          total,
+        subtotal,
+        shipping_cost,
+        total,
 
-          reference_number: referenceNumber,
-        },
-      ])
-      .select('id, reference_number, total, payment_status, status')
+        order_status: 'pending',
+        payment_method: paymentMethod,
+        payment_status: 'pending',
+        payment_id: null,
+        notes: null,
+      }])
+      .select('id, order_number, total, payment_status, order_status')
       .single();
 
     if (orderErr) return json(res, 500, { error: 'Failed to create order', details: orderErr.message });
 
     const orderId = orderInserted.id;
 
-    // 4) Insert items
+    // 4) Insert order_items (schema REAL)
     const itemsToInsert = normalizedItems.map((it) => ({
       order_id: orderId,
       product_id: it.product_id,
-      name: it.name,
-      model: it.model,
-      unit_price: it.unit_price,
+      product_name: it.product_name,
+      product_model: it.product_model,
+      product_image_url: it.product_image_url,
       quantity: it.quantity,
-      image_url: it.image_url,
+      unit_price: it.unit_price,
+      total_price: it.total_price,
     }));
 
     const { error: itemsErr } = await supabase.from('order_items').insert(itemsToInsert);
@@ -155,7 +160,7 @@ module.exports = async (req, res) => {
     return json(res, 200, {
       ok: true,
       orderId,
-      referenceNumber: orderInserted.reference_number,
+      orderNumber: orderInserted.order_number,
       total: orderInserted.total,
     });
   } catch (e) {
