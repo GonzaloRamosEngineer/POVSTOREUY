@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabaseAdmin';
 
+// 1. Forzamos que esta ruta sea dinámica siempre
 export const dynamic = 'force-dynamic';
 
 function json(status: number, body: any) {
@@ -47,13 +48,15 @@ async function requireAdmin(req: Request) {
   return { ok: true as const, supabase };
 }
 
-type Ctx = { params: Promise<{ id: string }> };
+// --- CAMBIO CLAVE: Usamos 'uuid' en lugar de 'id' para romper el caché de Vercel ---
+type Ctx = { params: Promise<{ uuid: string }> };
 
 export async function GET(req: Request, ctx: Ctx) {
-  const { id } = await ctx.params;
+  // 1. Leemos el nuevo parámetro 'uuid'
+  const { uuid } = await ctx.params;
   
-  // --- LOGS DE DEPURACIÓN ---
-  console.log(`🔍 [API GET] Iniciando petición para ID: ${id}`);
+  // --- LOGS DE DEPURACIÓN ACTUALIZADOS ---
+  console.log(`🔍 [API GET] Iniciando petición para UUID: ${uuid}`);
   console.log(`🔍 [API GET] URL: ${req.url}`);
   // --------------------------
 
@@ -62,7 +65,12 @@ export async function GET(req: Request, ctx: Ctx) {
 
   console.log(`✅ [API GET] Auth Admin Correcta. Buscando en DB...`);
 
-  const { data, error } = await auth.supabase.from('products').select('*').eq('id', id).single();
+  // 2. Buscamos en la DB (La columna sigue llamándose 'id', eso no cambia)
+  const { data, error } = await auth.supabase
+    .from('products')
+    .select('*')
+    .eq('id', uuid)
+    .single();
   
   if (error) {
     console.error(`❌ [API GET] Error Supabase:`, error);
@@ -70,7 +78,7 @@ export async function GET(req: Request, ctx: Ctx) {
   }
 
   if (!data) {
-    console.error(`⚠️ [API GET] Data es null para ID: ${id}`);
+    console.error(`⚠️ [API GET] Data es null para UUID: ${uuid}`);
     return json(404, { error: 'Product is null' });
   }
 
@@ -79,8 +87,8 @@ export async function GET(req: Request, ctx: Ctx) {
 }
 
 export async function PATCH(req: Request, ctx: Ctx) {
-  const { id } = await ctx.params;
-  console.log(`🔍 [API PATCH] Actualizando ID: ${id}`);
+  const { uuid } = await ctx.params;
+  console.log(`🔍 [API PATCH] Actualizando UUID: ${uuid}`);
 
   const auth = await requireAdmin(req);
   if (!auth.ok) return auth.res;
@@ -123,7 +131,8 @@ export async function PATCH(req: Request, ctx: Ctx) {
   if (patch.original_price !== undefined) {
     let priceToCompare = patch.price;
     if (priceToCompare === undefined) {
-      const { data: current, error: cErr } = await auth.supabase.from('products').select('price').eq('id', id).single();
+      // Usamos 'uuid' aquí también
+      const { data: current, error: cErr } = await auth.supabase.from('products').select('price').eq('id', uuid).single();
       if (cErr || !current) return json(404, { error: 'Product not found' });
       priceToCompare = Number(current.price || 0);
     }
@@ -132,7 +141,13 @@ export async function PATCH(req: Request, ctx: Ctx) {
     }
   }
 
-  const { data, error } = await auth.supabase.from('products').update(patch).eq('id', id).select('*').single();
+  // Usamos 'uuid' en la actualización
+  const { data, error } = await auth.supabase
+    .from('products')
+    .update(patch)
+    .eq('id', uuid)
+    .select('*')
+    .single();
   
   if (error) {
      console.error(`❌ [API PATCH] Error Update:`, error);
@@ -143,10 +158,18 @@ export async function PATCH(req: Request, ctx: Ctx) {
 }
 
 export async function DELETE(req: Request, ctx: Ctx) {
-  const { id } = await ctx.params;
+  const { uuid } = await ctx.params;
   const auth = await requireAdmin(req);
   if (!auth.ok) return auth.res;
-  const { data, error } = await auth.supabase.from('products').update({ is_active: false }).eq('id', id).select('*').single();
+  
+  // Usamos 'uuid' en el borrado lógico
+  const { data, error } = await auth.supabase
+    .from('products')
+    .update({ is_active: false })
+    .eq('id', uuid)
+    .select('*')
+    .single();
+    
   if (error) return json(500, { error: `DB delete error: ${error.message}` });
   return json(200, { product: data });
 }
