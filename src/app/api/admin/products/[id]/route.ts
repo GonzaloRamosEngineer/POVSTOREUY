@@ -15,12 +15,19 @@ function getBearerToken(req: Request) {
 
 async function requireAdmin(req: Request) {
   const token = getBearerToken(req);
-  if (!token) return { ok: false as const, res: json(401, { error: 'Missing Authorization Bearer token' }) };
+  if (!token) {
+    console.error("❌ [API] Missing Token");
+    return { ok: false as const, res: json(401, { error: 'Missing Authorization Bearer token' }) };
+  }
 
   const supabase = getSupabaseAdmin();
   const { data: userData, error: uErr } = await supabase.auth.getUser(token);
   const user = userData?.user;
-  if (uErr || !user) return { ok: false as const, res: json(401, { error: 'Invalid session token' }) };
+  
+  if (uErr || !user) {
+    console.error("❌ [API] Invalid Token/User", uErr);
+    return { ok: false as const, res: json(401, { error: 'Invalid session token' }) };
+  }
 
   const { data: profile, error: pErr } = await supabase
     .from('user_profiles')
@@ -28,8 +35,14 @@ async function requireAdmin(req: Request) {
     .eq('id', user.id)
     .single();
 
-  if (pErr || !profile) return { ok: false as const, res: json(403, { error: 'Profile not found' }) };
-  if (profile.role !== 'admin') return { ok: false as const, res: json(403, { error: 'Admin role required' }) };
+  if (pErr || !profile) {
+     console.error("❌ [API] Profile Error", pErr);
+     return { ok: false as const, res: json(403, { error: 'Profile not found' }) };
+  }
+  if (profile.role !== 'admin') {
+     console.error("❌ [API] Not Admin", profile.role);
+     return { ok: false as const, res: json(403, { error: 'Admin role required' }) };
+  }
 
   return { ok: true as const, supabase };
 }
@@ -38,19 +51,36 @@ type Ctx = { params: Promise<{ id: string }> };
 
 export async function GET(req: Request, ctx: Ctx) {
   const { id } = await ctx.params;
+  
+  // --- LOGS DE DEPURACIÓN ---
+  console.log(`🔍 [API GET] Iniciando petición para ID: ${id}`);
+  console.log(`🔍 [API GET] URL: ${req.url}`);
+  // --------------------------
 
   const auth = await requireAdmin(req);
   if (!auth.ok) return auth.res;
 
-  // Al hacer select('*'), automáticamente traerá gallery, colors y addon_ids si existen
-  const { data, error } = await auth.supabase.from('products').select('*').eq('id', id).single();
-  if (error) return json(404, { error: 'Product not found' });
+  console.log(`✅ [API GET] Auth Admin Correcta. Buscando en DB...`);
 
+  const { data, error } = await auth.supabase.from('products').select('*').eq('id', id).single();
+  
+  if (error) {
+    console.error(`❌ [API GET] Error Supabase:`, error);
+    return json(404, { error: 'Product not found', details: error.message });
+  }
+
+  if (!data) {
+    console.error(`⚠️ [API GET] Data es null para ID: ${id}`);
+    return json(404, { error: 'Product is null' });
+  }
+
+  console.log(`✅ [API GET] Producto encontrado: ${data.name}`);
   return json(200, { product: data });
 }
 
 export async function PATCH(req: Request, ctx: Ctx) {
   const { id } = await ctx.params;
+  console.log(`🔍 [API PATCH] Actualizando ID: ${id}`);
 
   const auth = await requireAdmin(req);
   if (!auth.ok) return auth.res;
@@ -63,33 +93,17 @@ export async function PATCH(req: Request, ctx: Ctx) {
   }
 
   const patch: any = {};
-
-  const setIfPresent = (k: string, v: any) => {
-    if (v !== undefined) patch[k] = v;
-  };
+  const setIfPresent = (k: string, v: any) => { if (v !== undefined) patch[k] = v; };
 
   setIfPresent('name', body.name !== undefined ? String(body.name).trim() : undefined);
   setIfPresent('model', body.model !== undefined ? String(body.model).trim() : undefined);
   setIfPresent('description', body.description !== undefined ? String(body.description).trim() : undefined);
   setIfPresent('image_url', body.image_url !== undefined ? String(body.image_url).trim() : undefined);
-  
-  // Multimedia
   setIfPresent('video_url', body.video_url !== undefined ? (body.video_url ? String(body.video_url).trim() : null) : undefined);
   
-  // Arrays
-  if (body.gallery !== undefined) {
-    patch.gallery = Array.isArray(body.gallery) ? body.gallery : [];
-  }
-
-  // --- ACTUALIZACIÓN: Nuevos campos (Arrays) ---
-  if (body.colors !== undefined) {
-    patch.colors = Array.isArray(body.colors) ? body.colors : [];
-  }
-  
-  if (body.addon_ids !== undefined) {
-    patch.addon_ids = Array.isArray(body.addon_ids) ? body.addon_ids : [];
-  }
-  // ---------------------------------------------
+  if (body.gallery !== undefined) patch.gallery = Array.isArray(body.gallery) ? body.gallery : [];
+  if (body.colors !== undefined) patch.colors = Array.isArray(body.colors) ? body.colors : [];
+  if (body.addon_ids !== undefined) patch.addon_ids = Array.isArray(body.addon_ids) ? body.addon_ids : [];
 
   setIfPresent('badge', body.badge !== undefined ? (body.badge ? String(body.badge).trim() : null) : undefined);
   setIfPresent('is_active', body.is_active !== undefined ? Boolean(body.is_active) : undefined);
@@ -97,58 +111,42 @@ export async function PATCH(req: Request, ctx: Ctx) {
 
   if (body.price !== undefined) patch.price = Number(body.price);
   if (body.stock_count !== undefined) patch.stock_count = Number(body.stock_count);
-
   if (body.original_price !== undefined) {
-    patch.original_price =
-      body.original_price === null || body.original_price === '' ? null : Number(body.original_price);
+    patch.original_price = body.original_price === null || body.original_price === '' ? null : Number(body.original_price);
   }
+  if (body.features !== undefined) patch.features = Array.isArray(body.features) ? body.features : [];
 
-  if (body.features !== undefined) {
-    patch.features = Array.isArray(body.features) ? body.features : [];
-  }
+  if (patch.price !== undefined && (Number.isNaN(patch.price) || patch.price < 0)) return json(400, { error: 'Invalid price' });
+  if (patch.stock_count !== undefined && (Number.isNaN(patch.stock_count) || patch.stock_count < 0)) return json(400, { error: 'Invalid stock_count' });
 
-  // Validaciones
-  if (patch.price !== undefined && (Number.isNaN(patch.price) || patch.price < 0)) {
-    return json(400, { error: 'Invalid price' });
-  }
-  if (patch.stock_count !== undefined && (Number.isNaN(patch.stock_count) || patch.stock_count < 0)) {
-    return json(400, { error: 'Invalid stock_count' });
-  }
-
-  // Si viene original_price, validarla contra price final
+  // Validación de precio original
   if (patch.original_price !== undefined) {
     let priceToCompare = patch.price;
-
     if (priceToCompare === undefined) {
       const { data: current, error: cErr } = await auth.supabase.from('products').select('price').eq('id', id).single();
       if (cErr || !current) return json(404, { error: 'Product not found' });
       priceToCompare = Number(current.price || 0);
     }
-
-    if (
-      patch.original_price !== null &&
-      (Number.isNaN(patch.original_price) || patch.original_price < priceToCompare)
-    ) {
+    if (patch.original_price !== null && (Number.isNaN(patch.original_price) || patch.original_price < priceToCompare)) {
       return json(400, { error: 'original_price must be null or >= price' });
     }
   }
 
   const { data, error } = await auth.supabase.from('products').update(patch).eq('id', id).select('*').single();
-  if (error) return json(500, { error: `DB update error: ${error.message}` });
+  
+  if (error) {
+     console.error(`❌ [API PATCH] Error Update:`, error);
+     return json(500, { error: `DB update error: ${error.message}` });
+  }
 
   return json(200, { product: data });
 }
 
 export async function DELETE(req: Request, ctx: Ctx) {
   const { id } = await ctx.params;
-
   const auth = await requireAdmin(req);
   if (!auth.ok) return auth.res;
-
-  // Soft delete: is_active = false
   const { data, error } = await auth.supabase.from('products').update({ is_active: false }).eq('id', id).select('*').single();
-
   if (error) return json(500, { error: `DB delete error: ${error.message}` });
-
   return json(200, { product: data });
 }
