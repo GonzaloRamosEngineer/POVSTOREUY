@@ -1,8 +1,14 @@
+'use client';
+
 import Link from 'next/link';
 import Icon from '@/components/ui/AppIcon';
 
 const FooterSection = () => {
-  const currentYear = new Date()?.getFullYear();
+  const currentYear = new Date().getFullYear();
+
+  const scrollToTop = () => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
 
   return (
     <footer className="bg-card border-t border-border">
@@ -11,7 +17,6 @@ const FooterSection = () => {
           {/* Brand Section */}
           <div className="space-y-4">
             <div className="flex items-center gap-3">
-              {/* BRAND: Fondo Rojo (Primary) con ícono blanco */}
               <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center shadow-[0_0_15px_rgba(220,38,38,0.3)]">
                 <Icon name="VideoCameraIcon" size={24} className="text-primary-foreground" variant="solid" />
               </div>
@@ -104,9 +109,7 @@ const FooterSection = () => {
 
         {/* Payment Methods */}
         <div className="border-t border-border pt-8 mb-8">
-          <h4 className="text-sm font-semibold text-foreground mb-4 text-center">
-            Métodos de Pago Aceptados
-          </h4>
+          <h4 className="text-sm font-semibold text-foreground mb-4 text-center">Métodos de Pago Aceptados</h4>
           <div className="flex flex-wrap justify-center gap-4">
             <div className="px-4 py-2 bg-muted rounded-md flex items-center gap-2 border border-border/50">
               <Icon name="CreditCardIcon" size={20} className="text-primary" />
@@ -125,10 +128,32 @@ const FooterSection = () => {
 
         {/* Bottom Bar */}
         <div className="border-t border-border pt-8 flex flex-col md:flex-row justify-between items-center gap-4">
-          <p className="text-sm text-muted-foreground text-center md:text-left">
-            © {currentYear} POV Store Uruguay. Todos los derechos reservados.
-          </p>
+          <div className="flex flex-col md:flex-row items-center gap-3 md:gap-6">
+            <p className="text-sm text-muted-foreground text-center md:text-left">
+              © {currentYear} POV Store Uruguay. Todos los derechos reservados.
+            </p>
+
+            {/* ✅ Firma DigitalMatchGlobal (pro, discreta) */}
+            <a
+              href="https://www.digitalmatchglobal.com/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="group relative flex items-center gap-2 px-3 py-1.5 rounded-full bg-muted/40 border border-border hover:border-primary/40 transition-all duration-500 overflow-hidden"
+              aria-label="Made by DigitalMatchGlobal"
+            >
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-primary/15 to-transparent translate-x-[-120%] group-hover:translate-x-[120%] transition-transform duration-1000" />
+              <span className="relative text-[10px] text-muted-foreground uppercase tracking-wider font-semibold">
+                Made by
+              </span>
+              <span className="relative text-xs font-bold text-foreground group-hover:text-primary transition-colors">
+                DigitalMatchGlobal
+              </span>
+              <Icon name="BoltIcon" size={14} className="relative text-muted-foreground group-hover:text-primary transition-colors" />
+            </a>
+          </div>
+
           <div className="flex items-center gap-4">
+            {/* Redes */}
             <a
               href="https://instagram.com/povstoreuruguay"
               target="_blank"
@@ -156,6 +181,27 @@ const FooterSection = () => {
             >
               <Icon name="PlayIcon" size={16} className="text-foreground group-hover:text-white" />
             </a>
+
+            {/* 🔒 Admin “camuflado” */}
+            <Link
+              href="/admin-login"
+              className="text-[10px] text-muted-foreground/60 hover:text-muted-foreground transition-colors uppercase tracking-[0.2em] font-bold"
+              aria-label="Admin"
+              title="Admin"
+            >
+              Admin
+            </Link>
+
+            {/* ⬆️ Scroll top */}
+            <button
+              type="button"
+              onClick={scrollToTop}
+              className="w-9 h-9 flex items-center justify-center rounded-full bg-muted hover:bg-primary transition-smooth focus-ring group"
+              aria-label="Scroll to top"
+              title="Subir"
+            >
+              <Icon name="ArrowUpIcon" size={16} className="text-foreground group-hover:text-white" />
+            </button>
           </div>
         </div>
       </div>
