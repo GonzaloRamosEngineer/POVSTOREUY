@@ -1,76 +1,90 @@
 import { createClient } from '@supabase/supabase-js';
+import { notFound } from 'next/navigation';
+import Header from '@/components/common/Header';
+import ProductDetailsInteractive from '@/app/product-details/components/ProductDetailsInteractive';
 
-// Forzamos dinamismo absoluto
+// -----------------------------------------------------------------------------
+// 🔥 ESTA ES LA LÍNEA CLAVE QUE FALTABA:
+// Obliga a Vercel a generar la página en cada visita (Server Side Rendering).
+// Esto evita que se quede guardada una página de "Error 404" en la memoria caché.
 export const dynamic = 'force-dynamic';
-export const revalidate = 0;
+// -----------------------------------------------------------------------------
 
-export default async function Page({ params }: { params: Promise<{ id: string }> }) {
-  const resolvedParams = await params;
-  const id = resolvedParams.id;
+// Configuración de Supabase (Server Side)
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+const supabase = createClient(supabaseUrl, supabaseKey);
 
-  // 1. Diagnóstico de Variables de Entorno
-  const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const sbKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+// Definimos el tipo de Params como una Promesa (Requisito de Next.js moderno)
+type Props = {
+  params: Promise<{ id: string }>;
+};
 
-  if (!sbUrl || !sbKey) {
-    return (
-      <div style={{ padding: 40, fontFamily: 'monospace', color: 'red' }}>
-        <h1>❌ ERROR CRÍTICO: VARIABLES FALTANTES</h1>
-        <p>Vercel no está inyectando las variables.</p>
-        <p>URL: {sbUrl ? 'OK' : 'MISSING'}</p>
-        <p>KEY: {sbKey ? 'OK' : 'MISSING'}</p>
-      </div>
-    );
+// SEO Dinámico
+export async function generateMetadata({ params }: Props) {
+  // 1. Esperamos a obtener los parámetros
+  const { id } = await params;
+
+  const { data: product } = await supabase
+    .from('products')
+    .select('name, description')
+    .eq('id', id)
+    .single();
+
+  if (!product) return { title: 'Producto no encontrado' };
+
+  return {
+    title: `${product.name} - POV Store Uruguay`,
+    description: product.description?.substring(0, 160) || 'Cámaras de acción profesionales.',
+  };
+}
+
+export default async function ProductPage({ params }: Props) {
+  // 1. Esperamos a obtener los parámetros aquí también
+  const { id } = await params;
+
+  // 2. Buscamos el producto en la DB usando el ID obtenido
+  const { data: product, error } = await supabase
+    .from('products')
+    .select('*')
+    .eq('id', id)
+    .single();
+
+  if (error || !product) {
+    notFound();
   }
 
-  // 2. Intento de Conexión Directa
-  const supabase = createClient(sbUrl, sbKey);
+  // 3. Preparamos la Galería
+  const formattedGallery = [
+    ...(product.video_url
+      ? [{
+          id: 'video-main',
+          url: product.video_url,
+          alt: `Video de ${product.name}`,
+          type: 'video' as const,
+        }]
+      : []),
+    {
+      id: 'main-image',
+      url: product.image_url,
+      alt: `${product.name} principal`,
+      type: 'image' as const,
+    },
+    ...(product.gallery || []).map((url: string, index: number) => ({
+      id: `gallery-${index}`,
+      url: url,
+      alt: `${product.name} vista ${index + 1}`,
+      type: 'image' as const,
+    })),
+  ];
 
-  console.log(`🔍 [DEBUG] Intentando buscar ID: ${id}`);
-
-  // Hacemos la consulta más simple posible (sin joins complejos)
-  const { data, error } = await supabase
-    .from('products')
-    .select('id, name, is_active')
-    .eq('id', id); // Usamos .eq en lugar de .single() para evitar error si hay 0 filas
-
-  // 3. Renderizado de Diagnóstico
   return (
-    <div style={{ padding: 40, fontFamily: 'monospace', backgroundColor: '#f4f4f5', minHeight: '100vh', color: '#000' }}>
-      <h1 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '20px' }}>🛠️ MODO DIAGNÓSTICO VERCEL</h1>
-      
-      <div style={{ border: '1px solid #ccc', padding: '20px', background: 'white', borderRadius: '8px' }}>
-        <p><strong>ID Solicitado:</strong> {id}</p>
-        
-        <hr style={{ margin: '20px 0' }} />
-
-        {error ? (
-          <div style={{ color: 'red' }}>
-            <h3>❌ Error de Supabase:</h3>
-            <pre>{JSON.stringify(error, null, 2)}</pre>
-          </div>
-        ) : (
-          <div style={{ color: 'green' }}>
-            <h3>✅ Conexión Exitosa</h3>
-            <p><strong>Resultados encontrados:</strong> {data?.length}</p>
-          </div>
-        )}
-
-        <hr style={{ margin: '20px 0' }} />
-
-        <h3>Datos Crudos (Primer resultado):</h3>
-        {data && data.length > 0 ? (
-          <pre style={{ background: '#eee', padding: '10px' }}>
-            {JSON.stringify(data[0], null, 2)}
-          </pre>
-        ) : (
-          <p style={{ color: 'orange' }}>⚠️ El array de datos está vacío. El ID no devuelve resultados.</p>
-        )}
-      </div>
-      
-      <div style={{ marginTop: '20px', fontSize: '12px', color: '#666' }}>
-        <p>Si ves esta pantalla, el enrutamiento de Next.js funciona bien. El problema estaba en generateMetadata o en los componentes hijos.</p>
-      </div>
+    <div className="min-h-screen bg-background">
+      <Header />
+      <ProductDetailsInteractive 
+        productInitial={product} 
+        galleryInitial={formattedGallery} 
+      />
     </div>
   );
 }

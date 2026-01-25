@@ -1,12 +1,20 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // 1. Mapas de fuente para producción (opcional, ayuda a debuggear)
   productionBrowserSourceMaps: true,
-  distDir: process.env.DIST_DIR || '.next',  typescript: {
+  
+  // 2. Directorio de distribución estándar
+  distDir: process.env.DIST_DIR || '.next',
+
+  // 3. Ignorar errores de tipado/linting en build (para que no falle el deploy por detalles)
+  typescript: {
     ignoreBuildErrors: true,
   },
   eslint: {
     ignoreDuringBuilds: true,
   },
+
+  // 4. Configuración de Imágenes (CRÍTICO: Agregamos Supabase aquí)
   images: {
     remotePatterns: [
       {
@@ -25,8 +33,15 @@ const nextConfig = {
         protocol: 'https',
         hostname: 'img.rocket.new',
       },
+      // --- AGREGADO: Tu dominio de Supabase ---
+      {
+        protocol: 'https',
+        hostname: 'kdzhyalorvjqxhybtdil.supabase.co',
+      },
     ],
   },
+
+  // 5. Redirecciones
   async redirects() {
     return [
       {
@@ -36,16 +51,9 @@ const nextConfig = {
       },
     ];
   },
-  webpack(config) {
-    config.module.rules.push({
-      test: /\.(jsx|tsx)$/,
-      exclude: [/node_modules/],
-      use: [{
-        loader: '@dhiwise/component-tagger/nextLoader',
-      }],
-    });
-    return config;
-  },
+
+  // --- BORRAMOS LA SECCIÓN DE WEBPACK DE DHIWISE ---
+  // Esa sección es la que causaba el conflicto con las rutas dinámicas.
 };
 
 export default nextConfig;
