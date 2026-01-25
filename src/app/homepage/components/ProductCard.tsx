@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link'; // <--- IMPORTANTE: Importamos Link
 import AppImage from '@/components/ui/AppImage';
 import Icon from '@/components/ui/AppIcon';
 
@@ -15,7 +16,7 @@ interface ProductCardProps {
   stockCount: number;
   badge?: string;
   onAddToCart: (productId: string) => void;
-  onViewDetails: (productId: string) => void;
+  onViewDetails?: (productId: string) => void; // Lo hacemos opcional porque ya no lo vamos a necesitar obligatoriamente
 }
 
 const ProductCard = ({
@@ -29,7 +30,6 @@ const ProductCard = ({
   stockCount,
   badge,
   onAddToCart,
-  onViewDetails,
 }: ProductCardProps) => {
   const [isHydrated, setIsHydrated] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
@@ -40,6 +40,9 @@ const ProductCard = ({
 
   const discount = originalPrice ? Math.round(((originalPrice - price) / originalPrice) * 100) : 0;
   const isLowStock = stockCount <= 5;
+  
+  // URL DE LA NUEVA PÁGINA PROFESIONAL
+  const productUrl = `/products/${id}`; 
 
   if (!isHydrated) {
     return (
@@ -71,15 +74,15 @@ const ProductCard = ({
       {/* Glow Effect Trasero (Rojo) */}
       <div className="absolute inset-0 bg-gradient-to-br from-red-600/0 via-transparent to-red-900/0 group-hover:from-red-600/5 group-hover:to-red-900/5 transition-all duration-500 pointer-events-none" />
       
-      {/* Image Section */}
-      <div className="relative h-80 bg-neutral-800 overflow-hidden">
+      {/* Image Section - AHORA ES UN LINK */}
+      <Link href={productUrl} className="block relative h-80 bg-neutral-800 overflow-hidden cursor-pointer">
         <AppImage
           src={image}
           alt={alt}
           className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-out"
         />
         
-        {/* Overlay on hover (Oscurece un poco para que resalte el botón play/detalles) */}
+        {/* Overlay on hover */}
         <div className="absolute inset-0 bg-black/20 group-hover:bg-black/40 transition-colors duration-300" />
         
         {/* Badges - Estilo Tech */}
@@ -110,15 +113,18 @@ const ProductCard = ({
             <Icon name="EyeIcon" size={24} className="text-white" variant="solid" />
           </div>
         </div>
-      </div>
+      </Link>
 
       {/* Content Section */}
       <div className="relative p-6 space-y-4 bg-neutral-900">
-        <h3 className="text-2xl font-heading font-bold text-white group-hover:text-red-500 transition-colors duration-300">{name}</h3>
+        <Link href={productUrl} className="block">
+           <h3 className="text-2xl font-heading font-bold text-white group-hover:text-red-500 transition-colors duration-300 cursor-pointer">
+             {name}
+           </h3>
+        </Link>
 
         {/* Pricing */}
         <div className="flex items-baseline gap-3">
-          {/* Precio Rojo Intenso */}
           <span className="text-3xl font-mono font-bold text-red-500 drop-shadow-[0_0_8px_rgba(220,38,38,0.3)]">
             ${price.toLocaleString('es-UY')}
           </span>
@@ -152,19 +158,19 @@ const ProductCard = ({
         <div className="pt-6 space-y-3">
           <button
             onClick={() => onAddToCart(id)}
-            // RED ALERT: Botón Rojo Fuerte
             className="w-full px-6 py-3.5 bg-red-600 hover:bg-red-500 text-white text-center font-bold rounded-xl transition-all shadow-[0_4px_14px_0_rgba(220,38,38,0.39)] hover:shadow-[0_6px_20px_rgba(220,38,38,0.23)] hover:-translate-y-0.5 active:translate-y-0 uppercase tracking-wide flex items-center justify-center gap-2"
           >
             <Icon name="ShoppingCartIcon" size={18} variant="solid" />
             <span>Comprar Ahora</span>
           </button>
           
-          <button
-            onClick={() => onViewDetails(id)}
-            className="w-full px-6 py-3 bg-transparent hover:bg-white/5 text-neutral-400 hover:text-white text-center font-medium rounded-xl transition-all border border-neutral-700 hover:border-neutral-500"
+          {/* BOTÓN VER DETALLES - AHORA ES UN LINK DIRECTO */}
+          <Link
+            href={productUrl}
+            className="block w-full px-6 py-3 bg-transparent hover:bg-white/5 text-neutral-400 hover:text-white text-center font-medium rounded-xl transition-all border border-neutral-700 hover:border-neutral-500"
           >
             Ver Detalles
-          </button>
+          </Link>
         </div>
       </div>
     </div>

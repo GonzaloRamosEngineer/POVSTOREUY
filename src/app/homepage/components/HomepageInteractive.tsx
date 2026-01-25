@@ -98,6 +98,7 @@ const HomepageInteractive = () => {
           'id,name,model,description,price,original_price,image_url,stock_count,features,badge,is_active,created_at'
         )
         .eq('is_active', true)
+        .eq('show_on_home', true)
         .order('created_at', { ascending: false });
 
       if (!mounted) return;

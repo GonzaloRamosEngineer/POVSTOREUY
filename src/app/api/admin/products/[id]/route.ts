@@ -40,6 +40,7 @@ export async function GET(req: Request, ctx: Ctx) {
   const auth = await requireAdmin(req);
   if (!auth.ok) return auth.res;
 
+  // Al hacer select('*'), automáticamente traerá gallery, colors y addon_ids si existen
   const { data, error } = await auth.supabase.from('products').select('*').eq('id', id).single();
   if (error) return json(404, { error: 'Product not found' });
 
@@ -69,8 +70,28 @@ export async function PATCH(req: Request, ctx: Ctx) {
   setIfPresent('model', body.model !== undefined ? String(body.model).trim() : undefined);
   setIfPresent('description', body.description !== undefined ? String(body.description).trim() : undefined);
   setIfPresent('image_url', body.image_url !== undefined ? String(body.image_url).trim() : undefined);
+  
+  // Multimedia
+  setIfPresent('video_url', body.video_url !== undefined ? (body.video_url ? String(body.video_url).trim() : null) : undefined);
+  
+  // Arrays
+  if (body.gallery !== undefined) {
+    patch.gallery = Array.isArray(body.gallery) ? body.gallery : [];
+  }
+
+  // --- ACTUALIZACIÓN: Nuevos campos (Arrays) ---
+  if (body.colors !== undefined) {
+    patch.colors = Array.isArray(body.colors) ? body.colors : [];
+  }
+  
+  if (body.addon_ids !== undefined) {
+    patch.addon_ids = Array.isArray(body.addon_ids) ? body.addon_ids : [];
+  }
+  // ---------------------------------------------
+
   setIfPresent('badge', body.badge !== undefined ? (body.badge ? String(body.badge).trim() : null) : undefined);
   setIfPresent('is_active', body.is_active !== undefined ? Boolean(body.is_active) : undefined);
+  setIfPresent('show_on_home', body.show_on_home !== undefined ? Boolean(body.show_on_home) : undefined);
 
   if (body.price !== undefined) patch.price = Number(body.price);
   if (body.stock_count !== undefined) patch.stock_count = Number(body.stock_count);
@@ -92,7 +113,7 @@ export async function PATCH(req: Request, ctx: Ctx) {
     return json(400, { error: 'Invalid stock_count' });
   }
 
-  // Si viene original_price, validarla contra price final (si no vino price, traemos el actual)
+  // Si viene original_price, validarla contra price final
   if (patch.original_price !== undefined) {
     let priceToCompare = patch.price;
 

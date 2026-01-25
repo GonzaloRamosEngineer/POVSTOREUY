@@ -85,7 +85,7 @@ const Header = ({ cartItems = [], onCartClick, isAdminMode = false }: HeaderProp
                 className="text-sm font-medium text-foreground hover:text-primary transition-smooth focus-ring rounded-md px-3 py-2"
                 onClick={handleNavigate}
               >
-                Products
+                Modelos
               </Link>
 
               {/* Si querés, podés agregar más links públicos acá */}

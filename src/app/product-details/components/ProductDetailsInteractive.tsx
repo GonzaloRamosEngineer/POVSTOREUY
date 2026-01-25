@@ -1,15 +1,18 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
-import { useSearchParams, useRouter } from 'next/navigation';
+import { useState, useMemo, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import ProductGallery from './ProductGallery';
 import ProductInfo from './ProductInfo';
 import ProductSpecs from './ProductSpecs';
-import AddToCartSection from './AddToCartSection';
 import CustomerReviews from './CustomerReviews';
 import RelatedProducts from './RelatedProducts';
+import Icon from '@/components/ui/AppIcon';
+import AppImage from '@/components/ui/AppImage';
 import { getSupabaseBrowserClient } from '@/lib/supabaseClient';
 import { upsertCartItem, incrementItem, readCart } from '@/lib/cart';
+
+// --- Interfaces ---
 
 interface GalleryImage {
   id: string;
@@ -35,29 +38,36 @@ interface Review {
   verified: boolean;
 }
 
-interface RelatedProduct {
+// Tipo para un Addon (Producto simplificado)
+interface AddonProduct {
+  id: string;
+  name: string;
+  price: number;
+  image_url: string;
+}
+
+// Interfaz del Producto Principal (Extendida con nuevos campos)
+interface ProductData {
   id: string;
   name: string;
   model: string;
-  price: number;
-  image: string;
-  imageAlt: string;
-  rating: number;
-}
-
-interface ProductRow {
-  id: string; // uuid
-  name: string;
-  model: string | null;
-  description: string | null;
+  description: string;
   price: number;
   original_price: number | null;
-  image_url: string | null;
-  stock_count: number | null;
-  features: any;
-  is_active?: boolean | null;
+  image_url: string;
+  stock_count: number;
+  features: string[] | string; // Puede venir como string JSON o array
+  is_active: boolean;
+  colors?: { name: string; hex: string }[];
+  addon_ids?: string[];
 }
 
+interface ProductInteractiveProps {
+  productInitial: ProductData; 
+  galleryInitial: GalleryImage[];
+}
+
+// --- Helpers ---
 function normalizeFeatures(v: unknown): string[] {
   if (Array.isArray(v)) return v.filter(Boolean).map(String);
   if (typeof v === 'string') {
@@ -69,89 +79,46 @@ function normalizeFeatures(v: unknown): string[] {
   return [];
 }
 
-export default function ProductDetailsInteractive() {
+export default function ProductDetailsInteractive({ productInitial, galleryInitial }: ProductInteractiveProps) {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const productId = searchParams.get('id'); // <- UUID real
+  const supabase = getSupabaseBrowserClient();
+  
+  // Usamos los datos iniciales
+  const product = productInitial;
 
-  const supabase = useMemo(() => getSupabaseBrowserClient(), []);
+  // --- ESTADOS ---
+  
+  // 1. Color Seleccionado (Predeterminado al primero si existe)
+  const [selectedColor, setSelectedColor] = useState<string | null>(
+      product.colors && product.colors.length > 0 ? product.colors[0].name : null
+  );
 
-  const [isHydrated, setIsHydrated] = useState(false);
+  // 2. Addons (Datos y Selección)
+  const [addonsData, setAddonsData] = useState<AddonProduct[]>([]);
+  const [selectedAddonIds, setSelectedAddonIds] = useState<string[]>([]);
+  
+  // 3. Cantidad Principal (Para la lógica de compra)
+  const [quantity, setQuantity] = useState(1);
 
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [product, setProduct] = useState<ProductRow | null>(null);
+  // --- EFECTOS ---
 
+  // Cargar datos de Addons desde Supabase
   useEffect(() => {
-    setIsHydrated(true);
-  }, []);
-
-  useEffect(() => {
-    let mounted = true;
-
-    async function load() {
-      if (!productId) {
-        setError('Falta el id del producto en la URL.');
-        setLoading(false);
-        return;
-      }
-
-      setLoading(true);
-      setError(null);
-
-      const { data, error } = await supabase
-        .from('products')
-        .select('id,name,model,description,price,original_price,image_url,stock_count,features,is_active')
-        .eq('id', productId)
-        .maybeSingle();
-
-      if (!mounted) return;
-
-      if (error) {
-        console.error(error);
-        setError(error.message || 'Error cargando producto');
-        setProduct(null);
-        setLoading(false);
-        return;
-      }
-
-      if (!data) {
-        setError('Producto no encontrado.');
-        setProduct(null);
-        setLoading(false);
-        return;
-      }
-
-      // Si querés bloquear productos inactivos:
-      if (data.is_active === false) {
-        setError('Este producto no está disponible.');
-        setProduct(null);
-        setLoading(false);
-        return;
-      }
-
-      setProduct({
-        id: data.id,
-        name: data.name,
-        model: data.model ?? null,
-        description: data.description ?? null,
-        price: Number(data.price),
-        original_price: data.original_price != null ? Number(data.original_price) : null,
-        image_url: data.image_url ?? null,
-        stock_count: data.stock_count != null ? Number(data.stock_count) : 0,
-        features: data.features,
-        is_active: data.is_active ?? true,
-      });
-
-      setLoading(false);
-    }
-
-    load();
-
-    return () => {
-      mounted = false;
+    const fetchAddons = async () => {
+        if (!product.addon_ids || product.addon_ids.length === 0) return;
+        
+        const { data } = await supabase
+            .from('products')
+            .select('id, name, price, image_url')
+            .in('id', product.addon_ids)
+            .eq('is_active', true);
+            
+        if (data) setAddonsData(data);
     };
-  }, [productId]);
+    fetchAddons();
+  }, [product.addon_ids, supabase]);
+
+  // --- CÁLCULOS DERIVADOS ---
 
   const title = useMemo(() => {
     if (!product) return '';
@@ -165,175 +132,250 @@ export default function ProductDetailsInteractive() {
   }, [product]);
 
   const stockCount = product?.stock_count ?? 0;
-
   const stockStatus: 'in-stock' | 'low-stock' | 'out-of-stock' =
     stockCount <= 0 ? 'out-of-stock' : stockCount <= 5 ? 'low-stock' : 'in-stock';
 
-  const galleryImages: GalleryImage[] = useMemo(() => {
-    const url = product?.image_url || '';
-    const alt = `${product?.name ?? 'Producto'} ${product?.model ?? ''}`.trim();
-    if (!url) return [];
-    return [{ id: 'main', url, alt, type: 'image' }];
-  }, [product]);
+  // Precio Total Dinámico (Producto * Cantidad + Addons)
+  // Nota: Los addons se suman 1 vez por conjunto, si quisieras que se multipliquen por la cantidad base, ajusta aquí.
+  const totalPrice = useMemo(() => {
+      const base = Number(product.price) * quantity;
+      const addonsCost = selectedAddonIds.reduce((acc, id) => {
+          const item = addonsData.find(a => a.id === id);
+          return acc + (item ? Number(item.price) : 0);
+      }, 0);
+      return base + addonsCost;
+  }, [product.price, quantity, selectedAddonIds, addonsData]);
 
-  // Specs: por ahora fijo (cuando guardes specs en DB, lo mapeamos)
+  // --- HANDLERS ---
+
+  const toggleAddon = (id: string) => {
+      setSelectedAddonIds(prev => 
+          prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+      );
+  };
+
+  const handleAddToCart = () => {
+      if (stockStatus === 'out-of-stock') return;
+
+      // 1. Agregar producto principal
+      // Si hay color seleccionado, lo agregamos al nombre para que se vea en el carrito
+      const mainProductName = selectedColor 
+          ? `${product.name} (${selectedColor})` 
+          : product.name;
+
+      upsertCartItem({
+          id: product.id, 
+          name: mainProductName,
+          model: product.model,
+          price: Number(product.price),
+          quantity: quantity,
+          image: product.image_url,
+          alt: title,
+          stock: product.stock_count,
+      });
+
+      // 2. Agregar Addons seleccionados como items separados
+      selectedAddonIds.forEach(addonId => {
+          const item = addonsData.find(a => a.id === addonId);
+          if (item) {
+              const existing = readCart().find(c => c.id === item.id);
+              if (existing) {
+                  incrementItem(item.id, 1);
+              } else {
+                  upsertCartItem({
+                      id: item.id,
+                      name: item.name,
+                      model: 'Accesorio', // Label genérico para addons
+                      price: Number(item.price),
+                      quantity: 1,
+                      image: item.image_url,
+                      stock: 99, // Asumimos stock alto para addons o lo traes de DB
+                      alt: item.name
+                  });
+              }
+          }
+      });
+
+      router.push('/shopping-cart');
+  };
+
+  // --- DATOS MOCK (Specs/Reviews) ---
   const specifications: Specification[] = [
-    { icon: 'VideoCameraIcon', label: 'Resolución de video', value: '4K a 30fps / 1080p a 60fps' },
-    { icon: 'CameraIcon', label: 'Resolución de foto', value: '12 megapíxeles' },
-    { icon: 'BoltIcon', label: 'Batería', value: '1200mAh - Hasta 90 minutos de grabación' },
-    { icon: 'CircleStackIcon', label: 'Almacenamiento', value: 'MicroSD hasta 128GB (no incluida)' },
-    { icon: 'WifiIcon', label: 'Conectividad', value: 'WiFi 2.4GHz + Bluetooth 5.0' },
-    { icon: 'DevicePhoneMobileIcon', label: 'Dimensiones', value: '59 x 41 x 30 mm - Peso: 58g' },
-    { icon: 'BeakerIcon', label: 'Resistencia', value: 'Resistente a salpicaduras IPX4' },
-    { icon: 'CubeIcon', label: 'Accesorios incluidos', value: 'Cable USB-C, manual, soporte adhesivo' },
+    { icon: 'VideoCameraIcon', label: 'Resolución', value: '4K Ultra HD' },
+    { icon: 'WifiIcon', label: 'Conectividad', value: 'WiFi Integrado' },
   ];
-
-  // Reviews/Related: mock por ahora
+  
   const reviews: Review[] = [
     {
       id: '1',
-      author: 'Martín González',
-      authorImage: 'https://images.unsplash.com/photo-1612993013894-3e0959edb6be',
-      authorImageAlt: 'Hombre joven con barba corta y camisa azul sonriendo a la cámara',
+      author: 'Cliente Verificado',
+      authorImage: '/assets/images/no_image.png', 
+      authorImageAlt: 'Cliente',
       rating: 5,
-      date: '15/12/2025',
-      comment:
-        'Excelente calidad de imagen para el precio. La uso para grabar mis videos y la calidad 4K es impresionante.',
+      date: 'Reciente',
+      comment: 'Excelente producto, muy recomendable.',
       verified: true,
     },
   ];
 
-  const relatedProducts: RelatedProduct[] = [];
-
-  function ensureCartItemQuantity(productId: string, qty: number) {
-    if (!product) return;
-
-    const existing = readCart().find((i) => i.id === productId);
-
-    if (existing) {
-      // suma qty (no 1)
-      incrementItem(productId, qty);
-      return;
-    }
-
-    // crear con qty real
-    upsertCartItem({
-      id: product.id,
-      name: title,
-      model: product.model ?? undefined,
-      price: Number(product.price),
-      quantity: qty,
-      image: product.image_url || '',
-      alt: `${product.name} ${product.model ?? ''}`.trim(),
-      stock: product.stock_count ?? 0,
-    });
-  }
-
-  const handleAddToCart = (payload: { quantity: number }) => {
-    if (!product) return;
-    if (stockStatus === 'out-of-stock') return;
-
-    const qty = Math.max(1, Math.min(10, payload.quantity || 1));
-    ensureCartItemQuantity(product.id, qty);
-
-    router.push('/shopping-cart');
-  };
-
-  const handleBuyNow = (payload: { quantity: number }) => {
-    if (!product) return;
-    if (stockStatus === 'out-of-stock') return;
-
-    const qty = Math.max(1, Math.min(10, payload.quantity || 1));
-    ensureCartItemQuantity(product.id, qty);
-
-    // ✅ manda directo a checkout, pero primero guardó el carrito
-    router.push('/checkout-payment');
-  };
-
-  if (!isHydrated) {
-    return (
-      <div className="min-h-screen bg-background">
-        <div className="max-w-[1400px] mx-auto px-4 lg:px-6 py-8">
-          <div className="animate-pulse space-y-8">
-            <div className="h-96 bg-muted rounded-lg" />
-            <div className="h-64 bg-muted rounded-lg" />
-          </div>
+  // Validación de seguridad
+  if (product.is_active === false) {
+     return (
+        <div className="min-h-screen flex items-center justify-center">
+           <p className="text-gray-500">Este producto ya no está disponible.</p>
         </div>
-      </div>
-    );
-  }
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-background">
-        <div className="max-w-[1400px] mx-auto px-4 lg:px-6 py-8">
-          <div className="animate-pulse space-y-8">
-            <div className="h-96 bg-muted rounded-lg" />
-            <div className="h-64 bg-muted rounded-lg" />
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (error || !product) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center p-6">
-        <div className="max-w-md text-center">
-          <p className="text-lg font-medium text-foreground">No se pudo cargar el producto</p>
-          <p className="text-sm text-muted-foreground mt-2">{error ?? 'Error desconocido'}</p>
-          <button
-            onClick={() => router.push('/homepage')}
-            className="mt-6 px-6 py-3 bg-primary text-primary-foreground font-semibold rounded-lg"
-          >
-            Volver a la tienda
-          </button>
-        </div>
-      </div>
-    );
+     );
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="max-w-[1400px] mx-auto px-4 lg:px-6 py-8 space-y-12">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-          <div className="lg:col-span-5">
-            <ProductGallery images={galleryImages} productName={title} />
-          </div>
-
-          <div className="lg:col-span-4">
-            <ProductInfo
-              name={title}
-              model={product.model ?? ''}
-              price={Number(product.price)}
-              originalPrice={product.original_price ?? undefined}
-              rating={4.8}
-              reviewCount={127}
-              stockStatus={stockStatus}
-              stockCount={stockCount}
-              description={desc}
-            />
-          </div>
-
-          <div className="lg:col-span-3">
-            <AddToCartSection
-              productId={product.id}
-              productName={title}
-              price={Number(product.price)}
-              stockStatus={stockStatus}
-              availableModels={[]}
-              onAddToCart={({ quantity }) => handleAddToCart({ quantity })}
-              onBuyNow={({ quantity }) => handleBuyNow({ quantity })}
-            />
-          </div>
+    <div className="max-w-[1400px] mx-auto px-4 lg:px-6 py-8 space-y-12">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+        
+        {/* COLUMNA 1: Galería */}
+        <div className="lg:col-span-5">
+          <ProductGallery images={galleryInitial} productName={title} />
         </div>
 
-        <ProductSpecs specifications={specifications} />
+        {/* COLUMNA 2: Información Central */}
+        <div className="lg:col-span-4 space-y-6">
+          <ProductInfo
+            name={title}
+            model={product.model ?? ''}
+            price={Number(product.price)}
+            originalPrice={product.original_price ?? undefined}
+            rating={4.8}
+            reviewCount={127}
+            stockStatus={stockStatus}
+            stockCount={stockCount}
+            description={desc}
+          />
 
-        <CustomerReviews reviews={reviews} averageRating={4.8} totalReviews={127} />
+          {/* Selector de Colores (Insertado aquí) */}
+          {product.colors && product.colors.length > 0 && (
+            <div className="pt-4 border-t">
+                <h3 className="text-sm font-medium text-gray-900 mb-3">
+                    Color: <span className="text-gray-500 font-normal">{selectedColor}</span>
+                </h3>
+                <div className="flex gap-3">
+                    {product.colors.map((c) => (
+                        <button
+                            key={c.name}
+                            onClick={() => setSelectedColor(c.name)}
+                            className={`w-8 h-8 rounded-full border shadow-sm transition-transform hover:scale-110 focus:outline-none ${selectedColor === c.name ? 'ring-2 ring-offset-2 ring-blue-600 border-white' : 'border-gray-200'}`}
+                            style={{ backgroundColor: c.hex }}
+                            title={c.name}
+                        />
+                    ))}
+                </div>
+            </div>
+          )}
+        </div>
 
-        <RelatedProducts products={relatedProducts} />
+        {/* COLUMNA 3: Acciones y Addons (Personalizada) */}
+        <div className="lg:col-span-3">
+          <div className="sticky top-24 space-y-6">
+              
+              {/* Tarjeta de Compra */}
+              <div className="bg-white p-6 rounded-xl border shadow-sm space-y-6">
+                  {/* Precio Total */}
+                  <div>
+                      <p className="text-sm text-gray-500 mb-1">Precio Total</p>
+                      <div className="text-3xl font-bold text-gray-900">
+                         ${totalPrice.toLocaleString('es-UY')}
+                      </div>
+                      {selectedAddonIds.length > 0 && (
+                          <p className="text-xs text-green-600 mt-1 font-medium">
+                              Incluye {selectedAddonIds.length} accesorio(s)
+                          </p>
+                      )}
+                  </div>
+
+                  {/* Selector de Addons (You might also like) */}
+                  {addonsData.length > 0 && (
+                    <div className="border rounded-lg overflow-hidden">
+                        <div className="bg-gray-50 px-3 py-2 text-xs font-bold text-gray-700 border-b uppercase tracking-wide">
+                            Agrega Accesorios
+                        </div>
+                        <div className="divide-y max-h-[220px] overflow-y-auto">
+                            {addonsData.map(addon => (
+                                <label key={addon.id} className="flex items-center gap-3 p-3 hover:bg-gray-50 cursor-pointer transition-colors group">
+                                    <input 
+                                        type="checkbox" 
+                                        checked={selectedAddonIds.includes(addon.id)}
+                                        onChange={() => toggleAddon(addon.id)}
+                                        className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                                    />
+                                    <div className="w-10 h-10 relative border rounded bg-white flex-shrink-0 p-0.5">
+                                        <AppImage src={addon.image_url} alt={addon.name} className="object-contain" />
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-xs font-medium text-gray-900 truncate group-hover:text-blue-600 transition-colors">
+                                            {addon.name}
+                                        </p>
+                                        <p className="text-xs text-gray-500 font-mono">
+                                            +${addon.price}
+                                        </p>
+                                    </div>
+                                </label>
+                            ))}
+                        </div>
+                    </div>
+                  )}
+
+                  {/* Selector de Cantidad (Simple) */}
+                  <div className="flex items-center justify-between border rounded-md p-1">
+                      <button 
+                        onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                        className="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded"
+                      >
+                          <Icon name="MinusIcon" size={16} />
+                      </button>
+                      <span className="font-bold text-gray-900 text-sm">{quantity}</span>
+                      <button 
+                        onClick={() => setQuantity(Math.min(stockCount, quantity + 1))}
+                        className="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded"
+                        disabled={quantity >= stockCount}
+                      >
+                          <Icon name="PlusIcon" size={16} />
+                      </button>
+                  </div>
+
+                  {/* Botón Principal */}
+                  <button 
+                    onClick={handleAddToCart}
+                    disabled={stockStatus === 'out-of-stock'}
+                    className={`w-full py-4 rounded-lg font-bold text-lg shadow-md transition-all active:scale-95 flex items-center justify-center gap-2
+                        ${stockStatus === 'out-of-stock' 
+                            ? 'bg-gray-200 text-gray-400 cursor-not-allowed shadow-none' 
+                            : 'bg-blue-600 hover:bg-blue-700 text-white hover:shadow-lg'
+                        }`}
+                  >
+                    <Icon name="ShoppingCartIcon" size={24} />
+                    <span>
+                        {stockStatus === 'out-of-stock' ? 'Sin Stock' : 'Agregar al Carrito'}
+                    </span>
+                  </button>
+                  
+                  {stockStatus === 'out-of-stock' && (
+                      <p className="text-center text-xs text-red-500 font-medium">
+                          Lo sentimos, este producto está agotado temporalmente.
+                      </p>
+                  )}
+              </div>
+
+              {/* Info de Envío (Estática por ahora) */}
+              <div className="flex items-center gap-3 text-sm text-gray-600 px-2">
+                 <Icon name="TruckIcon" size={20} className="text-green-600" />
+                 <span>Envío gratis en compras mayores a $2000</span>
+              </div>
+          </div>
+        </div>
       </div>
+
+      {/* Secciones Inferiores */}
+      <ProductSpecs specifications={specifications} />
+      <CustomerReviews reviews={reviews} averageRating={4.8} totalReviews={127} />
+      <RelatedProducts products={[]} /> 
     </div>
   );
 }

@@ -79,6 +79,7 @@ export async function POST(req: Request) {
     return json(400, { error: 'Invalid JSON body' });
   }
 
+  // --- ACTUALIZACIÓN: Agregamos gallery, video_url, colors y addon_ids ---
   const payload = {
     name: String(body?.name || '').trim(),
     model: String(body?.model || '').trim(),
@@ -88,6 +89,18 @@ export async function POST(req: Request) {
       ? null
       : Number(body?.original_price),
     image_url: String(body?.image_url || '').trim(),
+    
+    // Arrays y Multimedia
+    gallery: Array.isArray(body?.gallery) ? body.gallery : [],
+    video_url: body?.video_url ? String(body.video_url).trim() : null,
+    
+    // --- NUEVOS CAMPOS ---
+    colors: Array.isArray(body?.colors) ? body.colors : [],
+    addon_ids: Array.isArray(body?.addon_ids) ? body.addon_ids : [],
+    // ---------------------
+
+    show_on_home: body.show_on_home !== undefined ? Boolean(body.show_on_home) : true,
+
     stock_count: Number(body?.stock_count || 0),
     features: Array.isArray(body?.features) ? body.features : [],
     badge: body?.badge ? String(body.badge).trim() : null,
