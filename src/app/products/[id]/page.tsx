@@ -3,19 +3,23 @@ import { notFound } from 'next/navigation';
 import Header from '@/components/common/Header';
 import ProductDetailsInteractive from '@/app/product-details/components/ProductDetailsInteractive';
 
+// --- CORRECCIÓN CRÍTICA PARA VERCEL ---
+// Esto obliga a que la página se genere en el servidor en cada visita.
+// Sin esto, Vercel intenta buscar una página estática que no existe (Error 404).
+export const dynamic = 'force-dynamic';
+// --------------------------------------
+
 // Configuración de Supabase (Server Side)
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-// Definimos el tipo de Params como una Promesa (Requisito de Next.js moderno)
 type Props = {
   params: Promise<{ id: string }>;
 };
 
 // SEO Dinámico
 export async function generateMetadata({ params }: Props) {
-  // 1. Esperamos a obtener los parámetros
   const { id } = await params;
 
   const { data: product } = await supabase
@@ -33,18 +37,32 @@ export async function generateMetadata({ params }: Props) {
 }
 
 export default async function ProductPage({ params }: Props) {
-  // 1. Esperamos a obtener los parámetros aquí también
   const { id } = await params;
 
-  // 2. Buscamos el producto en la DB usando el ID obtenido
+  // --- LOGS DE DEPURACIÓN (Solo se verán en los logs de Vercel) ---
+  console.log(`🚀 [Server] Solicitando producto ID: ${id}`);
+  
+  // Verificamos conexión básica
+  if (!supabaseUrl || !supabaseKey) {
+     console.error("❌ [Server] Faltan variables de entorno de Supabase en Vercel");
+  }
+
+  // 2. Buscamos el producto en la DB
   const { data: product, error } = await supabase
     .from('products')
     .select('*')
     .eq('id', id)
     .single();
 
-  if (error || !product) {
-    notFound();
+  if (error) {
+    console.error(`❌ [Server] Error Supabase: ${error.message}`);
+  }
+
+  if (!product) {
+    console.warn(`⚠️ [Server] Producto no encontrado o es null para ID: ${id}`);
+    notFound(); // Esto dispara el 404 intencional si no hay producto
+  } else {
+    console.log(`✅ [Server] Producto encontrado: ${product.name}`);
   }
 
   // 3. Preparamos la Galería
