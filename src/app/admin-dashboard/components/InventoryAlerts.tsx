@@ -36,18 +36,7 @@ export default function InventoryAlerts({ items }: InventoryAlertsProps) {
     }
   };
 
-  const getStatusText = (status: string) => {
-    switch (status) {
-      case 'critical':
-        return 'Stock crítico';
-      case 'low':
-        return 'Stock bajo';
-      default:
-        return 'Stock normal';
-    }
-  };
-
-  const alertItems = items.filter(item => item.status !== 'normal');
+  const alertItems = items.filter((item) => item.status !== 'normal');
 
   if (alertItems.length === 0) {
     return (
@@ -59,6 +48,14 @@ export default function InventoryAlerts({ items }: InventoryAlertsProps) {
         <p className="text-sm text-muted-foreground">
           Todos los productos tienen stock suficiente. No hay alertas en este momento.
         </p>
+
+        <Link
+          href="/admin-dashboard/inventory"
+          className="mt-4 inline-flex items-center justify-center gap-2 px-4 py-2 bg-primary hover:bg-primary/90 text-primary-foreground rounded-md transition-smooth focus-ring"
+        >
+          <Icon name="CubeIcon" size={18} />
+          <span className="text-sm font-medium">Ver inventario</span>
+        </Link>
       </div>
     );
   }
@@ -90,8 +87,10 @@ export default function InventoryAlerts({ items }: InventoryAlertsProps) {
                 </p>
               </div>
             </div>
+
+            {/* ✅ ahora sí: ir a editar el producto */}
             <Link
-              href="/admin-dashboard"
+              href={`/admin-dashboard/inventory/${item.id}`}
               className="flex items-center gap-2 px-4 py-2 bg-background hover:bg-muted rounded-md transition-smooth focus-ring ml-3"
             >
               <Icon name="PencilIcon" size={16} className="text-foreground" />
@@ -101,8 +100,9 @@ export default function InventoryAlerts({ items }: InventoryAlertsProps) {
         ))}
       </div>
 
+      {/* ✅ ahora sí: inventario completo real */}
       <Link
-        href="/admin-dashboard"
+        href="/admin-dashboard/inventory"
         className="flex items-center justify-center gap-2 w-full mt-4 px-4 py-3 bg-primary hover:bg-primary/90 text-primary-foreground rounded-md transition-smooth focus-ring"
       >
         <Icon name="CubeIcon" size={18} />
