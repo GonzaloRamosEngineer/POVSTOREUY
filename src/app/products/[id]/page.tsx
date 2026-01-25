@@ -1,13 +1,11 @@
 import { createClient } from '@supabase/supabase-js';
-import { notFound } from 'next/navigation';
+// import { notFound } from 'next/navigation'; // <--- COMENTADO PARA MODO DIAGNÓSTICO
 import Header from '@/components/common/Header';
 import ProductDetailsInteractive from '@/app/product-details/components/ProductDetailsInteractive';
 
-// --- CORRECCIÓN CRÍTICA PARA VERCEL ---
+// --- CONFIGURACIÓN DE RENDERIZADO ---
 // Esto obliga a que la página se genere en el servidor en cada visita.
-// Sin esto, Vercel intenta buscar una página estática que no existe (Error 404).
 export const dynamic = 'force-dynamic';
-// --------------------------------------
 
 // Configuración de Supabase (Server Side)
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -39,33 +37,46 @@ export async function generateMetadata({ params }: Props) {
 export default async function ProductPage({ params }: Props) {
   const { id } = await params;
 
-  // --- LOGS DE DEPURACIÓN (Solo se verán en los logs de Vercel) ---
-  console.log(`🚀 [Server] Solicitando producto ID: ${id}`);
-  
-  // Verificamos conexión básica
-  if (!supabaseUrl || !supabaseKey) {
-     console.error("❌ [Server] Faltan variables de entorno de Supabase en Vercel");
-  }
-
-  // 2. Buscamos el producto en la DB
+  // 1. Buscamos el producto en la DB
   const { data: product, error } = await supabase
     .from('products')
     .select('*')
     .eq('id', id)
     .single();
 
-  if (error) {
-    console.error(`❌ [Server] Error Supabase: ${error.message}`);
-  }
+  // --- MODO DIAGNÓSTICO: EN LUGAR DE 404, MOSTRAMOS DATOS ---
+  // Si hay error o el producto es null, renderizamos este panel
+  if (error || !product) {
+    return (
+      <div className="min-h-screen bg-white text-black p-10 font-mono">
+        <h1 className="text-2xl font-bold text-red-600 mb-4">⚠️ DIAGNÓSTICO DE ERROR</h1>
+        <div className="space-y-4 border p-4 rounded bg-gray-50">
+          <p><strong>ID Solicitado:</strong> {id}</p>
+          
+          <p><strong>Estado Supabase:</strong> {product ? 'Producto Encontrado' : 'Producto NULL'}</p>
+          
+          <div className="bg-gray-200 p-2 rounded">
+            <strong>Error Detallado:</strong>
+            <pre className="whitespace-pre-wrap text-xs">
+                {JSON.stringify(error, null, 2)}
+            </pre>
+          </div>
 
-  if (!product) {
-    console.warn(`⚠️ [Server] Producto no encontrado o es null para ID: ${id}`);
-    notFound(); // Esto dispara el 404 intencional si no hay producto
-  } else {
-    console.log(`✅ [Server] Producto encontrado: ${product.name}`);
+          <div className="bg-yellow-50 p-2 rounded border border-yellow-200 text-sm">
+            <strong>Variables de Entorno (Server):</strong>
+            <p>URL Definida: {process.env.NEXT_PUBLIC_SUPABASE_URL ? 'SÍ ✅' : 'NO ❌'}</p>
+            <p>Key Definida: {process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ? 'SÍ ✅' : 'NO ❌'}</p>
+            <p className="mt-2 text-xs text-gray-500 break-all">
+                Valor URL: {process.env.NEXT_PUBLIC_SUPABASE_URL || '(Vacío)'}
+            </p> 
+          </div>
+        </div>
+      </div>
+    );
   }
+  // -----------------------------------------------------------
 
-  // 3. Preparamos la Galería
+  // 2. Si todo salió bien, Preparamos la Galería
   const formattedGallery = [
     ...(product.video_url
       ? [{
@@ -89,6 +100,7 @@ export default async function ProductPage({ params }: Props) {
     })),
   ];
 
+  // 3. Renderizamos la UI normal
   return (
     <div className="min-h-screen bg-background">
       <Header />
