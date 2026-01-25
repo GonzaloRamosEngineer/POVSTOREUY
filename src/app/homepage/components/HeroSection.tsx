@@ -20,17 +20,14 @@ const HeroSection = ({ onCtaClick, basicStock, proStock }: HeroSectionProps) => 
 
   if (!isHydrated) {
     return (
-      <section className="relative min-h-screen w-full bg-gray-950 overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-radial from-gray-900 via-gray-950 to-black" />
+      <section className="relative min-h-screen w-full bg-black overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-radial from-neutral-900 via-black to-black" />
         <div className="relative z-10 flex flex-col items-center justify-center min-h-screen px-4 py-20">
           <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
             <div className="space-y-8 text-center lg:text-left">
               <h1 className="text-5xl md:text-7xl lg:text-8xl font-heading font-bold text-white leading-tight">
                 Filma en 4K lo que ven tus ojos
               </h1>
-              <p className="text-xl md:text-2xl text-gray-300 max-w-2xl">
-                Cámaras POV mini 4K para creadores de contenido. Calidad profesional, precio accesible.
-              </p>
             </div>
           </div>
         </div>
@@ -39,119 +36,155 @@ const HeroSection = ({ onCtaClick, basicStock, proStock }: HeroSectionProps) => 
   }
 
   return (
-    <section className="relative min-h-screen w-full bg-gray-950 overflow-hidden">
-      {/* Background Effects */}
-      <div className="absolute inset-0">
-        <div className="absolute inset-0 bg-gradient-radial from-gray-900 via-gray-950 to-black" />
-        <div className="absolute top-0 left-1/4 w-96 h-96 bg-neon-cyan/10 rounded-full blur-3xl animate-pulse-subtle" />
-        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-primary/10 rounded-full blur-3xl animate-pulse-subtle" style={{ animationDelay: '1s' }} />
-        <div className="absolute inset-0 bg-noise opacity-5" />
+    <section className="relative min-h-screen w-full bg-black overflow-hidden flex items-center">
+      {/* 1. EFECTOS DE FONDO (ATMÓSFERA ROJA) */}
+      <div className="absolute inset-0 pointer-events-none">
+        {/* Gradiente radial base */}
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-neutral-900/50 via-black to-black" />
+        
+        {/* Mancha de luz roja gigante arriba a la izquierda */}
+        <div className="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] bg-red-600/20 rounded-full blur-[120px] opacity-60 animate-pulse-subtle" />
+        
+        {/* Mancha de luz roja abajo a la derecha */}
+        <div className="absolute bottom-[-10%] right-[-10%] w-[500px] h-[500px] bg-red-900/30 rounded-full blur-[120px] opacity-60" />
+        
+        {/* Textura de ruido para darle realismo */}
+        <div className="absolute inset-0 bg-noise opacity-[0.05]" />
       </div>
 
-      {/* Video Background */}
-      <div className="absolute inset-0 overflow-hidden opacity-20">
+      {/* 2. VIDEO DE FONDO (SUTIL) */}
+      <div className="absolute inset-0 overflow-hidden opacity-30 mix-blend-screen">
         <video
           autoPlay
           loop
           muted
           playsInline
-          className="absolute inset-0 w-full h-full object-cover"
+          className="absolute inset-0 w-full h-full object-cover grayscale brightness-50"
         >
           <source src="https://assets.mixkit.co/videos/preview/mixkit-person-recording-a-video-with-a-camera-4054-large.mp4" type="video/mp4" />
         </video>
       </div>
 
-      {/* Content */}
-      <div className="relative z-10 flex flex-col items-center justify-center min-h-screen px-4 py-20">
-        <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
-          {/* Left Column - Text Content */}
+      {/* 3. CONTENIDO PRINCIPAL */}
+      <div className="relative z-10 w-full px-4 py-12 md:py-20">
+        <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-20 items-center">
+          
+          {/* COLUMNA IZQUIERDA: TEXTO Y BOTONES */}
           <div className="space-y-8 text-center lg:text-left animate-fade-in">
-            <div className="inline-flex items-center gap-2 px-4 py-2 bg-neon-orange/20 border border-neon-orange rounded-full mb-4">
-              <Icon name="SparklesIcon" size={20} className="text-neon-orange" variant="solid" />
-              <span className="text-sm font-bold text-neon-orange">Stock Limitado en Uruguay</span>
+            
+            {/* Badge de Stock */}
+            <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-red-950/40 border border-red-500/30 rounded-full shadow-[0_0_15px_rgba(220,38,38,0.15)] backdrop-blur-md">
+              <Icon name="SparklesIcon" size={16} className="text-red-500" variant="solid" />
+              <span className="text-xs font-bold text-red-100 uppercase tracking-wider">Stock Limitado en Uruguay</span>
             </div>
 
-            <h1 className="text-5xl md:text-7xl lg:text-8xl font-heading font-bold text-white leading-tight drop-shadow-glow">
-              Filma en 4K lo que ven tus ojos
+            {/* Título Principal con GLOW ROJO (Efecto Neón) */}
+            <h1 className="text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-heading font-extrabold text-white leading-[0.9] tracking-tight drop-shadow-[0_0_35px_rgba(220,38,38,0.7)]">
+              Filma en 4K lo <br />
+              <span className="text-transparent bg-clip-text bg-gradient-to-br from-white to-red-200">
+                que ven tus ojos
+              </span>
             </h1>
 
-            <p className="text-xl md:text-2xl text-gray-300 max-w-2xl">
-              Cámaras POV mini 4K para creadores de contenido. Calidad profesional, precio accesible.
+            <p className="text-lg md:text-2xl text-neutral-300 max-w-2xl mx-auto lg:mx-0 font-light leading-relaxed">
+              Cámaras POV mini 4K para creadores de contenido. <br className="hidden md:block" />
+              <span className="text-white font-medium">Calidad profesional, precio accesible.</span>
             </p>
 
-            <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start items-center pt-4">
+            {/* Botones de Acción */}
+            <div className="flex flex-col sm:flex-row gap-5 justify-center lg:justify-start items-center pt-4">
               <button
                 onClick={onCtaClick}
-                className="w-full sm:w-auto px-8 py-4 bg-gradient-to-r from-neon-cyan to-primary hover:from-primary hover:to-neon-cyan text-white text-lg font-bold rounded-lg transition-all shadow-neon-glow hover:shadow-neon-glow-strong transform hover:scale-105 focus-ring"
+                className="group relative w-full sm:w-auto px-8 py-4 bg-red-600 hover:bg-red-500 text-white text-lg font-bold rounded-xl transition-all shadow-[0_0_20px_rgba(220,38,38,0.5)] hover:shadow-[0_0_40px_rgba(220,38,38,0.8)] focus:ring-2 focus:ring-red-500 focus:ring-offset-2 focus:ring-offset-black"
               >
-                Comprar Ahora
+                <span className="relative z-10 flex items-center justify-center gap-2">
+                  Comprar Ahora
+                  <Icon name="ArrowRightIcon" size={20} className="group-hover:translate-x-1 transition-transform" />
+                </span>
               </button>
+              
               <Link
                 href="#productos"
-                className="w-full sm:w-auto px-8 py-4 bg-gray-800/80 backdrop-blur-sm hover:bg-gray-700/80 text-white text-lg font-semibold rounded-lg transition-all border border-gray-700 hover:border-neon-cyan focus-ring"
+                className="w-full sm:w-auto px-8 py-4 bg-white/5 hover:bg-white/10 text-white text-lg font-semibold rounded-xl transition-all border border-white/10 hover:border-red-500/30 backdrop-blur-sm"
               >
                 Ver Modelos
               </Link>
             </div>
 
-            {/* Trust Indicators */}
-            <div className="flex flex-wrap justify-center lg:justify-start gap-6 pt-8 text-sm text-gray-400">
+            {/* Iconos de Confianza (Rojos) */}
+            <div className="flex flex-wrap justify-center lg:justify-start gap-x-8 gap-y-3 pt-6 text-sm text-neutral-400 font-medium">
               <div className="flex items-center gap-2">
-                <Icon name="TruckIcon" size={20} className="text-neon-cyan" />
-                <span>Envío gratis en Uruguay</span>
+                <Icon name="TruckIcon" size={18} className="text-red-500" />
+                <span>Envío gratis</span>
               </div>
               <div className="flex items-center gap-2">
-                <Icon name="ShieldCheckIcon" size={20} className="text-success" />
+                <Icon name="ShieldCheckIcon" size={18} className="text-red-500" />
                 <span>Garantía 12 meses</span>
               </div>
               <div className="flex items-center gap-2">
-                <Icon name="CreditCardIcon" size={20} className="text-neon-orange" />
-                <span>MercadoPago seguro</span>
+                <Icon name="CreditCardIcon" size={18} className="text-red-500" />
+                <span>MercadoPago</span>
               </div>
             </div>
           </div>
 
-          {/* Right Column - Demo Card & Stock Widget */}
-          <div className="space-y-6 animate-fade-in" style={{ animationDelay: '0.2s' }}>
-            {/* Demo Video Card */}
-            <div className="relative group">
-              <div className="absolute inset-0 bg-gradient-to-r from-neon-cyan to-primary rounded-2xl blur-xl opacity-50 group-hover:opacity-75 transition-opacity" />
-              <div className="relative bg-gray-900/90 backdrop-blur-xl rounded-2xl overflow-hidden border border-gray-800 shadow-2xl">
-                <div className="aspect-video relative">
+          {/* COLUMNA DERECHA: TARJETA DE VIDEO Y WIDGET */}
+          <div className="relative space-y-8 animate-fade-in lg:pl-10" style={{ animationDelay: '0.2s' }}>
+            
+            {/* TARJETA DE VIDEO con el GLOW TRASERO QUE PEDISTE */}
+            <div className="relative group perspective-1000">
+              
+              {/* --- AQUÍ ESTÁ EL FONDO DETRÁS DEL VIDEO (El Glow Rojo Intenso) --- */}
+              <div className="absolute -inset-1 bg-gradient-to-tr from-red-600 via-red-800 to-red-900 rounded-2xl blur-xl opacity-60 group-hover:opacity-80 group-hover:blur-2xl transition-all duration-500" />
+              
+              {/* Contenedor del Video */}
+              <div className="relative bg-neutral-900 rounded-2xl overflow-hidden border border-white/10 shadow-2xl transform transition-transform duration-500 group-hover:scale-[1.01]">
+                <div className="aspect-video relative overflow-hidden">
                   <video
                     autoPlay
                     loop
                     muted
                     playsInline
-                    className="w-full h-full object-cover"
+                    className="w-full h-full object-cover opacity-90 group-hover:opacity-100 transition-opacity"
                   >
                     <source src="https://assets.mixkit.co/videos/preview/mixkit-person-recording-a-video-with-a-camera-4054-large.mp4" type="video/mp4" />
                   </video>
-                  <div className="absolute inset-0 bg-gradient-to-t from-gray-900/80 to-transparent" />
+                  
+                  {/* Overlay oscuro para que resalte el botón de play */}
+                  <div className="absolute inset-0 bg-black/40 group-hover:bg-black/20 transition-colors" />
+
+                  {/* Botón Play Central (Rojo) */}
                   <div className="absolute inset-0 flex items-center justify-center">
-                    <button className="bg-neon-cyan/90 hover:bg-neon-cyan text-white rounded-full p-6 shadow-neon-glow transform hover:scale-110 transition-all">
-                      <Icon name="PlayIcon" size={32} variant="solid" />
+                    <button className="bg-red-600 hover:bg-red-500 text-white rounded-full p-5 shadow-[0_0_30px_rgba(220,38,38,0.5)] transform hover:scale-110 transition-all duration-300">
+                      <Icon name="PlayIcon" size={36} variant="solid" />
                     </button>
                   </div>
+                  
+                  {/* Etiqueta flotante interior */}
                   <div className="absolute bottom-4 left-4 right-4">
-                    <div className="bg-gray-900/80 backdrop-blur-sm rounded-lg px-4 py-2 border border-neon-cyan/30">
-                      <p className="text-white font-bold text-sm">▶ Ver POV 4K en acción</p>
-                      <p className="text-gray-400 text-xs">Calidad profesional hands-free</p>
+                    <div className="bg-black/70 backdrop-blur-md rounded-lg p-3 border border-white/10 flex items-center gap-3">
+                      <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse shadow-[0_0_10px_#ef4444]" />
+                      <div>
+                        <p className="text-white font-bold text-sm leading-none">Ver POV 4K en acción</p>
+                        <p className="text-neutral-400 text-xs mt-1">Calidad profesional hands-free</p>
+                      </div>
                     </div>
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Stock Widget */}
-            <StockWidget basicStock={basicStock} proStock={proStock} />
+            {/* Widget de Stock (Contenedor externo ajustado) */}
+            <div className="relative z-10">
+              <StockWidget basicStock={basicStock} proStock={proStock} />
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Scroll Indicator */}
-      <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 animate-bounce">
-        <Icon name="ChevronDownIcon" size={32} className="text-gray-500" />
+      {/* Flecha de Scroll */}
+      <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 animate-bounce opacity-50">
+        <Icon name="ChevronDownIcon" size={32} className="text-white" />
       </div>
     </section>
   );

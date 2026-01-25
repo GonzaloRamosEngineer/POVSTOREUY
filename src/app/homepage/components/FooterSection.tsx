@@ -11,7 +11,8 @@ const FooterSection = () => {
           {/* Brand Section */}
           <div className="space-y-4">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
+              {/* BRAND: Fondo Rojo (Primary) con ícono blanco */}
+              <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center shadow-[0_0_15px_rgba(220,38,38,0.3)]">
                 <Icon name="VideoCameraIcon" size={24} className="text-primary-foreground" variant="solid" />
               </div>
               <div>
@@ -107,15 +108,15 @@ const FooterSection = () => {
             Métodos de Pago Aceptados
           </h4>
           <div className="flex flex-wrap justify-center gap-4">
-            <div className="px-4 py-2 bg-muted rounded-md flex items-center gap-2">
+            <div className="px-4 py-2 bg-muted rounded-md flex items-center gap-2 border border-border/50">
               <Icon name="CreditCardIcon" size={20} className="text-primary" />
               <span className="text-sm text-foreground">MercadoPago</span>
             </div>
-            <div className="px-4 py-2 bg-muted rounded-md flex items-center gap-2">
+            <div className="px-4 py-2 bg-muted rounded-md flex items-center gap-2 border border-border/50">
               <Icon name="BanknotesIcon" size={20} className="text-primary" />
               <span className="text-sm text-foreground">Transferencia</span>
             </div>
-            <div className="px-4 py-2 bg-muted rounded-md flex items-center gap-2">
+            <div className="px-4 py-2 bg-muted rounded-md flex items-center gap-2 border border-border/50">
               <Icon name="DevicePhoneMobileIcon" size={20} className="text-primary" />
               <span className="text-sm text-foreground">Efectivo</span>
             </div>
@@ -132,28 +133,28 @@ const FooterSection = () => {
               href="https://instagram.com/povstoreuruguay"
               target="_blank"
               rel="noopener noreferrer"
-              className="w-8 h-8 flex items-center justify-center bg-muted hover:bg-primary rounded-full transition-smooth focus-ring"
+              className="w-8 h-8 flex items-center justify-center bg-muted hover:bg-primary rounded-full transition-smooth focus-ring group"
               aria-label="Instagram"
             >
-              <Icon name="CameraIcon" size={16} className="text-foreground hover:text-primary-foreground" />
+              <Icon name="CameraIcon" size={16} className="text-foreground group-hover:text-white" />
             </a>
             <a
               href="https://facebook.com/povstoreuruguay"
               target="_blank"
               rel="noopener noreferrer"
-              className="w-8 h-8 flex items-center justify-center bg-muted hover:bg-primary rounded-full transition-smooth focus-ring"
+              className="w-8 h-8 flex items-center justify-center bg-muted hover:bg-primary rounded-full transition-smooth focus-ring group"
               aria-label="Facebook"
             >
-              <Icon name="UserGroupIcon" size={16} className="text-foreground hover:text-primary-foreground" />
+              <Icon name="UserGroupIcon" size={16} className="text-foreground group-hover:text-white" />
             </a>
             <a
               href="https://youtube.com/@povstoreuruguay"
               target="_blank"
               rel="noopener noreferrer"
-              className="w-8 h-8 flex items-center justify-center bg-muted hover:bg-primary rounded-full transition-smooth focus-ring"
+              className="w-8 h-8 flex items-center justify-center bg-muted hover:bg-primary rounded-full transition-smooth focus-ring group"
               aria-label="YouTube"
             >
-              <Icon name="PlayIcon" size={16} className="text-foreground hover:text-primary-foreground" />
+              <Icon name="PlayIcon" size={16} className="text-foreground group-hover:text-white" />
             </a>
           </div>
         </div>

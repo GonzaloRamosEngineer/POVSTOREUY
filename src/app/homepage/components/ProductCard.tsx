@@ -43,8 +43,8 @@ const ProductCard = ({
 
   if (!isHydrated) {
     return (
-      <div className="bg-gray-900 rounded-2xl overflow-hidden border border-gray-800 shadow-xl">
-        <div className="relative h-80 bg-gray-800 overflow-hidden">
+      <div className="bg-neutral-900 rounded-2xl overflow-hidden border border-neutral-800 shadow-xl">
+        <div className="relative h-80 bg-neutral-800 overflow-hidden">
           <AppImage
             src={image}
             alt={alt}
@@ -54,7 +54,7 @@ const ProductCard = ({
         <div className="p-6 space-y-4">
           <h3 className="text-2xl font-heading font-bold text-white">{name}</h3>
           <div className="flex items-baseline gap-3">
-            <span className="text-3xl font-mono font-bold text-neon-cyan">${price.toLocaleString('es-UY')}</span>
+            <span className="text-3xl font-mono font-bold text-red-500">${price.toLocaleString('es-UY')}</span>
           </div>
         </div>
       </div>
@@ -63,103 +63,105 @@ const ProductCard = ({
 
   return (
     <div 
-      className="group relative bg-gray-900/80 backdrop-blur-sm rounded-2xl overflow-hidden border border-gray-800 hover:border-neon-cyan shadow-xl hover:shadow-neon-glow-strong transition-all duration-300 transform hover:-translate-y-2"
+      // TECH NOIR: Tarjeta oscura con borde sutil. Hover: Borde Rojo + Glow Rojo
+      className="group relative bg-neutral-900 rounded-2xl overflow-hidden border border-neutral-800 hover:border-red-600/50 shadow-xl hover:shadow-[0_0_30px_rgba(220,38,38,0.15)] transition-all duration-300 transform hover:-translate-y-1"
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
-      {/* Glow Effect */}
-      <div className="absolute inset-0 bg-gradient-to-br from-neon-cyan/0 via-transparent to-primary/0 group-hover:from-neon-cyan/10 group-hover:to-primary/10 transition-all duration-500 pointer-events-none" />
+      {/* Glow Effect Trasero (Rojo) */}
+      <div className="absolute inset-0 bg-gradient-to-br from-red-600/0 via-transparent to-red-900/0 group-hover:from-red-600/5 group-hover:to-red-900/5 transition-all duration-500 pointer-events-none" />
       
       {/* Image Section */}
-      <div className="relative h-80 bg-gray-800 overflow-hidden">
+      <div className="relative h-80 bg-neutral-800 overflow-hidden">
         <AppImage
           src={image}
           alt={alt}
-          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-out"
         />
         
-        {/* Overlay on hover */}
-        <div className="absolute inset-0 bg-gradient-to-t from-gray-900 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+        {/* Overlay on hover (Oscurece un poco para que resalte el botón play/detalles) */}
+        <div className="absolute inset-0 bg-black/20 group-hover:bg-black/40 transition-colors duration-300" />
         
-        {/* Badges */}
+        {/* Badges - Estilo Tech */}
         <div className="absolute top-4 left-4 flex flex-col gap-2 z-10">
           {badge && (
-            <span className="px-4 py-2 bg-gradient-to-r from-neon-cyan to-primary text-white text-xs font-bold rounded-full shadow-neon-glow animate-pulse-subtle uppercase tracking-wider">
+            <span className="px-3 py-1 bg-white text-black text-xs font-bold rounded-md shadow-lg uppercase tracking-wider border border-white">
               {badge}
             </span>
           )}
           {discount > 0 && (
-            <span className="px-4 py-2 bg-gradient-to-r from-neon-orange to-red-500 text-white text-xs font-bold rounded-full shadow-lg uppercase tracking-wider">
+            <span className="px-3 py-1 bg-red-600 text-white text-xs font-bold rounded-md shadow-lg uppercase tracking-wider border border-red-500">
               -{discount}% OFF
             </span>
           )}
         </div>
 
-        {/* Stock Indicator */}
+        {/* Stock Indicator (Red Alert) */}
         {isLowStock && (
-          <div className="absolute bottom-4 right-4 px-4 py-2 bg-neon-orange/90 backdrop-blur-sm text-white text-xs font-bold rounded-full flex items-center gap-2 shadow-lg animate-pulse-subtle z-10">
-            <Icon name="ExclamationTriangleIcon" size={16} variant="solid" />
-            <span>ÚLTIMAS {stockCount} UNIDADES</span>
+          <div className="absolute bottom-4 right-4 px-3 py-1.5 bg-red-600/90 backdrop-blur-sm text-white text-[10px] font-bold rounded-full flex items-center gap-1.5 shadow-lg animate-pulse z-10 border border-red-500/50">
+            <Icon name="ExclamationTriangleIcon" size={14} variant="solid" />
+            <span>ÚLTIMAS {stockCount}</span>
           </div>
         )}
 
-        {/* Play Icon Overlay */}
+        {/* Action Overlay Icon */}
         <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-10">
-          <div className="bg-neon-cyan/80 backdrop-blur-sm rounded-full p-4 transform scale-0 group-hover:scale-100 transition-transform duration-300">
-            <Icon name="PlayIcon" size={24} className="text-white" variant="solid" />
+          <div className="bg-red-600 rounded-full p-4 transform scale-50 group-hover:scale-100 transition-all duration-300 shadow-[0_0_20px_rgba(220,38,38,0.6)]">
+            <Icon name="EyeIcon" size={24} className="text-white" variant="solid" />
           </div>
         </div>
       </div>
 
       {/* Content Section */}
-      <div className="relative p-6 space-y-4">
-        <h3 className="text-2xl font-heading font-bold text-white group-hover:text-neon-cyan transition-colors">{name}</h3>
+      <div className="relative p-6 space-y-4 bg-neutral-900">
+        <h3 className="text-2xl font-heading font-bold text-white group-hover:text-red-500 transition-colors duration-300">{name}</h3>
 
         {/* Pricing */}
         <div className="flex items-baseline gap-3">
-          <span className="text-4xl font-mono font-bold text-neon-cyan drop-shadow-glow">
+          {/* Precio Rojo Intenso */}
+          <span className="text-3xl font-mono font-bold text-red-500 drop-shadow-[0_0_8px_rgba(220,38,38,0.3)]">
             ${price.toLocaleString('es-UY')}
           </span>
           {originalPrice && (
-            <span className="text-lg font-mono text-gray-500 line-through">
+            <span className="text-sm font-mono text-neutral-500 line-through decoration-neutral-600">
               ${originalPrice.toLocaleString('es-UY')}
             </span>
           )}
         </div>
 
         {/* Features */}
-        <ul className="space-y-2">
+        <ul className="space-y-2.5 pt-2">
           {features.map((feature, index) => (
             <li 
               key={index} 
-              className="flex items-start gap-2 text-sm text-gray-300 transform transition-all duration-300"
+              className="flex items-start gap-2.5 text-sm text-neutral-300 transform transition-all duration-300"
               style={{ 
                 transitionDelay: isHovered ? `${index * 50}ms` : '0ms',
                 transform: isHovered ? 'translateX(4px)' : 'translateX(0)'
               }}
             >
-              <div className="w-5 h-5 rounded-full bg-success/20 flex items-center justify-center flex-shrink-0 mt-0.5 border border-success/30">
-                <Icon name="CheckIcon" size={14} className="text-success" variant="solid" />
+              <div className="w-5 h-5 rounded-full bg-neutral-800 flex items-center justify-center flex-shrink-0 mt-0.5 border border-neutral-700 text-red-500">
+                <Icon name="CheckIcon" size={12} variant="solid" />
               </div>
-              <span>{feature}</span>
+              <span className="leading-snug">{feature}</span>
             </li>
           ))}
         </ul>
 
         {/* Actions */}
-        <div className="pt-4 space-y-3">
+        <div className="pt-6 space-y-3">
           <button
             onClick={() => onAddToCart(id)}
-            className="w-full px-6 py-4 bg-gradient-to-r from-neon-cyan to-primary hover:from-primary hover:to-neon-cyan text-white text-center font-bold rounded-lg transition-all shadow-neon-glow hover:shadow-neon-glow-strong transform hover:scale-105 focus-ring uppercase tracking-wide"
+            // RED ALERT: Botón Rojo Fuerte
+            className="w-full px-6 py-3.5 bg-red-600 hover:bg-red-500 text-white text-center font-bold rounded-xl transition-all shadow-[0_4px_14px_0_rgba(220,38,38,0.39)] hover:shadow-[0_6px_20px_rgba(220,38,38,0.23)] hover:-translate-y-0.5 active:translate-y-0 uppercase tracking-wide flex items-center justify-center gap-2"
           >
-            <div className="flex items-center justify-center gap-2">
-              <Icon name="ShoppingCartIcon" size={20} variant="solid" />
-              <span>Comprar Ahora</span>
-            </div>
+            <Icon name="ShoppingCartIcon" size={18} variant="solid" />
+            <span>Comprar Ahora</span>
           </button>
+          
           <button
             onClick={() => onViewDetails(id)}
-            className="w-full px-6 py-3 bg-gray-800/80 hover:bg-gray-700/80 text-gray-300 hover:text-white text-center font-medium rounded-lg transition-all border border-gray-700 hover:border-neon-cyan focus-ring"
+            className="w-full px-6 py-3 bg-transparent hover:bg-white/5 text-neutral-400 hover:text-white text-center font-medium rounded-xl transition-all border border-neutral-700 hover:border-neutral-500"
           >
             Ver Detalles
           </button>

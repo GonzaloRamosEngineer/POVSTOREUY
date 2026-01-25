@@ -15,7 +15,6 @@ import SocialMediaSection from './SocialMediaSection';
 import FooterSection from './FooterSection';
 import { getSupabaseBrowserClient } from '@/lib/supabaseClient';
 
-
 // ✅ carrito unificado (helper)
 import {
   readCart,
@@ -189,7 +188,8 @@ const HomepageInteractive = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-950">
+    // TECH NOIR: Fondo global negro
+    <div className="min-h-screen bg-black">
       <Header cartItems={isHydrated ? cartItems : []} />
 
       <main>
@@ -199,42 +199,44 @@ const HomepageInteractive = () => {
 
         <MobileStickyCTA onCtaClick={handleHeroCtaClick} totalStock={totalStock} />
 
-        <section id="productos" className="py-16 px-4 bg-gray-950">
+        {/* Sección de Productos: Fondo oscuro neutro con borde sutil rojo arriba */}
+        <section id="productos" className="py-24 px-4 bg-neutral-950 border-t border-red-900/30">
           <div className="max-w-7xl mx-auto">
-            <div className="text-center mb-12">
-              <h2 className="text-4xl md:text-5xl font-heading font-bold text-foreground mb-4">
+            <div className="text-center mb-16">
+              <h2 className="text-4xl md:text-5xl font-heading font-bold text-white mb-4 drop-shadow-md">
                 Nuestros Modelos
               </h2>
-              <p className="text-lg text-muted-foreground">
+              <p className="text-lg text-neutral-400">
                 Elegí la cámara perfecta para tu estilo de creación
               </p>
             </div>
 
             {loadingProducts ? (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                <div className="rounded-2xl border border-white/10 bg-white/5 h-[520px]" />
-                <div className="rounded-2xl border border-white/10 bg-white/5 h-[520px]" />
+                {/* Skeletons estilo Tech Noir */}
+                <div className="rounded-2xl border border-neutral-800 bg-neutral-900/50 h-[520px] animate-pulse" />
+                <div className="rounded-2xl border border-neutral-800 bg-neutral-900/50 h-[520px] animate-pulse" />
               </div>
             ) : productsError ? (
-              <div className="rounded-2xl border border-red-500/20 bg-red-500/5 p-8 text-center">
-                <p className="text-red-200 font-medium">No se pudieron cargar los productos.</p>
-                <p className="text-red-200/80 mt-2 text-sm">{productsError}</p>
-                <p className="text-muted-foreground mt-4 text-sm">
+              <div className="rounded-2xl border border-red-500/30 bg-red-900/10 p-8 text-center max-w-2xl mx-auto">
+                <p className="text-red-400 font-bold text-lg">No se pudieron cargar los productos.</p>
+                <p className="text-red-300/70 mt-2 text-sm">{productsError}</p>
+                <p className="text-neutral-500 mt-6 text-xs border-t border-red-500/20 pt-4">
                   Tip rápido: revisá que{' '}
-                  <span className="font-medium">NEXT_PUBLIC_SUPABASE_URL</span> sea el dominio real
-                  de tu proyecto (no “xxxxx”) y reiniciá el dev server.
+                  <span className="font-mono text-red-400">NEXT_PUBLIC_SUPABASE_URL</span> sea el dominio real
+                  de tu proyecto y reiniciá el servidor.
                 </p>
               </div>
             ) : products.length === 0 ? (
-              <div className="rounded-2xl border border-white/10 bg-white/5 p-8 text-center">
-                <p className="text-muted-foreground">No hay productos activos para mostrar.</p>
-                <p className="text-muted-foreground mt-2 text-sm">
+              <div className="rounded-2xl border border-neutral-800 bg-neutral-900 p-12 text-center max-w-2xl mx-auto">
+                <p className="text-neutral-400 text-lg">No hay productos activos para mostrar en este momento.</p>
+                <p className="text-neutral-600 mt-4 text-sm">
                   Verificá en Supabase que existan productos con{' '}
-                  <span className="font-medium">is_active = true</span>.
+                  <span className="font-mono text-neutral-400">is_active = true</span>.
                 </p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 lg:gap-12">
                 {products.map((product) => (
                   <ProductCard
                     key={product.id}
