@@ -1,55 +1,76 @@
 import { createClient } from '@supabase/supabase-js';
 
-// Forzamos dinamismo
+// Forzamos dinamismo absoluto
 export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
-export default async function ProductPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params;
+export default async function Page({ params }: { params: Promise<{ id: string }> }) {
+  const resolvedParams = await params;
+  const id = resolvedParams.id;
 
-  console.log("--- DEBUG START ---");
-  console.log("ID Solicitado:", id);
-  console.log("Supabase URL:", process.env.NEXT_PUBLIC_SUPABASE_URL); // ¿Se imprime la URL o undefined?
-  console.log("Supabase Key:", process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ? "EXISTE (Oculta)" : "NO EXISTE");
-
-  // Intento de conexión directo y sucio para probar
+  // 1. Diagnóstico de Variables de Entorno
   const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const sbKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
   if (!sbUrl || !sbKey) {
-    return <h1>❌ ERROR CRÍTICO: Faltan Variables de Entorno en Vercel</h1>;
-  }
-
-  const supabase = createClient(sbUrl, sbKey);
-
-  // Consulta simple
-  const { data, error } = await supabase
-    .from('products')
-    .select('id, name') // Solo traemos nombre e id para probar
-    .eq('id', id)
-    .single();
-
-  if (error) {
     return (
-      <div style={{ padding: 20, fontFamily: 'monospace' }}>
-        <h1>❌ Error de Supabase</h1>
-        <pre>{JSON.stringify(error, null, 2)}</pre>
+      <div style={{ padding: 40, fontFamily: 'monospace', color: 'red' }}>
+        <h1>❌ ERROR CRÍTICO: VARIABLES FALTANTES</h1>
+        <p>Vercel no está inyectando las variables.</p>
+        <p>URL: {sbUrl ? 'OK' : 'MISSING'}</p>
+        <p>KEY: {sbKey ? 'OK' : 'MISSING'}</p>
       </div>
     );
   }
 
-  if (!data) {
-    return <h1>⚠️ Producto no encontrado en la DB (Data is null)</h1>;
-  }
+  // 2. Intento de Conexión Directa
+  const supabase = createClient(sbUrl, sbKey);
 
+  console.log(`🔍 [DEBUG] Intentando buscar ID: ${id}`);
+
+  // Hacemos la consulta más simple posible (sin joins complejos)
+  const { data, error } = await supabase
+    .from('products')
+    .select('id, name, is_active')
+    .eq('id', id); // Usamos .eq en lugar de .single() para evitar error si hay 0 filas
+
+  // 3. Renderizado de Diagnóstico
   return (
-    <div style={{ padding: 20, fontFamily: 'monospace', background: '#f0f0f0' }}>
-      <h1>✅ ¡ÉXITO! Conexión Establecida</h1>
-      <p>Si ves esto, la base de datos y Vercel funcionan.</p>
-      <ul>
-        <li><strong>ID:</strong> {data.id}</li>
-        <li><strong>Nombre:</strong> {data.name}</li>
-      </ul>
-      <p>Ahora sabemos que el problema estaba en generateMetadata o en los componentes.</p>
+    <div style={{ padding: 40, fontFamily: 'monospace', backgroundColor: '#f4f4f5', minHeight: '100vh', color: '#000' }}>
+      <h1 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '20px' }}>🛠️ MODO DIAGNÓSTICO VERCEL</h1>
+      
+      <div style={{ border: '1px solid #ccc', padding: '20px', background: 'white', borderRadius: '8px' }}>
+        <p><strong>ID Solicitado:</strong> {id}</p>
+        
+        <hr style={{ margin: '20px 0' }} />
+
+        {error ? (
+          <div style={{ color: 'red' }}>
+            <h3>❌ Error de Supabase:</h3>
+            <pre>{JSON.stringify(error, null, 2)}</pre>
+          </div>
+        ) : (
+          <div style={{ color: 'green' }}>
+            <h3>✅ Conexión Exitosa</h3>
+            <p><strong>Resultados encontrados:</strong> {data?.length}</p>
+          </div>
+        )}
+
+        <hr style={{ margin: '20px 0' }} />
+
+        <h3>Datos Crudos (Primer resultado):</h3>
+        {data && data.length > 0 ? (
+          <pre style={{ background: '#eee', padding: '10px' }}>
+            {JSON.stringify(data[0], null, 2)}
+          </pre>
+        ) : (
+          <p style={{ color: 'orange' }}>⚠️ El array de datos está vacío. El ID no devuelve resultados.</p>
+        )}
+      </div>
+      
+      <div style={{ marginTop: '20px', fontSize: '12px', color: '#666' }}>
+        <p>Si ves esta pantalla, el enrutamiento de Next.js funciona bien. El problema estaba en generateMetadata o en los componentes hijos.</p>
+      </div>
     </div>
   );
 }
