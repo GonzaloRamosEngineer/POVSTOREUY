@@ -35,12 +35,18 @@ const FooterSection = () => {
             <h4 className="text-sm font-semibold text-foreground mb-4">Productos</h4>
             <ul className="space-y-2">
               <li>
-                <Link href="/product-details" className="text-sm text-muted-foreground hover:text-primary transition-smooth">
+                <Link
+                  href="/product-details"
+                  className="text-sm text-muted-foreground hover:text-primary transition-smooth"
+                >
                   POV Básico
                 </Link>
               </li>
               <li>
-                <Link href="/product-details" className="text-sm text-muted-foreground hover:text-primary transition-smooth">
+                <Link
+                  href="/product-details"
+                  className="text-sm text-muted-foreground hover:text-primary transition-smooth"
+                >
                   POV Pro
                 </Link>
               </li>
@@ -126,25 +132,27 @@ const FooterSection = () => {
           </div>
         </div>
 
-        {/* ✅ MOBILE ACTIONS: Admin visible en celu */}
+        {/* ✅ MOBILE ACTIONS: Admin camuflado (solo ícono) */}
         <div className="md:hidden border-t border-border pt-6 mb-6">
           <div className="flex items-center justify-between gap-3">
+            {/* Admin: solo ícono, chiquito, low-opacity */}
             <Link
               href="/admin-login"
-              className="inline-flex items-center gap-2 px-3 py-2 rounded-md bg-muted hover:bg-muted/80 border border-border text-xs font-bold uppercase tracking-wider text-muted-foreground transition-smooth"
+              className="inline-flex items-center justify-center w-9 h-9 rounded-full bg-muted/30 hover:bg-muted/60 border border-border text-muted-foreground/40 hover:text-muted-foreground/70 transition-smooth focus-ring"
               aria-label="Admin"
+              title="Admin"
             >
-              <Icon name="LockClosedIcon" size={16} className="text-muted-foreground" />
-              Admin
+              <Icon name="LockClosedIcon" size={16} className="text-current" />
             </Link>
 
+            {/* Subir */}
             <button
               type="button"
               onClick={scrollToTop}
               className="inline-flex items-center gap-2 px-3 py-2 rounded-md bg-muted hover:bg-primary border border-border text-xs font-bold uppercase tracking-wider text-muted-foreground hover:text-white transition-smooth"
               aria-label="Subir"
             >
-              <Icon name="ChevronUpIcon" size={16} className="text-muted-foreground group-hover:text-white" />
+              <Icon name="ChevronUpIcon" size={16} className="text-current" />
               Subir
             </button>
           </div>
@@ -172,8 +180,11 @@ const FooterSection = () => {
               <span className="relative text-xs font-bold text-foreground group-hover:text-primary transition-colors">
                 DigitalMatchGlobal
               </span>
-              {/* si BoltIcon no existe en tu AppIcon, cambiá por SparklesIcon */}
-              <Icon name="SparklesIcon" size={14} className="relative text-muted-foreground group-hover:text-primary transition-colors" />
+              <Icon
+                name="SparklesIcon"
+                size={14}
+                className="relative text-muted-foreground group-hover:text-primary transition-colors"
+              />
             </a>
           </div>
 
@@ -207,14 +218,14 @@ const FooterSection = () => {
               <Icon name="PlayIcon" size={16} className="text-foreground group-hover:text-white" />
             </a>
 
-            {/* 🔒 Admin camuflado SOLO desktop */}
+            {/* 🔒 Admin camuflado SOLO desktop: solo ícono y bajita opacidad */}
             <Link
               href="/admin-login"
-              className="hidden md:inline-flex text-[10px] text-muted-foreground/60 hover:text-muted-foreground transition-colors uppercase tracking-[0.2em] font-bold"
+              className="hidden md:inline-flex items-center justify-center w-9 h-9 rounded-full bg-muted/20 hover:bg-muted/50 border border-border text-muted-foreground/35 hover:text-muted-foreground/70 transition-smooth focus-ring"
               aria-label="Admin"
               title="Admin"
             >
-              Admin
+              <Icon name="LockClosedIcon" size={16} className="text-current" />
             </Link>
 
             {/* ⬆️ Scroll top SOLO desktop (mobile ya tiene arriba) */}
