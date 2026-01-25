@@ -126,6 +126,30 @@ const FooterSection = () => {
           </div>
         </div>
 
+        {/* ✅ MOBILE ACTIONS: Admin visible en celu */}
+        <div className="md:hidden border-t border-border pt-6 mb-6">
+          <div className="flex items-center justify-between gap-3">
+            <Link
+              href="/admin-login"
+              className="inline-flex items-center gap-2 px-3 py-2 rounded-md bg-muted hover:bg-muted/80 border border-border text-xs font-bold uppercase tracking-wider text-muted-foreground transition-smooth"
+              aria-label="Admin"
+            >
+              <Icon name="LockClosedIcon" size={16} className="text-muted-foreground" />
+              Admin
+            </Link>
+
+            <button
+              type="button"
+              onClick={scrollToTop}
+              className="inline-flex items-center gap-2 px-3 py-2 rounded-md bg-muted hover:bg-primary border border-border text-xs font-bold uppercase tracking-wider text-muted-foreground hover:text-white transition-smooth"
+              aria-label="Subir"
+            >
+              <Icon name="ChevronUpIcon" size={16} className="text-muted-foreground group-hover:text-white" />
+              Subir
+            </button>
+          </div>
+        </div>
+
         {/* Bottom Bar */}
         <div className="border-t border-border pt-8 flex flex-col md:flex-row justify-between items-center gap-4">
           <div className="flex flex-col md:flex-row items-center gap-3 md:gap-6">
@@ -133,7 +157,7 @@ const FooterSection = () => {
               © {currentYear} POV Store Uruguay. Todos los derechos reservados.
             </p>
 
-            {/* ✅ Firma DigitalMatchGlobal (pro, discreta) */}
+            {/* Firma DigitalMatchGlobal */}
             <a
               href="https://www.digitalmatchglobal.com/"
               target="_blank"
@@ -148,7 +172,8 @@ const FooterSection = () => {
               <span className="relative text-xs font-bold text-foreground group-hover:text-primary transition-colors">
                 DigitalMatchGlobal
               </span>
-              <Icon name="BoltIcon" size={14} className="relative text-muted-foreground group-hover:text-primary transition-colors" />
+              {/* si BoltIcon no existe en tu AppIcon, cambiá por SparklesIcon */}
+              <Icon name="SparklesIcon" size={14} className="relative text-muted-foreground group-hover:text-primary transition-colors" />
             </a>
           </div>
 
@@ -182,25 +207,25 @@ const FooterSection = () => {
               <Icon name="PlayIcon" size={16} className="text-foreground group-hover:text-white" />
             </a>
 
-            {/* 🔒 Admin “camuflado” */}
+            {/* 🔒 Admin camuflado SOLO desktop */}
             <Link
               href="/admin-login"
-              className="text-[10px] text-muted-foreground/60 hover:text-muted-foreground transition-colors uppercase tracking-[0.2em] font-bold"
+              className="hidden md:inline-flex text-[10px] text-muted-foreground/60 hover:text-muted-foreground transition-colors uppercase tracking-[0.2em] font-bold"
               aria-label="Admin"
               title="Admin"
             >
               Admin
             </Link>
 
-            {/* ⬆️ Scroll top */}
+            {/* ⬆️ Scroll top SOLO desktop (mobile ya tiene arriba) */}
             <button
               type="button"
               onClick={scrollToTop}
-              className="w-9 h-9 flex items-center justify-center rounded-full bg-muted hover:bg-primary transition-smooth focus-ring group"
+              className="hidden md:inline-flex w-9 h-9 items-center justify-center rounded-full bg-muted hover:bg-primary transition-smooth focus-ring group"
               aria-label="Scroll to top"
               title="Subir"
             >
-              <Icon name="ArrowUpIcon" size={16} className="text-foreground group-hover:text-white" />
+              <Icon name="ChevronUpIcon" size={16} className="text-foreground group-hover:text-white" />
             </button>
           </div>
         </div>
