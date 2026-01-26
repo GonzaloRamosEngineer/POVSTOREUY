@@ -2,16 +2,15 @@
 
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
-import Link from 'next/link';
-import Icon from '@/components/ui/AppIcon';
+import { ArrowRight, Instagram, Zap, Camera } from 'lucide-react';
 
 export default function ComingSoonPage() {
   const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });
   const [mounted, setMounted] = useState(false);
+  const [intensity, setIntensity] = useState(0);
 
   useEffect(() => {
     setMounted(true);
-    // FECHA OBJETIVO: 30 Enero 2026
     const targetDate = new Date('2026-01-30T00:00:00-03:00').getTime();
 
     const timer = setInterval(() => {
@@ -22,6 +21,9 @@ export default function ComingSoonPage() {
         clearInterval(timer);
         return;
       }
+
+      const total = targetDate - new Date('2026-01-25T00:00:00-03:00').getTime();
+      setIntensity(1 - (distance / total));
 
       setTimeLeft({
         days: Math.floor(distance / (1000 * 60 * 60 * 24)),
@@ -34,108 +36,280 @@ export default function ComingSoonPage() {
     return () => clearInterval(timer);
   }, []);
 
-  if (!mounted) return null; // Evita flash de hidratación
+  if (!mounted) return null;
+
+  const urgencyPhrases = [
+    "El futuro de los creadores",
+    "Algo grande está por llegar",
+    "La espera casi termina",
+    "Prepárate para el cambio"
+  ];
+
+  const currentPhrase = urgencyPhrases[Math.floor((timeLeft.seconds / 15) % urgencyPhrases.length)];
 
   return (
-    <main className="relative min-h-[100dvh] w-full bg-[#050505] text-white overflow-hidden flex flex-col items-center justify-center selection:bg-red-600 selection:text-white">
+    <main className="relative min-h-screen w-full bg-black text-white overflow-hidden flex flex-col items-center justify-center">
       
-      {/* --- FONDO ATMOSFÉRICO (Tech Noir) --- */}
+      {/* Fondo Atmosférico Mejorado */}
       <div className="absolute inset-0 pointer-events-none select-none">
-        {/* Gradiente Radial Sutil (Luz de estudio) */}
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-neutral-900/40 via-[#050505] to-[#050505]" />
+        {/* Grid Sutil */}
+        <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,.02)_1px,transparent_1px)] bg-[size:100px_100px] [mask-image:radial-gradient(ellipse_80%_50%_at_50%_50%,black,transparent)]" />
         
-        {/* Ruido Granulado (Textura de cine) */}
-        <div className="absolute inset-0 opacity-[0.07]" style={{ backgroundImage: 'url("https://grainy-gradients.vercel.app/noise.svg")' }} />
+        {/* Ruido de película */}
+        <div className="absolute inset-0 opacity-[0.015] mix-blend-overlay" style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg viewBox=\'0 0 400 400\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cfilter id=\'noiseFilter\'%3E%3CfeTurbulence type=\'fractalNoise\' baseFrequency=\'0.9\' numOctaves=\'4\' /%3E%3C/filter%3E%3Crect width=\'100%25\' height=\'100%25\' filter=\'url(%23noiseFilter)\' /%3E%3C/svg%3E")' }} />
         
-        {/* El Corazón Rojo (Luz de fondo) */}
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[60vw] h-[60vw] max-w-[800px] max-h-[800px] bg-red-600/10 rounded-full blur-[120px] animate-pulse-slow" />
+        {/* Aura Roja Pulsante - Intensidad dinámica */}
+        <div 
+          className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full blur-[150px] transition-all duration-1000"
+          style={{
+            width: `${40 + intensity * 30}vw`,
+            height: `${40 + intensity * 30}vw`,
+            maxWidth: '1000px',
+            maxHeight: '1000px',
+            background: `radial-gradient(circle, rgba(220,38,38,${0.15 + intensity * 0.15}) 0%, transparent 70%)`,
+            animation: 'pulse-breath 4s ease-in-out infinite'
+          }}
+        />
+        
+        {/* Lens Flare Sutil */}
+        <div className="absolute top-1/4 right-1/4 w-96 h-96 bg-red-500/5 rounded-full blur-[100px] animate-float" />
       </div>
 
-      {/* --- CONTENIDO PRINCIPAL --- */}
-      <div className="relative z-10 w-full max-w-5xl px-6 flex flex-col items-center gap-12 sm:gap-16">
+      {/* Partículas Flotantes */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        {[...Array(12)].map((_, i) => (
+          <div
+            key={i}
+            className="absolute w-1 h-1 bg-red-500/30 rounded-full"
+            style={{
+              left: `${Math.random() * 100}%`,
+              top: `${Math.random() * 100}%`,
+              animation: `float-particle ${8 + Math.random() * 10}s linear infinite`,
+              animationDelay: `${Math.random() * 5}s`
+            }}
+          />
+        ))}
+      </div>
+
+      {/* Contenido Principal */}
+      <div className="relative z-10 w-full max-w-6xl px-6 flex flex-col items-center gap-8 sm:gap-12">
         
-        {/* 1. LOGO & UBICACIÓN */}
-        <div className="flex flex-col items-center gap-6 animate-fade-in-up">
-          <div className="relative group">
-            {/* Efecto de respiración detrás del logo */}
-            <div className="absolute -inset-6 bg-red-600/20 rounded-full blur-xl animate-pulse-heartbeat opacity-50 group-hover:opacity-80 transition-opacity duration-700" />
-            
-            <div className="relative w-32 h-32 sm:w-40 sm:h-40 md:w-48 md:h-48 animate-pulse-heartbeat">
-              <Image 
-                src="/images/logo-pov.png" // Asegúrate de que este nombre sea correcto en public/images/
-                alt="POV Store Logo" 
-                fill
-                className="object-contain drop-shadow-2xl"
-                priority
-                unoptimized
-              />
-            </div>
+        {/* Logo POV con Efectos Premium */}
+        <div className="relative group animate-fade-in-down">
+          {/* Glow principal del logo */}
+          <div className="absolute -inset-8 bg-gradient-to-r from-red-600/20 via-red-500/30 to-red-600/20 rounded-full blur-2xl opacity-60 group-hover:opacity-100 transition-all duration-700 animate-pulse-slow" />
+          
+          {/* Anillo giratorio de fondo */}
+          <div className="absolute -inset-6 rounded-full bg-gradient-to-r from-red-500/10 via-transparent to-red-500/10 animate-spin-slow" />
+          
+          {/* Logo */}
+          <div className="relative w-32 h-32 sm:w-40 sm:h-40 md:w-48 md:h-48 group-hover:scale-110 transition-transform duration-500">
+            <Image 
+              src="/images/logo-pov.png"
+              alt="POV Store Logo" 
+              fill
+              className="object-contain drop-shadow-[0_0_30px_rgba(220,38,38,0.6)] transition-all duration-500 group-hover:drop-shadow-[0_0_50px_rgba(220,38,38,0.8)]"
+              priority
+              unoptimized
+            />
           </div>
           
-          <div className="flex items-center gap-3 text-red-500/80 tracking-[0.2em] text-xs sm:text-sm font-bold uppercase border border-red-900/30 px-4 py-1.5 rounded-full bg-red-950/10 backdrop-blur-sm">
-            <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
-            Montevideo, Uruguay
-          </div>
+          {/* Reflejo sutil debajo */}
+          <div className="absolute -bottom-6 left-1/2 -translate-x-1/2 w-32 h-8 bg-gradient-to-b from-red-500/10 to-transparent blur-xl opacity-50" />
         </div>
 
-        {/* 2. TITULAR MONUMENTAL */}
-        <div className="text-center space-y-2 sm:space-y-4 animate-fade-in-up" style={{ animationDelay: '0.1s' }}>
-          <h2 className="text-xl sm:text-2xl md:text-3xl font-medium text-neutral-400 tracking-widest uppercase">
-            La revolución visual
-          </h2>
-          <h1 className="text-6xl sm:text-8xl md:text-9xl font-black tracking-tighter leading-[0.9] text-transparent bg-clip-text bg-gradient-to-b from-white via-white to-neutral-500">
-            IS COMING
+        {/* Badge de Ubicación con Pulso */}
+        <div className="flex items-center gap-2.5 px-5 py-2 rounded-full bg-red-950/20 border border-red-900/30 backdrop-blur-md animate-fade-in" style={{ animationDelay: '0.1s' }}>
+          <span className="relative flex h-2.5 w-2.5">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-500 opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500"></span>
+          </span>
+          <span className="text-xs sm:text-sm font-bold tracking-[0.25em] text-red-400 uppercase">Montevideo, Uruguay</span>
+        </div>
+
+        {/* Headline Dramático */}
+        <div className="text-center space-y-3 sm:space-y-5 animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
+          <div className="relative inline-block">
+            <h2 className="text-lg sm:text-xl md:text-2xl font-light text-neutral-400 tracking-[0.3em] uppercase mb-2">
+              {currentPhrase}
+            </h2>
+            <div className="h-px w-1/3 mx-auto bg-gradient-to-r from-transparent via-red-500 to-transparent" />
+          </div>
+          
+          <h1 className="text-6xl sm:text-8xl md:text-9xl lg:text-[12rem] font-black tracking-tighter leading-[0.85] relative">
+            <span className="absolute inset-0 text-transparent bg-clip-text bg-gradient-to-b from-red-500/20 to-transparent blur-2xl">
+              POV STORE
+            </span>
+            <span className="relative text-transparent bg-clip-text bg-gradient-to-b from-white via-neutral-200 to-neutral-600">
+              POV STORE
+            </span>
           </h1>
-        </div>
-
-        {/* 3. TIMER DE ALTA PRECISIÓN */}
-        <div className="w-full max-w-4xl border-y border-white/10 py-8 sm:py-12 bg-white/5 backdrop-blur-sm rounded-2xl animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
-          <div className="grid grid-cols-4 gap-2 sm:gap-8 divide-x divide-white/10">
-            <TimeUnit value={timeLeft.days} label="Días" />
-            <TimeUnit value={timeLeft.hours} label="Horas" />
-            <TimeUnit value={timeLeft.minutes} label="Mins" />
-            <TimeUnit value={timeLeft.seconds} label="Segs" isLast />
-          </div>
-        </div>
-
-        {/* 4. CALL TO ACTION (Solo Instagram) */}
-        <div className="animate-fade-in-up" style={{ animationDelay: '0.3s' }}>
-          <Link 
-            href="https://www.instagram.com/povstore.uy/"
-            target="_blank"
-            className="group flex items-center gap-4 px-8 py-4 bg-white text-black hover:bg-red-600 hover:text-white rounded-full transition-all duration-500 shadow-[0_0_20px_rgba(255,255,255,0.2)] hover:shadow-[0_0_40px_rgba(220,38,38,0.6)]"
-          >
-            <Icon name="CameraIcon" size={24} className="group-hover:scale-110 transition-transform" />
-            <span className="font-bold tracking-wide text-sm sm:text-base">SÍGUENOS EN INSTAGRAM</span>
-            <Icon name="ArrowRightIcon" size={20} className="group-hover:translate-x-1 transition-transform" />
-          </Link>
-          <p className="text-neutral-500 text-xs text-center mt-4 tracking-wide">
-            Sé el primero en saberlo.
+          
+          <p className="text-sm sm:text-base md:text-lg text-neutral-400 tracking-widest max-w-2xl mx-auto font-light">
+            El ecosistema definitivo para creadores de contenido visual
           </p>
         </div>
 
+        {/* Countdown Ultra Destacado */}
+        <div className="w-full max-w-5xl relative animate-fade-in-up" style={{ animationDelay: '0.3s' }}>
+          {/* Glow de fondo */}
+          <div className="absolute -inset-4 bg-gradient-to-r from-red-600/10 via-red-500/20 to-red-600/10 blur-3xl rounded-3xl" />
+          
+          <div className="relative border border-white/10 rounded-3xl p-8 sm:p-12 bg-gradient-to-b from-white/[0.07] to-white/[0.02] backdrop-blur-xl">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-6 sm:gap-8">
+              <TimeUnit value={timeLeft.days} label="Días" icon={<Zap className="w-5 h-5" />} isPrimary />
+              <TimeUnit value={timeLeft.hours} label="Horas" />
+              <TimeUnit value={timeLeft.minutes} label="Minutos" />
+              <TimeUnit value={timeLeft.seconds} label="Segundos" isAnimated />
+            </div>
+            
+            {/* Progress Bar */}
+            <div className="mt-8 h-1 w-full bg-white/5 rounded-full overflow-hidden">
+              <div 
+                className="h-full bg-gradient-to-r from-red-600 via-red-500 to-red-600 transition-all duration-1000 rounded-full"
+                style={{ width: `${intensity * 100}%` }}
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* CTA Mejorado */}
+        <div className="flex flex-col sm:flex-row gap-4 items-center animate-fade-in-up" style={{ animationDelay: '0.4s' }}>
+          <a 
+            href="https://www.instagram.com/povstore.uy/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="group relative px-8 py-4 rounded-full overflow-hidden transition-all duration-300 hover:scale-105"
+          >
+            <div className="absolute inset-0 bg-gradient-to-r from-red-600 to-red-700 transition-transform group-hover:scale-110" />
+            <div className="absolute inset-0 bg-gradient-to-r from-red-500 to-red-600 opacity-0 group-hover:opacity-100 transition-opacity" />
+            <div className="relative flex items-center gap-3 text-white font-bold tracking-wide">
+              <Instagram className="w-5 h-5 group-hover:rotate-12 transition-transform" />
+              <span className="text-sm sm:text-base">SÍGUENOS EN INSTAGRAM</span>
+              <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+            </div>
+          </a>
+          
+          <button className="group px-8 py-4 rounded-full border-2 border-white/20 hover:border-white/40 backdrop-blur-sm transition-all duration-300 hover:bg-white/5">
+            <div className="flex items-center gap-3 text-white/80 group-hover:text-white font-bold tracking-wide">
+              <Camera className="w-5 h-5" />
+              <span className="text-sm sm:text-base">NOTIFICARME</span>
+            </div>
+          </button>
+        </div>
+
+        {/* Teaser de Características
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 w-full max-w-3xl mt-8 animate-fade-in-up" style={{ animationDelay: '0.5s' }}>
+          {[
+            { title: 'Equipos Pro', desc: 'Cámaras, lenses y accesorios premium' },
+            { title: 'Alquiler Flex', desc: 'Acceso al mejor equipo sin comprar' },
+            { title: 'Comunidad', desc: 'Conecta con creadores locales' }
+          ].map((feature, i) => (
+            <div key={i} className="group p-4 rounded-2xl border border-white/5 bg-white/[0.02] hover:bg-white/[0.05] hover:border-white/10 transition-all duration-300">
+              <h3 className="text-white font-bold text-sm mb-1 group-hover:text-red-400 transition-colors">{feature.title}</h3>
+              <p className="text-neutral-500 text-xs leading-relaxed">{feature.desc}</p>
+            </div>
+          ))}
+        </div> */}
       </div>
 
-      {/* Footer Sutil */}
-      <div className="absolute bottom-6 w-full text-center">
-        <p className="text-[10px] text-neutral-600 uppercase tracking-widest">
-          © {new Date().getFullYear()} POV Store • Potenciando Creadores
+      {/* Footer Elegante */}
+      <div className="absolute bottom-0 w-full py-6 bg-gradient-to-t from-black/50 to-transparent backdrop-blur-sm">
+        <p className="text-center text-[10px] text-neutral-600 uppercase tracking-[0.3em]">
+          © {new Date().getFullYear()} POV Store • Potenciando la Visión de Creadores
         </p>
       </div>
+
+      <style jsx>{`
+        @keyframes pulse-breath {
+          0%, 100% { transform: translate(-50%, -50%) scale(1); opacity: 0.3; }
+          50% { transform: translate(-50%, -50%) scale(1.1); opacity: 0.5; }
+        }
+        
+        @keyframes float-particle {
+          0% { transform: translateY(100vh) translateX(0); opacity: 0; }
+          10% { opacity: 0.3; }
+          90% { opacity: 0.3; }
+          100% { transform: translateY(-100vh) translateX(50px); opacity: 0; }
+        }
+        
+        @keyframes fade-in-down {
+          from { opacity: 0; transform: translateY(-20px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        
+        @keyframes fade-in-up {
+          from { opacity: 0; transform: translateY(20px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        
+        @keyframes fade-in {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+        
+        @keyframes float {
+          0%, 100% { transform: translate(0, 0); }
+          50% { transform: translate(20px, -20px); }
+        }
+        
+        @keyframes pulse-slow {
+          0%, 100% { opacity: 0.5; }
+          50% { opacity: 0.8; }
+        }
+        
+        @keyframes spin-slow {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+        
+        .animate-pulse-breath { animation: pulse-breath 4s ease-in-out infinite; }
+        .animate-float { animation: float 10s ease-in-out infinite; }
+        .animate-fade-in-down { animation: fade-in-down 0.6s ease-out forwards; }
+        .animate-fade-in-up { animation: fade-in-up 0.6s ease-out forwards; }
+        .animate-fade-in { animation: fade-in 0.6s ease-out forwards; }
+        .animate-pulse-slow { animation: pulse-slow 3s ease-in-out infinite; }
+        .animate-spin-slow { animation: spin-slow 20s linear infinite; }
+      `}</style>
     </main>
   );
 }
 
-// --- Componente de Unidad de Tiempo ---
-function TimeUnit({ value, label, isLast = false }: { value: number; label: string; isLast?: boolean }) {
+function TimeUnit({ value, label, icon, isPrimary = false, isAnimated = false }: { 
+  value: number; 
+  label: string; 
+  icon?: React.ReactNode;
+  isPrimary?: boolean;
+  isAnimated?: boolean;
+}) {
   return (
     <div className="flex flex-col items-center justify-center group">
-      <div className={`text-4xl sm:text-6xl md:text-7xl font-mono font-light tracking-tighter tabular-nums transition-colors duration-300 ${isLast ? 'text-red-500' : 'text-white group-hover:text-red-200'}`}>
-        {String(value).padStart(2, '0')}
+      <div className="relative">
+        {isPrimary && (
+          <div className="absolute -inset-2 bg-red-500/20 rounded-2xl blur-xl group-hover:bg-red-500/30 transition-all" />
+        )}
+        <div className={`relative px-4 py-3 rounded-2xl transition-all duration-300 ${
+          isPrimary 
+            ? 'bg-gradient-to-b from-red-500/10 to-red-600/5 border border-red-500/20' 
+            : 'bg-white/5 group-hover:bg-white/10'
+        }`}>
+          <div className={`text-5xl sm:text-6xl md:text-7xl font-mono font-bold tracking-tighter tabular-nums transition-all duration-300 ${
+            isPrimary 
+              ? 'text-transparent bg-clip-text bg-gradient-to-b from-red-400 to-red-600' 
+              : isAnimated
+              ? 'text-white group-hover:text-red-400'
+              : 'text-white group-hover:text-red-300'
+          } ${isAnimated ? 'animate-pulse' : ''}`}>
+            {String(value).padStart(2, '0')}
+          </div>
+        </div>
       </div>
-      <span className="text-[10px] sm:text-xs text-neutral-500 font-bold uppercase tracking-[0.2em] mt-2 group-hover:text-white transition-colors">
-        {label}
-      </span>
+      <div className="flex items-center gap-1.5 mt-3">
+        {icon && <div className="text-red-500/70">{icon}</div>}
+        <span className="text-[10px] sm:text-xs text-neutral-400 font-bold uppercase tracking-[0.2em] group-hover:text-white transition-colors">
+          {label}
+        </span>
+      </div>
     </div>
   );
 }
