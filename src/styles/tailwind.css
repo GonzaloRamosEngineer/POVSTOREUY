@@ -199,7 +199,6 @@
   }
 }
 
-
 /* Animación de Latido Fuerte para el Logo */
 @keyframes heartbeat {
   0% { transform: scale(1); filter: drop-shadow(0 0 15px rgba(220,38,38,0.4)); }
