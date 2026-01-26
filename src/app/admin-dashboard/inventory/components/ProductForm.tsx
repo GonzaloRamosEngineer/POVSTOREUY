@@ -244,7 +244,7 @@ export default function ProductForm({ mode, productId }: { mode: Mode; productId
       return;
     }
 
-    const res = await fetch(`/api/admin/products/${productId}`, {
+    const res = await fetch(`/api/admin/products?id=${productId}`, {
       headers: { Authorization: `Bearer ${token}` },
       cache: 'no-store',
     });
@@ -337,8 +337,11 @@ export default function ProductForm({ mode, productId }: { mode: Mode; productId
       return;
     }
 
-    const url = mode === 'create' ? '/api/admin/products' : `/api/admin/products/${productId}`;
-    const method = mode === 'create' ? 'POST' : 'PATCH';
+    const url = mode === 'create' 
+  ? '/api/admin/products' 
+  : `/api/admin/products?id=${productId}`;
+  
+const method = mode === 'create' ? 'POST' : 'PATCH';
 
     const res = await fetch(url, {
       method,
