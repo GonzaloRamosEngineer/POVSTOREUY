@@ -78,7 +78,7 @@ export default function ComingSoonPage() {
            <div className="relative w-40 h-40 sm:w-52 sm:h-52 md:w-64 md:h-64 animate-pulse-heartbeat filter drop-shadow-[0_0_20px_rgba(220,38,38,0.6)]">
              {/* REEMPLAZA '/images/logo-pov-black-red.png' CON LA RUTA REAL DE TU LOGO */}
              <Image 
-                src="/images/logo-pov.png" 
+                src="/images/logo-pov-black-red.png" 
                 alt="POV Store Uruguay Logo" 
                 fill
                 className="object-contain"
