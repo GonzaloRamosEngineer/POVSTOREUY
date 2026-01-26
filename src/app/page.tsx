@@ -197,12 +197,12 @@ export default function ComingSoonPage() {
               </div>
             </a>
             
-            <button className="group px-6 sm:px-8 py-3 sm:py-4 rounded-full border-2 border-white/20 hover:border-white/40 backdrop-blur-sm transition-all duration-300 hover:bg-white/5 flex-1 sm:flex-initial">
+            {/* <button className="group px-6 sm:px-8 py-3 sm:py-4 rounded-full border-2 border-white/20 hover:border-white/40 backdrop-blur-sm transition-all duration-300 hover:bg-white/5 flex-1 sm:flex-initial">
               <div className="flex items-center justify-center gap-2 sm:gap-3 text-white/80 group-hover:text-white font-bold tracking-wide">
                 <Camera className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />
-                {/* <span className="text-xs sm:text-sm md:text-base whitespace-nowrap">NOTIFICARME</span> */}
+                {<span className="text-xs sm:text-sm md:text-base whitespace-nowrap">NOTIFICARME</span> }
               </div>
-            </button>
+            </button> */}
           </div>
 
           {/* Features Grid
