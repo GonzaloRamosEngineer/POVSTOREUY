@@ -44,11 +44,11 @@ const nextConfig = {
   // 5. Redirecciones
   async redirects() {
     return [
-      {
-        source: '/',
-        destination: '/homepage',
-        permanent: false,
-      },
+      // {
+      //   source: '/',
+      //   destination: '/homepage',
+      //   permanent: false,
+      // },
     ];
   },
 
