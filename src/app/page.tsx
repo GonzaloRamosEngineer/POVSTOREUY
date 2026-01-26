@@ -40,9 +40,11 @@ export default function ComingSoonPage() {
 
   const urgencyPhrases = [
     "El futuro de los creadores",
-    "Algo grande está por llegar",
+    "Algo grande está llegando",
     "La espera casi termina",
-    "Prepárate para el cambio"
+    "Prepárate para el cambio",
+    "Drop 01 Viernes 30/01",
+    "Powered by SJCAM - Tecnología Oficial -"
   ];
 
   const currentPhrase = urgencyPhrases[Math.floor((timeLeft.seconds / 15) % urgencyPhrases.length)];
@@ -151,7 +153,7 @@ export default function ComingSoonPage() {
             </h1>
             
             <p className="text-xs sm:text-sm md:text-base lg:text-lg text-neutral-400 tracking-wide sm:tracking-widest max-w-xs sm:max-w-md md:max-w-2xl mx-auto font-light px-4">
-              El ecosistema definitivo para creadores de contenido visual
+              Tu vida en primera persona
             </p>
           </div>
 
@@ -198,12 +200,12 @@ export default function ComingSoonPage() {
             <button className="group px-6 sm:px-8 py-3 sm:py-4 rounded-full border-2 border-white/20 hover:border-white/40 backdrop-blur-sm transition-all duration-300 hover:bg-white/5 flex-1 sm:flex-initial">
               <div className="flex items-center justify-center gap-2 sm:gap-3 text-white/80 group-hover:text-white font-bold tracking-wide">
                 <Camera className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />
-                <span className="text-xs sm:text-sm md:text-base whitespace-nowrap">NOTIFICARME</span>
+                {/* <span className="text-xs sm:text-sm md:text-base whitespace-nowrap">NOTIFICARME</span> */}
               </div>
             </button>
           </div>
 
-          {/* Features Grid */}
+          {/* Features Grid
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 w-full max-w-3xl px-4 sm:px-0 animate-fade-in-up" style={{ animationDelay: '0.5s' }}>
             {[
               { title: 'Equipos Pro', desc: 'Cámaras, lenses y accesorios premium' },
@@ -215,7 +217,7 @@ export default function ComingSoonPage() {
                 <p className="text-neutral-500 text-[10px] sm:text-xs leading-relaxed">{feature.desc}</p>
               </div>
             ))}
-          </div>
+          </div> */}
         </div>
       </div>
 
