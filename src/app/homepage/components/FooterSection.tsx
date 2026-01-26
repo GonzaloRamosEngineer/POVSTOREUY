@@ -35,16 +35,18 @@ const FooterSection = () => {
             <h4 className="text-sm font-semibold text-foreground mb-4">Productos</h4>
             <ul className="space-y-2">
               <li>
+                {/* CORREGIDO: Apunta al ancla de productos en la homepage */}
                 <Link
-                  href="/product-details"
+                  href="/homepage#productos"
                   className="text-sm text-muted-foreground hover:text-primary transition-smooth"
                 >
                   POV Básico
                 </Link>
               </li>
               <li>
+                {/* CORREGIDO: Apunta al ancla de productos en la homepage */}
                 <Link
-                  href="/product-details"
+                  href="/homepage#productos"
                   className="text-sm text-muted-foreground hover:text-primary transition-smooth"
                 >
                   POV Pro
