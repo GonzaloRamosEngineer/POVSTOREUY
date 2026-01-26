@@ -108,7 +108,7 @@ export default function ComingSoonPage() {
             </div>
             
             {/* Logo */}
-            <div className="relative w-24 h-24 sm:w-32 sm:h-32 md:w-40 md:h-40 group-hover:scale-110 transition-transform duration-500">
+                      <div className="relative w-32 h-32 sm:w-40 sm:h-40 md:w-48 md:h-48 group-hover:scale-110 transition-transform duration-500">
               <Image 
                 src="/images/logo-pov.png"
                 alt="POV Store Logo" 
