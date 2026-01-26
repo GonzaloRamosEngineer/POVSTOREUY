@@ -1,18 +1,18 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import Icon from '@/components/ui/AppIcon';
 
 export default function ComingSoonPage() {
   const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });
-  const [isAudioEnabled, setIsAudioEnabled] = useState(false);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [mounted, setMounted] = useState(false);
 
-  // --- LÓGICA DE CUENTA REGRESIVA ---
   useEffect(() => {
-    const targetDate = new Date('2026-01-30T00:00:00-03:00').getTime(); // Hora Uruguay
+    setMounted(true);
+    // FECHA OBJETIVO: 30 Enero 2026
+    const targetDate = new Date('2026-01-30T00:00:00-03:00').getTime();
 
     const timer = setInterval(() => {
       const now = new Date().getTime();
@@ -20,8 +20,6 @@ export default function ComingSoonPage() {
 
       if (distance < 0) {
         clearInterval(timer);
-        // Opcional: Redirigir a /homepage cuando llegue la fecha
-        // window.location.href = '/homepage'; 
         return;
       }
 
@@ -36,125 +34,108 @@ export default function ComingSoonPage() {
     return () => clearInterval(timer);
   }, []);
 
-  // --- LÓGICA DE AUDIO (Latidos) ---
-  const toggleAudio = () => {
-    if (!audioRef.current) return;
-    if (isAudioEnabled) {
-      audioRef.current.pause();
-    } else {
-      audioRef.current.play().catch(() => {}); // Ignorar error de autoplay browser policy
-    }
-    setIsAudioEnabled(!isAudioEnabled);
-  };
+  if (!mounted) return null; // Evita flash de hidratación
 
   return (
-    <main className="relative min-h-screen w-full bg-black overflow-hidden flex flex-col items-center justify-center text-center selection:bg-red-600/50">
+    <main className="relative min-h-[100dvh] w-full bg-[#050505] text-white overflow-hidden flex flex-col items-center justify-center selection:bg-red-600 selection:text-white">
       
-      {/* --- AUDIO OCULTO (Latido Profundo) --- */}
-      {/* Descarga un "deep heartbeat sound" y ponlo en public/sounds/heartbeat.mp3 */}
-      <audio ref={audioRef} src="/sounds/heartbeat.mp3" loop hidden />
-
-      {/* --- FONDO VISCERAL --- */}
-      <div className="absolute inset-0 pointer-events-none">
-        {/* Ruido de película antigua */}
-        <div className="absolute inset-0 opacity-[0.12] mix-blend-overlay" style={{ backgroundImage: 'url("https://grainy-gradients.vercel.app/noise.svg")' }} />
+      {/* --- FONDO ATMOSFÉRICO (Tech Noir) --- */}
+      <div className="absolute inset-0 pointer-events-none select-none">
+        {/* Gradiente Radial Sutil (Luz de estudio) */}
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-neutral-900/40 via-[#050505] to-[#050505]" />
         
-        {/* Luz Roja Sangrante (Palpita con CSS) */}
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[80vw] h-[80vw] max-w-[1000px] max-h-[1000px] bg-red-700/20 rounded-full blur-[180px] animate-pulse-heartbeat-bg" />
+        {/* Ruido Granulado (Textura de cine) */}
+        <div className="absolute inset-0 opacity-[0.07]" style={{ backgroundImage: 'url("https://grainy-gradients.vercel.app/noise.svg")' }} />
         
-        {/* Viñeta oscura dramática */}
-        <div className="absolute inset-0 bg-[radial-gradient(transparent_30%,_black_90%)]" />
+        {/* El Corazón Rojo (Luz de fondo) */}
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[60vw] h-[60vw] max-w-[800px] max-h-[800px] bg-red-600/10 rounded-full blur-[120px] animate-pulse-slow" />
       </div>
 
       {/* --- CONTENIDO PRINCIPAL --- */}
-      <div className="relative z-20 px-6 space-y-16 max-w-6xl mx-auto flex flex-col items-center">
+      <div className="relative z-10 w-full max-w-5xl px-6 flex flex-col items-center gap-12 sm:gap-16">
         
-        {/* --- EL CORAZÓN DE LA MARCA (Logo Animado) --- */}
-        <div className="relative group">
-           {/* Glow detrás del logo */}
-           <div className="absolute -inset-4 bg-red-600/30 rounded-full blur-2xl animate-pulse-heartbeat opacity-70 group-hover:opacity-100 transition-opacity duration-500" />
-           
-           {/* Logo Real */}
-           <div className="relative w-40 h-40 sm:w-52 sm:h-52 md:w-64 md:h-64 animate-pulse-heartbeat filter drop-shadow-[0_0_20px_rgba(220,38,38,0.6)]">
-             {/* REEMPLAZA '/images/logo-pov-black-red.png' CON LA RUTA REAL DE TU LOGO */}
-             <Image 
-                src="/images/logo-pov-black-red.png" 
-                alt="POV Store Uruguay Logo" 
+        {/* 1. LOGO & UBICACIÓN */}
+        <div className="flex flex-col items-center gap-6 animate-fade-in-up">
+          <div className="relative group">
+            {/* Efecto de respiración detrás del logo */}
+            <div className="absolute -inset-6 bg-red-600/20 rounded-full blur-xl animate-pulse-heartbeat opacity-50 group-hover:opacity-80 transition-opacity duration-700" />
+            
+            <div className="relative w-32 h-32 sm:w-40 sm:h-40 md:w-48 md:h-48 animate-pulse-heartbeat">
+              <Image 
+                src="/images/logo-pov.png" // Asegúrate de que este nombre sea correcto en public/images/
+                alt="POV Store Logo" 
                 fill
-                className="object-contain"
+                className="object-contain drop-shadow-2xl"
                 priority
-             />
-           </div>
+                unoptimized
+              />
+            </div>
+          </div>
+          
+          <div className="flex items-center gap-3 text-red-500/80 tracking-[0.2em] text-xs sm:text-sm font-bold uppercase border border-red-900/30 px-4 py-1.5 rounded-full bg-red-950/10 backdrop-blur-sm">
+            <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+            Montevideo, Uruguay
+          </div>
         </div>
 
-        {/* TITULARES DE IMPACTO */}
-        <div className="space-y-4 uppercase tracking-tighter">
-          <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-red-600 animate-glitch-subtle">
-            Montevideo, Uruguay
+        {/* 2. TITULAR MONUMENTAL */}
+        <div className="text-center space-y-2 sm:space-y-4 animate-fade-in-up" style={{ animationDelay: '0.1s' }}>
+          <h2 className="text-xl sm:text-2xl md:text-3xl font-medium text-neutral-400 tracking-widest uppercase">
+            La revolución visual
           </h2>
-          <h1 className="text-7xl sm:text-8xl md:text-[10rem] font-black text-white leading-[0.85] scale-y-110 drop-shadow-2xl">
-            ESTAMOS<br />
-            <span className="text-transparent bg-clip-text bg-gradient-to-b from-red-500 to-red-800">
-              LLEGANDO
-            </span>
+          <h1 className="text-6xl sm:text-8xl md:text-9xl font-black tracking-tighter leading-[0.9] text-transparent bg-clip-text bg-gradient-to-b from-white via-white to-neutral-500">
+            IS COMING
           </h1>
         </div>
 
-        {/* CUENTA REGRESIVA MONUMENTAL */}
-        <div className="grid grid-cols-4 gap-2 sm:gap-6 md:gap-10 w-full max-w-4xl border-t border-b border-red-900/30 py-8">
-          <TimeBox value={timeLeft.days} label="DÍAS" />
-          <TimeBox value={timeLeft.hours} label="HS" />
-          <TimeBox value={timeLeft.minutes} label="MIN" />
-          <TimeBox value={timeLeft.seconds} label="SEG" isRed />
+        {/* 3. TIMER DE ALTA PRECISIÓN */}
+        <div className="w-full max-w-4xl border-y border-white/10 py-8 sm:py-12 bg-white/5 backdrop-blur-sm rounded-2xl animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
+          <div className="grid grid-cols-4 gap-2 sm:gap-8 divide-x divide-white/10">
+            <TimeUnit value={timeLeft.days} label="Días" />
+            <TimeUnit value={timeLeft.hours} label="Horas" />
+            <TimeUnit value={timeLeft.minutes} label="Mins" />
+            <TimeUnit value={timeLeft.seconds} label="Segs" isLast />
+          </div>
         </div>
 
-        {/* BOTÓN DE AUDIO + REDES */}
-        <div className="flex flex-col items-center gap-8 pt-8">
-            {/* Botón para activar la experiencia sonora */}
-            <button 
-                onClick={toggleAudio}
-                className={`flex items-center gap-3 px-6 py-3 rounded-full border transition-all duration-500 group ${isAudioEnabled ? 'border-red-500 bg-red-500/10 text-red-400' : 'border-neutral-800 text-neutral-500 hover:text-white hover:border-white'}`}
-            >
-                <Icon name={isAudioEnabled ? 'SpeakerWaveIcon' : 'SpeakerXMarkIcon'} size={20} className={isAudioEnabled ? 'animate-pulse' : ''} />
-                <span className="text-sm font-bold tracking-widest uppercase">
-                    {isAudioEnabled ? 'Adrenalina Activada' : 'Activar Sonido'}
-                </span>
-            </button>
-
-            {/* Redes Sociales */}
-            <div className="flex gap-6 opacity-60 hover:opacity-100 transition-opacity duration-500">
-                <SocialLink href="https://instagram.com/povstoreuruguay" icon="CameraIcon" />
-                <SocialLink href="https://facebook.com/povstoreuruguay" icon="UserGroupIcon" />
-                <SocialLink href="https://youtube.com/@povstoreuruguay" icon="PlayIcon" />
-            </div>
+        {/* 4. CALL TO ACTION (Solo Instagram) */}
+        <div className="animate-fade-in-up" style={{ animationDelay: '0.3s' }}>
+          <Link 
+            href="https://www.instagram.com/povstore.uy/"
+            target="_blank"
+            className="group flex items-center gap-4 px-8 py-4 bg-white text-black hover:bg-red-600 hover:text-white rounded-full transition-all duration-500 shadow-[0_0_20px_rgba(255,255,255,0.2)] hover:shadow-[0_0_40px_rgba(220,38,38,0.6)]"
+          >
+            <Icon name="CameraIcon" size={24} className="group-hover:scale-110 transition-transform" />
+            <span className="font-bold tracking-wide text-sm sm:text-base">SÍGUENOS EN INSTAGRAM</span>
+            <Icon name="ArrowRightIcon" size={20} className="group-hover:translate-x-1 transition-transform" />
+          </Link>
+          <p className="text-neutral-500 text-xs text-center mt-4 tracking-wide">
+            Sé el primero en saberlo.
+          </p>
         </div>
+
+      </div>
+
+      {/* Footer Sutil */}
+      <div className="absolute bottom-6 w-full text-center">
+        <p className="text-[10px] text-neutral-600 uppercase tracking-widest">
+          © {new Date().getFullYear()} POV Store • Potenciando Creadores
+        </p>
       </div>
     </main>
   );
 }
 
-// --- Componentes & Estilos ---
-
-function TimeBox({ value, label, isRed = false }: { value: number; label: string; isRed?: boolean }) {
+// --- Componente de Unidad de Tiempo ---
+function TimeUnit({ value, label, isLast = false }: { value: number; label: string; isLast?: boolean }) {
   return (
-    <div className="flex flex-col items-center">
-      {/* Los segundos tienen un efecto de "glitch" rojo */}
-      <div className={`text-5xl sm:text-7xl md:text-8xl font-black font-mono tabular-nums leading-none ${isRed ? 'text-red-500 drop-shadow-[0_0_25px_rgba(220,38,38,0.8)] animate-pulse-fast' : 'text-white'}`}>
+    <div className="flex flex-col items-center justify-center group">
+      <div className={`text-4xl sm:text-6xl md:text-7xl font-mono font-light tracking-tighter tabular-nums transition-colors duration-300 ${isLast ? 'text-red-500' : 'text-white group-hover:text-red-200'}`}>
         {String(value).padStart(2, '0')}
       </div>
-      <span className="text-xs sm:text-sm md:text-base text-red-700 font-bold tracking-[0.3em] mt-3 uppercase">{label}</span>
+      <span className="text-[10px] sm:text-xs text-neutral-500 font-bold uppercase tracking-[0.2em] mt-2 group-hover:text-white transition-colors">
+        {label}
+      </span>
     </div>
-  );
-}
-
-function SocialLink({ href, icon }: { href: string; icon: string }) {
-  return (
-    <Link 
-      href={href} 
-      target="_blank"
-      className="text-neutral-400 hover:text-red-500 transition-colors duration-300 hover:scale-110 transform"
-    >
-      <Icon name={icon as any} size={28} />
-    </Link>
   );
 }
