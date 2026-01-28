@@ -165,6 +165,20 @@ export default function ComingSoonPage() {
             <p className="text-xs sm:text-sm md:text-base lg:text-lg text-neutral-400 tracking-wide sm:tracking-widest max-w-xs sm:max-w-md md:max-w-2xl mx-auto font-light px-4">
               Tu vida en primera persona
             </p>
+
+
+            <div className="pt-4 sm:pt-6">
+              <div className="inline-flex items-center gap-2 sm:gap-3 px-4 sm:px-6 py-2 sm:py-3 rounded-lg border border-red-500/30 bg-red-950/30 backdrop-blur-md shadow-[0_0_15px_rgba(220,38,38,0.2)]">
+                <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-red-500 animate-pulse shadow-[0_0_10px_#ef4444]" />
+                <span className="text-sm sm:text-base md:text-lg font-mono font-bold text-red-100 tracking-widest uppercase">
+                  Apertura: Viernes 30/01 <span className="text-red-500 mx-1">|</span> 12:00 HS
+                </span>
+                <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-red-500 animate-pulse shadow-[0_0_10px_#ef4444]" />
+              </div>
+            </div>
+
+
+
           </div>
 
           {/* Countdown */}
