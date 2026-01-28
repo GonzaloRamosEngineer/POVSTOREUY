@@ -3,28 +3,27 @@ import { notFound } from 'next/navigation';
 import Header from '@/components/common/Header';
 import ProductDetailsInteractive from '@/app/product-details/components/ProductDetailsInteractive';
 
-// -----------------------------------------------------------------------------
-// 🔥 ESTA ES LA LÍNEA CLAVE QUE FALTABA:
-// Obliga a Vercel a generar la página en cada visita (Server Side Rendering).
-// Esto evita que se quede guardada una página de "Error 404" en la memoria caché.
-export const dynamic = 'force-dynamic';
-// -----------------------------------------------------------------------------
+// --- NUEVAS IMPORTACIONES ---
+import ProductStickyNav from '@/app/product-details/components/ProductStickyNav';
+import DynamicStoryRenderer from '@/app/product-details/components/DynamicStoryRenderer';
+import TechSpecsTable from '@/app/product-details/components/TechSpecsTable';
+import ProductComparison from '@/app/product-details/components/ProductComparison';
+import ProductFAQ from '@/app/product-details/components/ProductFAQ'; // <--- NUEVO IMPORT
+import { Product } from '@/types/product'; 
+// -----------------------------
 
-// Configuración de Supabase (Server Side)
+export const dynamic = 'force-dynamic';
+
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-// Definimos el tipo de Params como una Promesa (Requisito de Next.js moderno)
 type Props = {
   params: Promise<{ id: string }>;
 };
 
-// SEO Dinámico
 export async function generateMetadata({ params }: Props) {
-  // 1. Esperamos a obtener los parámetros
   const { id } = await params;
-
   const { data: product } = await supabase
     .from('products')
     .select('name, description')
@@ -40,21 +39,30 @@ export async function generateMetadata({ params }: Props) {
 }
 
 export default async function ProductPage({ params }: Props) {
-  // 1. Esperamos a obtener los parámetros aquí también
   const { id } = await params;
 
-  // 2. Buscamos el producto en la DB usando el ID obtenido
-  const { data: product, error } = await supabase
+  // Traemos todos los productos activos para la comparación
+  const { data: allProducts, error } = await supabase
     .from('products')
     .select('*')
-    .eq('id', id)
-    .single();
+    .eq('is_active', true)
+    .order('price', { ascending: true });
 
-  if (error || !product) {
+  if (error || !allProducts) {
     notFound();
   }
 
-  // 3. Preparamos la Galería
+  const rawProduct = allProducts.find((p) => p.id === id);
+
+  if (!rawProduct) {
+    notFound();
+  }
+
+  // Casting de Tipos
+  const product = rawProduct as unknown as Product;
+  const productsList = allProducts as unknown as Product[];
+
+  // Formateo de galería
   const formattedGallery = [
     ...(product.video_url
       ? [{
@@ -79,12 +87,44 @@ export default async function ProductPage({ params }: Props) {
   ];
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-white">
       <Header />
+      
+      {/* 1. SECCIÓN DE COMPRA */}
       <ProductDetailsInteractive 
-        productInitial={product} 
+        productInitial={rawProduct} 
         galleryInitial={formattedGallery} 
       />
+
+      {/* 2. BARRA DE NAVEGACIÓN PEGAJOSA */}
+      <ProductStickyNav />
+
+      {/* 3. HISTORIA VISUAL */}
+      <div id="overview">
+         <DynamicStoryRenderer content={product.story_content} />
+      </div>
+
+      {/* 4. ESPECIFICACIONES TÉCNICAS */}
+      <div id="specs">
+         <TechSpecsTable specs={product.tech_specs} />
+      </div>
+
+      {/* 5. TABLA COMPARATIVA */}
+      <div id="compare">
+        <ProductComparison currentProduct={product} allProducts={productsList} />
+      </div>
+
+      {/* 6. 🔥 NUEVO: PREGUNTAS FRECUENTES (FAQ) 🔥 */}
+      <div id="faq">
+        <ProductFAQ faqs={product.faq_content} />
+      </div>
+
+      {/* 7. RESEÑAS */}
+      <div id="reviews" className="py-16 bg-gray-50 text-center">
+          <h2 className="text-2xl font-bold mb-4">Reseñas de Clientes</h2>
+          <p className="text-gray-500">Próximamente: Sistema de reseñas integrado.</p>
+      </div>
+
     </div>
   );
 }

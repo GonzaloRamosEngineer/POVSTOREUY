@@ -4,9 +4,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import ProductGallery from './ProductGallery';
 import ProductInfo from './ProductInfo';
-import ProductSpecs from './ProductSpecs';
-import CustomerReviews from './CustomerReviews';
-import RelatedProducts from './RelatedProducts';
+// ❌ BORRADO: ProductSpecs, CustomerReviews, RelatedProducts ya no se importan aquí
 import Icon from '@/components/ui/AppIcon';
 import AppImage from '@/components/ui/AppImage';
 import { getSupabaseBrowserClient } from '@/lib/supabaseClient';
@@ -21,23 +19,6 @@ interface GalleryImage {
   type: 'image' | 'video';
 }
 
-interface Specification {
-  icon: string;
-  label: string;
-  value: string;
-}
-
-interface Review {
-  id: string;
-  author: string;
-  authorImage: string;
-  authorImageAlt: string;
-  rating: number;
-  date: string;
-  comment: string;
-  verified: boolean;
-}
-
 // Tipo para un Addon (Producto simplificado)
 interface AddonProduct {
   id: string;
@@ -46,7 +27,7 @@ interface AddonProduct {
   image_url: string;
 }
 
-// Interfaz del Producto Principal (Extendida con nuevos campos)
+// Interfaz del Producto Principal
 interface ProductData {
   id: string;
   name: string;
@@ -56,7 +37,7 @@ interface ProductData {
   original_price: number | null;
   image_url: string;
   stock_count: number;
-  features: string[] | string; // Puede venir como string JSON o array
+  features: string[] | string; 
   is_active: boolean;
   colors?: { name: string; hex: string }[];
   addon_ids?: string[];
@@ -83,26 +64,18 @@ export default function ProductDetailsInteractive({ productInitial, galleryIniti
   const router = useRouter();
   const supabase = getSupabaseBrowserClient();
   
-  // Usamos los datos iniciales
   const product = productInitial;
 
   // --- ESTADOS ---
-  
-  // 1. Color Seleccionado (Predeterminado al primero si existe)
   const [selectedColor, setSelectedColor] = useState<string | null>(
       product.colors && product.colors.length > 0 ? product.colors[0].name : null
   );
 
-  // 2. Addons (Datos y Selección)
   const [addonsData, setAddonsData] = useState<AddonProduct[]>([]);
   const [selectedAddonIds, setSelectedAddonIds] = useState<string[]>([]);
-  
-  // 3. Cantidad Principal (Para la lógica de compra)
   const [quantity, setQuantity] = useState(1);
 
   // --- EFECTOS ---
-
-  // Cargar datos de Addons desde Supabase
   useEffect(() => {
     const fetchAddons = async () => {
         if (!product.addon_ids || product.addon_ids.length === 0) return;
@@ -119,7 +92,6 @@ export default function ProductDetailsInteractive({ productInitial, galleryIniti
   }, [product.addon_ids, supabase]);
 
   // --- CÁLCULOS DERIVADOS ---
-
   const title = useMemo(() => {
     if (!product) return '';
     return `${product.name}${product.model ? ` - ${product.model}` : ''}`;
@@ -135,8 +107,6 @@ export default function ProductDetailsInteractive({ productInitial, galleryIniti
   const stockStatus: 'in-stock' | 'low-stock' | 'out-of-stock' =
     stockCount <= 0 ? 'out-of-stock' : stockCount <= 5 ? 'low-stock' : 'in-stock';
 
-  // Precio Total Dinámico (Producto * Cantidad + Addons)
-  // Nota: Los addons se suman 1 vez por conjunto, si quisieras que se multipliquen por la cantidad base, ajusta aquí.
   const totalPrice = useMemo(() => {
       const base = Number(product.price) * quantity;
       const addonsCost = selectedAddonIds.reduce((acc, id) => {
@@ -147,7 +117,6 @@ export default function ProductDetailsInteractive({ productInitial, galleryIniti
   }, [product.price, quantity, selectedAddonIds, addonsData]);
 
   // --- HANDLERS ---
-
   const toggleAddon = (id: string) => {
       setSelectedAddonIds(prev => 
           prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
@@ -157,8 +126,6 @@ export default function ProductDetailsInteractive({ productInitial, galleryIniti
   const handleAddToCart = () => {
       if (stockStatus === 'out-of-stock') return;
 
-      // 1. Agregar producto principal
-      // Si hay color seleccionado, lo agregamos al nombre para que se vea en el carrito
       const mainProductName = selectedColor 
           ? `${product.name} (${selectedColor})` 
           : product.name;
@@ -174,7 +141,6 @@ export default function ProductDetailsInteractive({ productInitial, galleryIniti
           stock: product.stock_count,
       });
 
-      // 2. Agregar Addons seleccionados como items separados
       selectedAddonIds.forEach(addonId => {
           const item = addonsData.find(a => a.id === addonId);
           if (item) {
@@ -185,11 +151,11 @@ export default function ProductDetailsInteractive({ productInitial, galleryIniti
                   upsertCartItem({
                       id: item.id,
                       name: item.name,
-                      model: 'Accesorio', // Label genérico para addons
+                      model: 'Accesorio',
                       price: Number(item.price),
                       quantity: 1,
                       image: item.image_url,
-                      stock: 99, // Asumimos stock alto para addons o lo traes de DB
+                      stock: 99,
                       alt: item.name
                   });
               }
@@ -198,25 +164,6 @@ export default function ProductDetailsInteractive({ productInitial, galleryIniti
 
       router.push('/shopping-cart');
   };
-
-  // --- DATOS MOCK (Specs/Reviews) ---
-  const specifications: Specification[] = [
-    { icon: 'VideoCameraIcon', label: 'Resolución', value: '4K Ultra HD' },
-    { icon: 'WifiIcon', label: 'Conectividad', value: 'WiFi Integrado' },
-  ];
-  
-  const reviews: Review[] = [
-    {
-      id: '1',
-      author: 'Cliente Verificado',
-      authorImage: '/assets/images/no_image.png', 
-      authorImageAlt: 'Cliente',
-      rating: 5,
-      date: 'Reciente',
-      comment: 'Excelente producto, muy recomendable.',
-      verified: true,
-    },
-  ];
 
   // Validación de seguridad
   if (product.is_active === false) {
@@ -250,7 +197,7 @@ export default function ProductDetailsInteractive({ productInitial, galleryIniti
             description={desc}
           />
 
-          {/* Selector de Colores (Insertado aquí) */}
+          {/* Selector de Colores */}
           {product.colors && product.colors.length > 0 && (
             <div className="pt-4 border-t">
                 <h3 className="text-sm font-medium text-gray-900 mb-3">
@@ -271,7 +218,7 @@ export default function ProductDetailsInteractive({ productInitial, galleryIniti
           )}
         </div>
 
-        {/* COLUMNA 3: Acciones y Addons (Personalizada) */}
+        {/* COLUMNA 3: Acciones y Addons */}
         <div className="lg:col-span-3">
           <div className="sticky top-24 space-y-6">
               
@@ -281,7 +228,7 @@ export default function ProductDetailsInteractive({ productInitial, galleryIniti
                   <div>
                       <p className="text-sm text-gray-500 mb-1">Precio Total</p>
                       <div className="text-3xl font-bold text-gray-900">
-                         ${totalPrice.toLocaleString('es-UY')}
+                          ${totalPrice.toLocaleString('es-UY')}
                       </div>
                       {selectedAddonIds.length > 0 && (
                           <p className="text-xs text-green-600 mt-1 font-medium">
@@ -290,7 +237,7 @@ export default function ProductDetailsInteractive({ productInitial, galleryIniti
                       )}
                   </div>
 
-                  {/* Selector de Addons (You might also like) */}
+                  {/* Selector de Addons */}
                   {addonsData.length > 0 && (
                     <div className="border rounded-lg overflow-hidden">
                         <div className="bg-gray-50 px-3 py-2 text-xs font-bold text-gray-700 border-b uppercase tracking-wide">
@@ -322,7 +269,7 @@ export default function ProductDetailsInteractive({ productInitial, galleryIniti
                     </div>
                   )}
 
-                  {/* Selector de Cantidad (Simple) */}
+                  {/* Selector de Cantidad */}
                   <div className="flex items-center justify-between border rounded-md p-1">
                       <button 
                         onClick={() => setQuantity(Math.max(1, quantity - 1))}
@@ -363,7 +310,7 @@ export default function ProductDetailsInteractive({ productInitial, galleryIniti
                   )}
               </div>
 
-              {/* Info de Envío (Estática por ahora) */}
+              {/* Info de Envío */}
               <div className="flex items-center gap-3 text-sm text-gray-600 px-2">
                  <Icon name="TruckIcon" size={20} className="text-green-600" />
                  <span>Envío gratis en compras mayores a $2000</span>
@@ -372,10 +319,8 @@ export default function ProductDetailsInteractive({ productInitial, galleryIniti
         </div>
       </div>
 
-      {/* Secciones Inferiores */}
-      <ProductSpecs specifications={specifications} />
-      <CustomerReviews reviews={reviews} averageRating={4.8} totalReviews={127} />
-      <RelatedProducts products={[]} /> 
+      {/* ❌ ZONA BORRADA: Aquí estaban ProductSpecs, Reviews y RelatedProducts.
+          Ahora esto lo maneja page.tsx fuera de este componente. */}
     </div>
   );
 }
