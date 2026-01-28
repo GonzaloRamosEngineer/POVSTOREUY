@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
-import { ArrowRight, Instagram, Zap, Camera } from 'lucide-react';
+import { ArrowRight, Instagram, Zap, Camera , MessageCircle } from 'lucide-react';
 
 export default function ComingSoonPage() {
   const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });
@@ -180,8 +180,10 @@ export default function ComingSoonPage() {
             </div>
           </div>
 
-          {/* CTA Buttons */}
-          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 items-stretch sm:items-center w-full max-w-md sm:max-w-none px-4 sm:px-0 animate-fade-in-up" style={{ animationDelay: '0.4s' }}>
+{/* CTA Buttons */}
+          <div className="flex flex-col sm:flex-row justify-center gap-3 sm:gap-4 items-stretch sm:items-center w-full max-w-md sm:max-w-none px-4 sm:px-0 animate-fade-in-up" style={{ animationDelay: '0.4s' }}>
+            
+            {/* Botón Instagram */}
             <a 
               href="https://www.instagram.com/povstore.uy/"
               target="_blank"
@@ -197,12 +199,19 @@ export default function ComingSoonPage() {
               </div>
             </a>
             
-            {/* <button className="group px-6 sm:px-8 py-3 sm:py-4 rounded-full border-2 border-white/20 hover:border-white/40 backdrop-blur-sm transition-all duration-300 hover:bg-white/5 flex-1 sm:flex-initial">
+            {/* Botón Lista VIP (WhatsApp) */}
+            <a 
+              href="https://wa.me/59898752992?text=Hola!%20Quiero%20unirme%20a%20la%20Lista%20VIP%20de%20POV%20Store."
+              target="_blank"
+              rel="noopener noreferrer"
+              className="group px-6 sm:px-8 py-3 sm:py-4 rounded-full border-2 border-white/20 hover:border-white/40 backdrop-blur-sm transition-all duration-300 hover:bg-white/5 flex-1 sm:flex-initial"
+            >
               <div className="flex items-center justify-center gap-2 sm:gap-3 text-white/80 group-hover:text-white font-bold tracking-wide">
-                <Camera className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />
-                {<span className="text-xs sm:text-sm md:text-base whitespace-nowrap">NOTIFICARME</span> }
+                <MessageCircle className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />
+                <span className="text-xs sm:text-sm md:text-base whitespace-nowrap">UNIRME A LA LISTA VIP</span>
               </div>
-            </button> */}
+            </a>
+
           </div>
 
           {/* Features Grid
