@@ -225,7 +225,7 @@ export default function ComingSoonPage() {
             
             {/* Botón Lista VIP (WhatsApp) */}
             <a 
-              href="https://wa.me/59898752992?text=Hola!%20Quiero%20unirme%20a%20la%20Lista%20VIP%20de%20POV%20Store."
+              href="https://wa.me/59897801202?text=Hola!%20Quiero%20unirme%20a%20la%20Lista%20VIP%20de%20POV%20Store."
               target="_blank"
               rel="noopener noreferrer"
               className="group px-6 sm:px-8 py-3 sm:py-4 rounded-full border-2 border-white/20 hover:border-white/40 backdrop-blur-sm transition-all duration-300 hover:bg-white/5 flex-1 sm:flex-initial"
