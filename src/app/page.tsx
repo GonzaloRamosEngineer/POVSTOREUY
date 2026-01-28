@@ -2,12 +2,22 @@
 
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
-import { ArrowRight, Instagram, Zap, Camera , MessageCircle } from 'lucide-react';
+import { ArrowRight, Instagram, Zap, Camera , MessageCircle, Clapperboard, Mountain, PawPrint } from 'lucide-react';
 
 export default function ComingSoonPage() {
   const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });
   const [mounted, setMounted] = useState(false);
   const [intensity, setIntensity] = useState(0);
+
+  const [votes, setVotes] = useState({
+    creators: 1240,
+    adventurers: 856,
+    pets: 642
+  });
+  
+  const handleVote = (team) => {
+    setVotes(prev => ({ ...prev, [team]: prev[team] + 1 }));
+  };
 
   useEffect(() => {
     setMounted(true);
@@ -212,6 +222,76 @@ export default function ComingSoonPage() {
               </div>
             </a>
 
+          </div>
+
+
+          {/* Sección de Votación Interactiva */}
+          <div className="w-full max-w-4xl mt-16 animate-fade-in-up" style={{ animationDelay: '0.6s' }}>
+            <div className="text-center mb-8">
+              <h3 className="text-sm md:text-base text-white/60 font-light tracking-[0.2em] uppercase mb-2">
+                Elige tu estilo
+              </h3>
+              <div className="h-px w-12 mx-auto bg-red-500/50" />
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 px-4 sm:px-0">
+              {/* Card 1: Team Creators */}
+              <button 
+                onClick={() => handleVote('creators')}
+                className="group relative p-6 rounded-2xl border border-white/10 bg-white/5 hover:bg-red-900/10 hover:border-red-500/30 transition-all duration-300 hover:-translate-y-1"
+              >
+                <div className="flex flex-col items-center gap-3">
+                  <div className="p-3 rounded-full bg-white/5 group-hover:bg-red-500/20 text-white/70 group-hover:text-red-400 transition-colors">
+                    <Clapperboard className="w-6 h-6" />
+                  </div>
+                  <div className="text-center">
+                    <span className="block text-xs font-bold tracking-widest text-neutral-400 group-hover:text-white mb-1">TEAM</span>
+                    <span className="block text-sm font-bold text-white">CREADORES DE CONTENIDO</span>
+                  </div>
+                  <div className="text-2xl font-mono font-bold text-transparent bg-clip-text bg-gradient-to-b from-white to-white/50 group-hover:from-red-400 group-hover:to-red-600">
+                    {votes.creators.toLocaleString()}
+                  </div>
+                </div>
+              </button>
+
+              {/* Card 2: Team Adventure */}
+              <button 
+                onClick={() => handleVote('adventurers')}
+                className="group relative p-6 rounded-2xl border border-white/10 bg-white/5 hover:bg-red-900/10 hover:border-red-500/30 transition-all duration-300 hover:-translate-y-1"
+              >
+                <div className="flex flex-col items-center gap-3">
+                  <div className="p-3 rounded-full bg-white/5 group-hover:bg-red-500/20 text-white/70 group-hover:text-red-400 transition-colors">
+                    <Mountain className="w-6 h-6" />
+                  </div>
+                  <div className="text-center">
+                    <span className="block text-xs font-bold tracking-widest text-neutral-400 group-hover:text-white mb-1">TEAM</span>
+                    <span className="block text-sm font-bold text-white">AVENTURA</span>
+                  </div>
+                  <div className="text-2xl font-mono font-bold text-transparent bg-clip-text bg-gradient-to-b from-white to-white/50 group-hover:from-red-400 group-hover:to-red-600">
+                    {votes.adventurers.toLocaleString()}
+                  </div>
+                </div>
+              </button>
+
+              {/* Card 3: Team Pets */}
+              <button 
+                onClick={() => handleVote('pets')}
+                className="group relative p-6 rounded-2xl border border-white/10 bg-white/5 hover:bg-red-900/10 hover:border-red-500/30 transition-all duration-300 hover:-translate-y-1"
+              >
+                <div className="flex flex-col items-center gap-3">
+                  <div className="p-3 rounded-full bg-white/5 group-hover:bg-red-500/20 text-white/70 group-hover:text-red-400 transition-colors">
+                    <PawPrint className="w-6 h-6" />
+                  </div>
+                  <div className="text-center">
+                    <span className="block text-xs font-bold tracking-widest text-neutral-400 group-hover:text-white mb-1">TEAM</span>
+                    <span className="block text-sm font-bold text-white">MASCOTAS</span>
+                  </div>
+                  <div className="text-2xl font-mono font-bold text-transparent bg-clip-text bg-gradient-to-b from-white to-white/50 group-hover:from-red-400 group-hover:to-red-600">
+                    {votes.pets.toLocaleString()}
+                  </div>
+                </div>
+              </button>
+            </div>
           </div>
 
           {/* Features Grid
