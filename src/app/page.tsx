@@ -21,7 +21,7 @@ export default function ComingSoonPage() {
 
   useEffect(() => {
     setMounted(true);
-    const targetDate = new Date('2026-01-30T00:00:00-03:00').getTime();
+    const targetDate = new Date('2026-01-30T12:00:00-03:00').getTime();
 
     const timer = setInterval(() => {
       const now = new Date().getTime();
