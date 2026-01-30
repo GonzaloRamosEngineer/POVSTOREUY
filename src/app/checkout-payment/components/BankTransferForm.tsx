@@ -3,16 +3,15 @@
 import Icon from '@/components/ui/AppIcon';
 
 interface BankTransferFormProps {
-  onSubmit: () => void; // Lo mantenemos por compatibilidad, pero el protagonista es el link
+  onSubmit: () => void; 
   referenceNumber: string;
+  isProcessing: boolean; // AGREGADO: Para saber si está guardando
 }
 
-export default function BankTransferForm({ referenceNumber }: BankTransferFormProps) {
+export default function BankTransferForm({ referenceNumber, onSubmit, isProcessing }: BankTransferFormProps) {
   
-  // Configuración del mensaje
-  const whatsappNumber = '59897801202';
-  const message = `¡Hola POV Store! Quiero finalizar mi compra por Transferencia Bancaria para acceder al descuento. Mi referencia de carrito es: ${referenceNumber}`;
-  const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(message)}`;
+  // Nota: La URL de WhatsApp ahora se generará en el padre después de guardar, 
+  // o usamos este botón para disparar el proceso.
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
@@ -37,7 +36,6 @@ export default function BankTransferForm({ referenceNumber }: BankTransferFormPr
 
           <div className="inline-flex items-center gap-2 px-4 py-2 bg-white rounded-full border border-green-200 shadow-sm mb-2">
              <Icon name="TagIcon" size={18} className="text-green-600" variant="solid" />
-             {/* CAMBIO QUIRÚRGICO AQUÍ: 5% -> 10% */}
              <span className="font-bold text-green-800">5% DE DESCUENTO APLICADO</span>
           </div>
         </div>
@@ -52,19 +50,25 @@ export default function BankTransferForm({ referenceNumber }: BankTransferFormPr
         </p>
       </div>
 
-      {/* Botón de Acción Principal */}
-      <a
-        href={whatsappUrl}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="group relative w-full flex items-center justify-center gap-3 px-6 py-4 bg-[#25D366] hover:bg-[#1ebd59] text-white font-bold text-lg rounded-xl transition-all duration-300 shadow-lg shadow-green-200 hover:shadow-green-300 hover:-translate-y-1"
+      {/* Botón de Acción Principal (AHORA ES UN BUTTON, NO UN LINK) */}
+      <button
+        onClick={onSubmit}
+        disabled={isProcessing}
+        className="group relative w-full flex items-center justify-center gap-3 px-6 py-4 bg-[#25D366] hover:bg-[#1ebd59] text-white font-bold text-lg rounded-xl transition-all duration-300 shadow-lg shadow-green-200 hover:shadow-green-300 hover:-translate-y-1 disabled:opacity-70 disabled:cursor-wait"
       >
-        <Icon name="ChatBubbleLeftRightIcon" size={28} className="text-white" />
-        <span>Finalizar compra por WhatsApp</span>
-        
-        {/* Flecha animada */}
-        <Icon name="ArrowRightIcon" size={20} className="group-hover:translate-x-1 transition-transform" />
-      </a>
+        {isProcessing ? (
+          <>
+            <Icon name="ArrowPathIcon" size={24} className="animate-spin" />
+            <span>Registrando pedido...</span>
+          </>
+        ) : (
+          <>
+            <Icon name="ChatBubbleLeftRightIcon" size={28} className="text-white" />
+            <span>Finalizar compra por WhatsApp</span>
+            <Icon name="ArrowRightIcon" size={20} className="group-hover:translate-x-1 transition-transform" />
+          </>
+        )}
+      </button>
 
       <p className="text-center text-xs text-gray-400">
         Referencia de pedido: <span className="font-mono font-bold text-gray-600">{referenceNumber}</span>

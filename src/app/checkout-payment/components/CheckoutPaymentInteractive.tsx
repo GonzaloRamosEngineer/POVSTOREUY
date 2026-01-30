@@ -9,6 +9,10 @@ import BankTransferForm from './BankTransferForm';
 import CustomerInfoForm from './CustomerInfoForm';
 import { readCart, clearCart, type CartItem as CartItemType } from '@/lib/cart';
 
+// ... (Interfaces OrderItem, PaymentMethod, CustomerInfo se mantienen igual)
+// ... (PICKUP_ADDRESS y isCustomerInfoValid se mantienen igual)
+// Copia las interfaces del archivo original para no ocupar espacio, aquí pongo el componente:
+
 interface OrderItem {
   id: string;
   name: string;
@@ -45,9 +49,7 @@ const PICKUP_ADDRESS =
 function isCustomerInfoValid(ci: CustomerInfo, method: DeliveryMethod) {
   const baseOk = Boolean(ci.email && ci.fullName && ci.phone);
   if (!baseOk) return false;
-
   if (method === 'pickup') return true;
-
   return Boolean(ci.address && ci.city && ci.department);
 }
 
@@ -161,23 +163,15 @@ export default function CheckoutPaymentInteractive() {
         router.push('/shopping-cart');
         return;
       }
-
       if (!isCustomerInfoValid(customerInfo, deliveryMethod)) {
         alert('Completá tus datos de contacto antes de pagar.');
         return;
       }
-
       setIsProcessing(true);
-
-      // 1) crear orden (Supabase)
       const created = await createOrder();
-
-      // 2) crear preferencia MP y redirigir
       const pref = await createMpPreference(created.orderId);
-
       const url = pref.initPoint || pref.sandboxInitPoint;
       if (!url) throw new Error('No initPoint returned by MercadoPago');
-
       window.location.href = url;
     } catch (e: any) {
       console.error(e);
@@ -186,6 +180,7 @@ export default function CheckoutPaymentInteractive() {
     }
   };
 
+  // --- LÓGICA CORREGIDA PARA TRANSFERENCIA ---
   const handleBankTransferSubmit = async () => {
     try {
       if (!cart.length) {
@@ -195,17 +190,27 @@ export default function CheckoutPaymentInteractive() {
 
       if (!isCustomerInfoValid(customerInfo, deliveryMethod)) {
         alert('Completá tus datos de contacto antes de confirmar.');
+        // Hacemos scroll arriba para que vean el error
+        window.scrollTo({ top: 0, behavior: 'smooth' });
         return;
       }
 
       setIsProcessing(true);
 
+      // 1. Guardamos la orden en BD (estado pending)
       const created = await createOrder();
 
-      // transferencia: dejamos pending y vaciamos carrito
+      // 2. Limpiamos carrito
       clearCart();
 
-      router.push(`/order-confirmation?orderId=${created.orderId}&status=pending`);
+      // 3. Generamos Link de WhatsApp
+      const whatsappNumber = '59897801202';
+      const message = `¡Hola POV Store! Quiero finalizar mi compra #${created.orderNumber} por Transferencia Bancaria para acceder al descuento del 5%.`;
+      const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(message)}`;
+
+      // 4. Redirigimos a WhatsApp
+      window.location.href = whatsappUrl;
+
     } catch (e: any) {
       console.error(e);
       alert(e?.message || 'Error al crear pedido por transferencia');
@@ -226,15 +231,8 @@ export default function CheckoutPaymentInteractive() {
       <div className="min-h-screen bg-background flex items-center justify-center p-6 text-center">
         <div className="max-w-md">
           <p className="text-lg font-medium text-foreground mb-2">Tu carrito está vacío</p>
-          <p className="text-sm text-muted-foreground mb-6">
-            Agregá productos antes de finalizar la compra.
-          </p>
-          <button
-            onClick={() => router.push('/homepage')}
-            className="px-6 py-3 bg-primary text-primary-foreground font-semibold rounded-lg"
-          >
-            Volver a la tienda
-          </button>
+          <p className="text-sm text-muted-foreground mb-6">Agregá productos antes de finalizar la compra.</p>
+          <button onClick={() => router.push('/homepage')} className="px-6 py-3 bg-primary text-primary-foreground font-semibold rounded-lg">Volver a la tienda</button>
         </div>
       </div>
     );
@@ -244,32 +242,23 @@ export default function CheckoutPaymentInteractive() {
     <div className="min-h-screen bg-background">
       <div className="max-w-[1400px] mx-auto px-4 lg:px-6 py-8">
         <div className="mb-8">
-          <h1 className="text-3xl lg:text-4xl font-heading font-bold text-foreground">
-            Finalizar Compra
-          </h1>
-          <p className="text-muted-foreground mt-2">
-            Completa tu información y elige tu método de pago preferido
-          </p>
+          <h1 className="text-3xl lg:text-4xl font-heading font-bold text-foreground">Finalizar Compra</h1>
+          <p className="text-muted-foreground mt-2">Completa tu información y elige tu método de pago preferido</p>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
-          
-          {/* COLUMNA IZQUIERDA: FORMULARIOS */}
           <div className="lg:col-span-2 space-y-6">
             
-            {/* 1. INFORMACIÓN DE CLIENTE (Incluye selección de envío/retiro) */}
             <div className="bg-card rounded-lg border border-border p-6">
               <CustomerInfoForm
                 onUpdate={handleCustomerInfoUpdate}
                 initialData={customerInfo}
                 deliveryMethod={deliveryMethod}
                 pickupAddress={PICKUP_ADDRESS}
-                // 👇 CRITICO: Pasamos la función para actualizar el estado del envío
                 onDeliveryChange={setDeliveryMethod} 
               />
             </div>
 
-            {/* 2. SELECCIÓN DE PAGO */}
             <div className="bg-card rounded-lg border border-border p-6">
               <PaymentMethodSelector
                 methods={paymentMethods}
@@ -278,17 +267,19 @@ export default function CheckoutPaymentInteractive() {
               />
             </div>
 
-            {/* 3. FORMULARIO DE PAGO ESPECÍFICO */}
             <div className="bg-card rounded-lg border border-border p-6">
               {selectedPaymentMethod === 'mercadopago' ? (
                 <MercadoPagoForm onPay={handlePayMercadoPago} isProcessing={isProcessing} />
               ) : (
-                <BankTransferForm onSubmit={handleBankTransferSubmit} referenceNumber={referenceNumber} />
+                <BankTransferForm 
+                  onSubmit={handleBankTransferSubmit} 
+                  referenceNumber={referenceNumber}
+                  isProcessing={isProcessing} // Pasamos el estado de carga
+                />
               )}
             </div>
           </div>
 
-          {/* COLUMNA DERECHA: RESUMEN */}
           <div className="lg:col-span-1">
             <div className="lg:sticky lg:top-24">
               <OrderSummary
