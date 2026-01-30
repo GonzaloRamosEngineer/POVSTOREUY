@@ -1,198 +1,74 @@
 'use client';
 
-import { useState } from 'react';
 import Icon from '@/components/ui/AppIcon';
 
 interface BankTransferFormProps {
-  onSubmit: () => void;
+  onSubmit: () => void; // Lo mantenemos por compatibilidad, pero el protagonista es el link
   referenceNumber: string;
 }
 
-export default function BankTransferForm({ onSubmit, referenceNumber }: BankTransferFormProps) {
-  const [copied, setCopied] = useState(false);
-
-  const bankDetails = {
-    bank: 'Banco República',
-    accountType: 'Cuenta Corriente',
-    accountNumber: '001-123456-00001',
-    accountHolder: 'POV Store Uruguay S.A.',
-    rut: '217654320018',
-    reference: referenceNumber
-  };
-
-  const handleCopy = (text: string) => {
-    navigator.clipboard.writeText(text);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
+export default function BankTransferForm({ referenceNumber }: BankTransferFormProps) {
+  
+  // Configuración del mensaje
+  const whatsappNumber = '59897801202';
+  const message = `¡Hola POV Store! Quiero finalizar mi compra por Transferencia Bancaria para acceder al descuento. Mi referencia de carrito es: ${referenceNumber}`;
+  const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(message)}`;
 
   return (
-    <div className="space-y-6">
-      {/* Instructions */}
-      <div className="flex items-start gap-3 p-4 bg-accent/10 border border-accent/20 rounded-lg">
-        <Icon name="InformationCircleIcon" size={20} className="text-accent flex-shrink-0 mt-0.5" variant="solid" />
-        <div>
-          <p className="text-sm font-medium text-foreground">
-            Instrucciones de Transferencia
+    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
+      
+      {/* Tarjeta de Beneficio */}
+      <div className="bg-gradient-to-br from-green-50 to-emerald-50 border border-green-200 rounded-xl p-6 text-center shadow-sm relative overflow-hidden">
+        {/* Decoración de fondo */}
+        <div className="absolute top-0 right-0 -mt-4 -mr-4 w-24 h-24 bg-green-200/50 rounded-full blur-2xl"></div>
+        
+        <div className="relative z-10 flex flex-col items-center">
+          <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center shadow-md mb-4 border border-green-100">
+             <Icon name="BanknotesIcon" size={32} className="text-green-600" />
+          </div>
+          
+          <h3 className="text-xl font-heading font-bold text-green-900 mb-2">
+            ¡Beneficio Pago Directo!
+          </h3>
+          
+          <p className="text-green-700 text-sm max-w-xs mx-auto mb-6">
+            Al pagar por transferencia bancaria directa, te ahorrás las comisiones y te regalamos un descuento especial.
           </p>
-          <p className="text-xs text-muted-foreground mt-1">
-            Realiza la transferencia a la cuenta indicada e incluye el número de referencia. Tu pedido se procesará en 24-48 horas.
-          </p>
-        </div>
-      </div>
 
-      {/* Bank Details */}
-      <div className="space-y-4">
-        <h3 className="text-lg font-heading font-semibold text-foreground">
-          Datos Bancarios
-        </h3>
-
-        <div className="space-y-3">
-          {/* Bank Name */}
-          <div className="p-4 bg-card border border-border rounded-lg">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs text-muted-foreground">Banco</p>
-                <p className="text-sm font-medium text-foreground mt-1">
-                  {bankDetails.bank}
-                </p>
-              </div>
-              <Icon name="BuildingLibraryIcon" size={20} className="text-primary" />
-            </div>
-          </div>
-
-          {/* Account Type */}
-          <div className="p-4 bg-card border border-border rounded-lg">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs text-muted-foreground">Tipo de Cuenta</p>
-                <p className="text-sm font-medium text-foreground mt-1">
-                  {bankDetails.accountType}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* Account Number */}
-          <div className="p-4 bg-card border border-border rounded-lg">
-            <div className="flex items-center justify-between">
-              <div className="flex-1">
-                <p className="text-xs text-muted-foreground">Número de Cuenta</p>
-                <p className="text-sm font-mono font-medium text-foreground mt-1">
-                  {bankDetails.accountNumber}
-                </p>
-              </div>
-              <button
-                onClick={() => handleCopy(bankDetails.accountNumber)}
-                className="flex items-center justify-center w-8 h-8 rounded-md hover:bg-muted transition-smooth focus-ring"
-                aria-label="Copy account number"
-              >
-                <Icon
-                  name={copied ? 'CheckIcon' : 'ClipboardDocumentIcon'}
-                  size={18}
-                  className={copied ? 'text-success' : 'text-muted-foreground'}
-                />
-              </button>
-            </div>
-          </div>
-
-          {/* Account Holder */}
-          <div className="p-4 bg-card border border-border rounded-lg">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs text-muted-foreground">Titular</p>
-                <p className="text-sm font-medium text-foreground mt-1">
-                  {bankDetails.accountHolder}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* RUT */}
-          <div className="p-4 bg-card border border-border rounded-lg">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs text-muted-foreground">RUT</p>
-                <p className="text-sm font-mono font-medium text-foreground mt-1">
-                  {bankDetails.rut}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* Reference Number */}
-          <div className="p-4 bg-primary/10 border-2 border-primary rounded-lg">
-            <div className="flex items-center justify-between">
-              <div className="flex-1">
-                <p className="text-xs text-primary font-medium">Número de Referencia (IMPORTANTE)</p>
-                <p className="text-base font-mono font-bold text-primary mt-1">
-                  {bankDetails.reference}
-                </p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Incluye este número en el concepto de la transferencia
-                </p>
-              </div>
-              <button
-                onClick={() => handleCopy(bankDetails.reference)}
-                className="flex items-center justify-center w-8 h-8 rounded-md hover:bg-primary/20 transition-smooth focus-ring"
-                aria-label="Copy reference number"
-              >
-                <Icon
-                  name={copied ? 'CheckIcon' : 'ClipboardDocumentIcon'}
-                  size={18}
-                  className={copied ? 'text-success' : 'text-primary'}
-                />
-              </button>
-            </div>
+          <div className="inline-flex items-center gap-2 px-4 py-2 bg-white rounded-full border border-green-200 shadow-sm mb-2">
+             <Icon name="TagIcon" size={18} className="text-green-600" variant="solid" />
+             <span className="font-bold text-green-800">5% DE DESCUENTO APLICADO</span>
           </div>
         </div>
       </div>
 
-      {/* Next Steps */}
-      <div className="space-y-3">
-        <h4 className="text-sm font-medium text-foreground">Próximos Pasos:</h4>
-        <div className="space-y-2">
-          <div className="flex items-start gap-3">
-            <div className="flex items-center justify-center w-6 h-6 bg-primary text-primary-foreground text-xs font-bold rounded-full flex-shrink-0">
-              1
-            </div>
-            <p className="text-sm text-muted-foreground">
-              Realiza la transferencia bancaria con los datos proporcionados
-            </p>
-          </div>
-          <div className="flex items-start gap-3">
-            <div className="flex items-center justify-center w-6 h-6 bg-primary text-primary-foreground text-xs font-bold rounded-full flex-shrink-0">
-              2
-            </div>
-            <p className="text-sm text-muted-foreground">
-              Incluye el número de referencia en el concepto
-            </p>
-          </div>
-          <div className="flex items-start gap-3">
-            <div className="flex items-center justify-center w-6 h-6 bg-primary text-primary-foreground text-xs font-bold rounded-full flex-shrink-0">
-              3
-            </div>
-            <p className="text-sm text-muted-foreground">
-              Recibirás un email de confirmación cuando procesemos tu pago
-            </p>
-          </div>
-        </div>
+      {/* Explicación Simple */}
+      <div className="flex items-start gap-3 px-2">
+        <Icon name="InformationCircleIcon" size={20} className="text-gray-400 flex-shrink-0 mt-0.5" />
+        <p className="text-sm text-gray-500">
+          Para aplicar el descuento correctamente y verificar el stock inmediato, 
+          <strong>un asesor procesará tu pedido manualmente por WhatsApp.</strong>
+        </p>
       </div>
 
-      {/* Confirm Button */}
-      <button
-        onClick={onSubmit}
-        className="w-full px-6 py-4 bg-primary hover:bg-primary/90 text-primary-foreground font-medium rounded-lg transition-smooth focus-ring flex items-center justify-center gap-2"
+      {/* Botón de Acción Principal */}
+      <a
+        href={whatsappUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="group relative w-full flex items-center justify-center gap-3 px-6 py-4 bg-[#25D366] hover:bg-[#1ebd59] text-white font-bold text-lg rounded-xl transition-all duration-300 shadow-lg shadow-green-200 hover:shadow-green-300 hover:-translate-y-1"
       >
-        <Icon name="CheckCircleIcon" size={20} className="text-primary-foreground" variant="solid" />
-        Confirmar Pedido
-      </button>
+        <Icon name="ChatBubbleLeftRightIcon" size={28} className="text-white" />
+        <span>Finalizar compra por WhatsApp</span>
+        
+        {/* Flecha animada */}
+        <Icon name="ArrowRightIcon" size={20} className="group-hover:translate-x-1 transition-transform" />
+      </a>
 
-      {/* Support Info */}
-      <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
-        <Icon name="QuestionMarkCircleIcon" size={16} className="text-muted-foreground" />
-        <span>¿Necesitas ayuda? Contáctanos a pagos@povstore.uy</span>
-      </div>
+      <p className="text-center text-xs text-gray-400">
+        Referencia de pedido: <span className="font-mono font-bold text-gray-600">{referenceNumber}</span>
+      </p>
+
     </div>
   );
 }
