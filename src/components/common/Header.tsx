@@ -19,26 +19,54 @@ const Header = ({ isAdminMode = false }: HeaderProps) => {
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [isHydrated, setIsHydrated] = useState(false);
 
+  // Función para actualizar el carrito desde localStorage
+  const updateCartFromStorage = () => {
+    const items = readCart();
+    setCartItems(items);
+  };
+
   // Cargar carrito y escuchar cambios
   useEffect(() => {
     setIsHydrated(true);
-    setCartItems(readCart());
+    updateCartFromStorage();
 
     const handleCartUpdate = () => {
-        setCartItems(readCart());
+      updateCartFromStorage();
     };
 
+    // Escuchar eventos personalizados y cambios en localStorage
     window.addEventListener('cart-updated', handleCartUpdate);
     window.addEventListener('storage', handleCartUpdate);
+
+    // También actualizar cuando la ventana recupera el foco
+    window.addEventListener('focus', handleCartUpdate);
 
     return () => {
       window.removeEventListener('cart-updated', handleCartUpdate);
       window.removeEventListener('storage', handleCartUpdate);
+      window.removeEventListener('focus', handleCartUpdate);
     };
   }, []);
 
+  // Actualizar carrito cuando se abre el drawer
+  useEffect(() => {
+    if (isCartOpen) {
+      updateCartFromStorage();
+    }
+  }, [isCartOpen]);
+
   const cartItemCount = cartItems.reduce((total, item) => total + item.quantity, 0);
   const cartTotal = cartItems.reduce((total, item) => total + item.price * item.quantity, 0);
+
+  // Función para vaciar el carrito
+  const handleClearCart = () => {
+    if (confirm('¿Estás seguro de que querés vaciar todo el carrito?')) {
+      localStorage.removeItem('cart');
+      setCartItems([]);
+      window.dispatchEvent(new Event('cart-updated'));
+      window.dispatchEvent(new Event('storage'));
+    }
+  };
 
   // Scroll effect
   useEffect(() => {
@@ -273,6 +301,16 @@ const Header = ({ isAdminMode = false }: HeaderProps) => {
                   <span className="text-neutral-400">Total Estimado</span>
                   <span className="text-xl font-bold text-white">${cartTotal.toLocaleString('es-UY')}</span>
                 </div>
+                
+                {/* Botón para vaciar carrito */}
+                <button
+                  onClick={handleClearCart}
+                  className="w-full py-2 bg-neutral-800 text-neutral-400 font-medium text-center rounded-lg hover:bg-neutral-700 hover:text-white transition-colors flex items-center justify-center gap-2 text-sm"
+                >
+                  <Icon name="TrashIcon" size={16} />
+                  Vaciar Carrito
+                </button>
+
                 <div className="grid gap-3">
                     <Link
                         href="/shopping-cart"

@@ -253,61 +253,26 @@ export default function CheckoutPaymentInteractive() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
+          
+          {/* COLUMNA IZQUIERDA: FORMULARIOS */}
           <div className="lg:col-span-2 space-y-6">
+            
+            {/* 1. INFORMACIÓN DE CLIENTE (Incluye selección de envío/retiro) */}
             <div className="bg-card rounded-lg border border-border p-6">
               <CustomerInfoForm
                 onUpdate={handleCustomerInfoUpdate}
                 initialData={customerInfo}
                 deliveryMethod={deliveryMethod}
                 pickupAddress={PICKUP_ADDRESS}
+                // 👇 CORRECCIÓN: Pasamos la función requerida
+                onDeliveryChange={setDeliveryMethod} 
               />
             </div>
 
-            {/* Método de entrega */}
-            <div className="bg-card rounded-lg border border-border p-6">
-              <div className="flex items-center justify-between gap-4 flex-wrap">
-                <div>
-                  <p className="text-sm font-medium text-foreground">Método de entrega</p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Elegí envío a domicilio o retiro sin costo
-                  </p>
-                </div>
+            {/* NOTA: Eliminamos el bloque antiguo de selección de envío que estaba aquí, 
+               porque ahora está integrado dentro de CustomerInfoForm */}
 
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setDeliveryMethod('delivery')}
-                    className={`px-4 py-2 rounded-md border transition-smooth ${
-                      deliveryMethod === 'delivery'
-                        ? 'bg-primary text-primary-foreground border-primary'
-                        : 'bg-transparent text-foreground border-border hover:bg-muted'
-                    }`}
-                  >
-                    Envío a domicilio
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setDeliveryMethod('pickup')}
-                    className={`px-4 py-2 rounded-md border transition-smooth ${
-                      deliveryMethod === 'pickup'
-                        ? 'bg-primary text-primary-foreground border-primary'
-                        : 'bg-transparent text-foreground border-border hover:bg-muted'
-                    }`}
-                  >
-                    Retiro en local
-                  </button>
-                </div>
-              </div>
-
-              {deliveryMethod === 'pickup' && (
-                <div className="mt-4 p-4 rounded-lg bg-muted">
-                  <p className="text-sm font-medium text-foreground">Dirección de retiro</p>
-                  <p className="text-xs text-muted-foreground mt-1">{PICKUP_ADDRESS}</p>
-                </div>
-              )}
-            </div>
-
+            {/* 2. SELECCIÓN DE PAGO */}
             <div className="bg-card rounded-lg border border-border p-6">
               <PaymentMethodSelector
                 methods={paymentMethods}
@@ -316,6 +281,7 @@ export default function CheckoutPaymentInteractive() {
               />
             </div>
 
+            {/* 3. FORMULARIO DE PAGO ESPECÍFICO */}
             <div className="bg-card rounded-lg border border-border p-6">
               {selectedPaymentMethod === 'mercadopago' ? (
                 <MercadoPagoForm onPay={handlePayMercadoPago} isProcessing={isProcessing} />
@@ -325,6 +291,7 @@ export default function CheckoutPaymentInteractive() {
             </div>
           </div>
 
+          {/* COLUMNA DERECHA: RESUMEN */}
           <div className="lg:col-span-1">
             <div className="lg:sticky lg:top-24">
               <OrderSummary
