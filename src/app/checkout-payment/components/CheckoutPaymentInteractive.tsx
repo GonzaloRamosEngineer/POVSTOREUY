@@ -264,13 +264,10 @@ export default function CheckoutPaymentInteractive() {
                 initialData={customerInfo}
                 deliveryMethod={deliveryMethod}
                 pickupAddress={PICKUP_ADDRESS}
-                // 👇 CORRECCIÓN: Pasamos la función requerida
+                // 👇 CRITICO: Pasamos la función para actualizar el estado del envío
                 onDeliveryChange={setDeliveryMethod} 
               />
             </div>
-
-            {/* NOTA: Eliminamos el bloque antiguo de selección de envío que estaba aquí, 
-               porque ahora está integrado dentro de CustomerInfoForm */}
 
             {/* 2. SELECCIÓN DE PAGO */}
             <div className="bg-card rounded-lg border border-border p-6">

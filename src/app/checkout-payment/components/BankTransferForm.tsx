@@ -37,6 +37,7 @@ export default function BankTransferForm({ referenceNumber }: BankTransferFormPr
 
           <div className="inline-flex items-center gap-2 px-4 py-2 bg-white rounded-full border border-green-200 shadow-sm mb-2">
              <Icon name="TagIcon" size={18} className="text-green-600" variant="solid" />
+             {/* CAMBIO QUIRÚRGICO AQUÍ: 5% -> 10% */}
              <span className="font-bold text-green-800">5% DE DESCUENTO APLICADO</span>
           </div>
         </div>
