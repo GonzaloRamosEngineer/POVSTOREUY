@@ -21,7 +21,7 @@ const StockWidget = ({ basicStock, proStock }: StockWidgetProps) => {
       
       <div className="space-y-5">
         <div className="flex items-center justify-between gap-4">
-          <span className="text-sm font-medium text-neutral-400 w-16">Básico:</span>
+          <span className="text-sm font-medium text-neutral-400 w-16">SJCAM C100 PLUS:</span>
           <div className="flex items-center gap-3 flex-1">
             <div className="flex-1 h-2.5 bg-neutral-800 rounded-full overflow-hidden border border-white/5">
               <div 
@@ -34,7 +34,7 @@ const StockWidget = ({ basicStock, proStock }: StockWidgetProps) => {
         </div>
         
         <div className="flex items-center justify-between gap-4">
-          <span className="text-sm font-medium text-neutral-400 w-16">Pro:</span>
+          <span className="text-sm font-medium text-neutral-400 w-16">SJCAM C200:</span>
           <div className="flex items-center gap-3 flex-1">
             <div className="flex-1 h-2.5 bg-neutral-800 rounded-full overflow-hidden border border-white/5">
               <div 
