@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import Header from '@/components/common/Header';
+// ❌ HEADER Y FOOTER REMOVIDOS (Ahora están en layout.tsx)
 import MarqueeBanner from './MarqueeBanner';
 import HeroSection from './HeroSection';
 import ProductCard from './ProductCard';
@@ -12,10 +12,9 @@ import TargetAudienceSection from './TargetAudienceSection';
 import TestimonialsSection from './TestimonialsSection';
 import NewsletterSection from './NewsletterSection';
 import SocialMediaSection from './SocialMediaSection';
-import FooterSection from './FooterSection';
 import { getSupabaseBrowserClient } from '@/lib/supabaseClient';
 
-// ✅ carrito unificado (helper)
+// Helper del carrito
 import {
   readCart,
   upsertCartItem,
@@ -24,7 +23,7 @@ import {
 } from '@/lib/cart';
 
 interface Product {
-  id: string; // UUID
+  id: string;
   name: string;
   price: number;
   originalPrice?: number;
@@ -35,68 +34,55 @@ interface Product {
   badge?: string;
 }
 
+// Helpers locales
 function normalizeFeatures(v: unknown): string[] {
   if (Array.isArray(v)) return v.filter(Boolean).map(String);
   if (typeof v === 'string') {
     try {
       const parsed = JSON.parse(v);
       if (Array.isArray(parsed)) return parsed.filter(Boolean).map(String);
-    } catch {
-      // ignore
-    }
+    } catch {}
   }
   return [];
 }
 
 function pickProductByType(products: Product[], type: 'basic' | 'pro'): Product | undefined {
   const needles = type === 'basic' ? ['basico', 'básico', 'basic'] : ['pro', 'profesional'];
-
   const byName = products.find((p) => needles.some((n) => p.name?.toLowerCase().includes(n)));
   if (byName) return byName;
-
   if (products.length === 0) return undefined;
-
-  if (type === 'pro') {
-    return [...products].sort((a, b) => (b.price ?? 0) - (a.price ?? 0))[0];
-  }
+  if (type === 'pro') return [...products].sort((a, b) => (b.price ?? 0) - (a.price ?? 0))[0];
   return [...products].sort((a, b) => (a.price ?? 0) - (b.price ?? 0))[0];
 }
 
 const HomepageInteractive = () => {
   const router = useRouter();
-
-    const supabase = useMemo(() => getSupabaseBrowserClient(), []);
-
-  // avoid localStorage before hydration
-  const [isHydrated, setIsHydrated] = useState(false);
+  const supabase = useMemo(() => getSupabaseBrowserClient(), []);
 
   // products
   const [products, setProducts] = useState<Product[]>([]);
   const [loadingProducts, setLoadingProducts] = useState(true);
   const [productsError, setProductsError] = useState<string | null>(null);
 
-  // cart
-  const [cartItems, setCartItems] = useState<CartItemType[]>([]);
+  // NOTA: Ya no necesitamos el estado 'cartItems' aquí para pasarlo al Header.
+  // Solo lo necesitamos si quisiéramos validar stock vs carrito localmente, 
+  // pero para simplificar, usaremos lectura directa.
+  const [isHydrated, setIsHydrated] = useState(false);
 
-  // 1) hydration + cart load
   useEffect(() => {
     setIsHydrated(true);
-    setCartItems(readCart());
   }, []);
 
-  // 2) load products
+  // Load products
   useEffect(() => {
     let mounted = true;
-
     const loadProducts = async () => {
       setLoadingProducts(true);
       setProductsError(null);
 
       const { data, error } = await supabase
         .from('products')
-        .select(
-          'id,name,model,description,price,original_price,image_url,stock_count,features,badge,is_active,created_at'
-        )
+        .select('id,name,model,description,price,original_price,image_url,stock_count,features,badge,is_active,created_at')
         .eq('is_active', true)
         .eq('show_on_home', true)
         .order('created_at', { ascending: false });
@@ -105,8 +91,7 @@ const HomepageInteractive = () => {
 
       if (error) {
         console.error('Error loading products:', error);
-        setProducts([]);
-        setProductsError(error.message || 'Error cargando productos desde Supabase.');
+        setProductsError(error.message || 'Error cargando productos.');
         setLoadingProducts(false);
         return;
       }
@@ -128,11 +113,8 @@ const HomepageInteractive = () => {
     };
 
     loadProducts();
-
-    return () => {
-      mounted = false;
-    };
-  }, []);
+    return () => { mounted = false; };
+  }, [supabase]);
 
   const totalStock = useMemo(
     () => products.reduce((sum, p) => sum + (Number.isFinite(p.stockCount) ? p.stockCount : 0), 0),
@@ -141,46 +123,41 @@ const HomepageInteractive = () => {
 
   const basicProduct = useMemo(() => pickProductByType(products, 'basic'), [products]);
   const proProduct = useMemo(() => pickProductByType(products, 'pro'), [products]);
-
   const basicStock = basicProduct?.stockCount ?? 0;
   const proStock = proProduct?.stockCount ?? 0;
 
-  const refreshCartState = () => {
-    setCartItems(readCart());
-  };
-
+  // --- LÓGICA DE CARRITO MEJORADA ---
   const handleAddToCart = (productId: string) => {
     if (!isHydrated) return;
 
     const product = products.find((p) => p.id === productId);
     if (!product) return;
+    if ((product.stockCount ?? 0) <= 0) return; // Sin stock
 
-    const existing = cartItems.find((i) => i.id === productId);
-
-    // opcional: si querés bloquear cuando no hay stock
-    if ((product.stockCount ?? 0) <= 0) return;
+    const currentCart = readCart();
+    const existing = currentCart.find((i) => i.id === productId);
 
     if (existing) {
       incrementItem(productId, 1);
-      refreshCartState();
-      return;
+    } else {
+      upsertCartItem({
+        id: product.id,
+        name: product.name,
+        price: product.price,
+        quantity: 1,
+        image: product.image,
+        alt: product.alt,
+        stock: product.stockCount,
+      });
     }
 
-    upsertCartItem({
-      id: product.id,
-      name: product.name,
-      price: product.price,
-      quantity: 1,
-      image: product.image,
-      alt: product.alt,
-      stock: product.stockCount,
-    });
-
-    refreshCartState();
+    // 🔥 EL SECRETO: Avisar al Header Global que hubo cambios
+    // Esto asegura que el numerito del carrito se actualice instantáneamente
+    window.dispatchEvent(new Event('cart-updated'));
   };
 
   const handleViewDetails = (productId: string) => {
-    router.push(`/product-details?id=${productId}`);
+    router.push(`/products/${productId}`); // Corregí la ruta para que coincida con tu estructura Next.js
   };
 
   const handleHeroCtaClick = () => {
@@ -189,9 +166,11 @@ const HomepageInteractive = () => {
   };
 
   return (
-    // TECH NOIR: Fondo global negro
-    <div className="min-h-screen bg-black">
-      <Header cartItems={isHydrated ? cartItems : []} />
+    // Ya no envolvemos en <body> o <html> porque eso está en layout.tsx
+    // Usamos el fondo negro tech-noir
+    <div className="bg-black text-neutral-200">
+      
+      {/* HEADER ELIMINADO: Ya está en layout.tsx */}
 
       <main>
         <MarqueeBanner />
@@ -200,11 +179,11 @@ const HomepageInteractive = () => {
 
         <MobileStickyCTA onCtaClick={handleHeroCtaClick} totalStock={totalStock} />
 
-        {/* Sección de Productos: Fondo oscuro neutro con borde sutil rojo arriba */}
+        {/* Sección de Productos */}
         <section id="productos" className="py-24 px-4 bg-neutral-950 border-t border-red-900/30">
           <div className="max-w-7xl mx-auto">
             <div className="text-center mb-16">
-              <h2 className="text-4xl md:text-5xl font-heading font-bold text-white mb-4 drop-shadow-md">
+              <h2 className="text-4xl md:text-5xl font-bold text-white mb-4 drop-shadow-md">
                 Nuestros Modelos
               </h2>
               <p className="text-lg text-neutral-400">
@@ -214,27 +193,17 @@ const HomepageInteractive = () => {
 
             {loadingProducts ? (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                {/* Skeletons estilo Tech Noir */}
                 <div className="rounded-2xl border border-neutral-800 bg-neutral-900/50 h-[520px] animate-pulse" />
                 <div className="rounded-2xl border border-neutral-800 bg-neutral-900/50 h-[520px] animate-pulse" />
               </div>
             ) : productsError ? (
               <div className="rounded-2xl border border-red-500/30 bg-red-900/10 p-8 text-center max-w-2xl mx-auto">
-                <p className="text-red-400 font-bold text-lg">No se pudieron cargar los productos.</p>
-                <p className="text-red-300/70 mt-2 text-sm">{productsError}</p>
-                <p className="text-neutral-500 mt-6 text-xs border-t border-red-500/20 pt-4">
-                  Tip rápido: revisá que{' '}
-                  <span className="font-mono text-red-400">NEXT_PUBLIC_SUPABASE_URL</span> sea el dominio real
-                  de tu proyecto y reiniciá el servidor.
-                </p>
+                <p className="text-red-400 font-bold">Error cargando productos.</p>
+                <p className="text-sm mt-2">{productsError}</p>
               </div>
             ) : products.length === 0 ? (
               <div className="rounded-2xl border border-neutral-800 bg-neutral-900 p-12 text-center max-w-2xl mx-auto">
-                <p className="text-neutral-400 text-lg">No hay productos activos para mostrar en este momento.</p>
-                <p className="text-neutral-600 mt-4 text-sm">
-                  Verificá en Supabase que existan productos con{' '}
-                  <span className="font-mono text-neutral-400">is_active = true</span>.
-                </p>
+                <p className="text-neutral-400">No hay productos activos por el momento.</p>
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8 lg:gap-12">
@@ -256,7 +225,8 @@ const HomepageInteractive = () => {
         <TestimonialsSection />
         <NewsletterSection />
         <SocialMediaSection />
-        <FooterSection />
+        
+        {/* FOOTER ELIMINADO: Ya está en layout.tsx */}
       </main>
     </div>
   );

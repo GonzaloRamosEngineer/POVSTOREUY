@@ -6,41 +6,45 @@ import Icon from '@/components/ui/AppIcon';
 interface PolicyItem {
   id: string;
   title: string;
+  iconName: string;
   content: string[];
 }
 
 const policies: PolicyItem[] = [
   {
     id: 'shipping',
-    title: 'Política de Envío',
+    title: 'Envíos y Despacho',
+    iconName: 'TruckIcon',
     content: [
-      'Envío gratis a todo Uruguay en compras superiores a $2.000',
-      'Entregas en Montevideo: 24-48 horas hábiles',
-      'Entregas en el interior: 3-5 días hábiles',
-      'Seguimiento en tiempo real de tu pedido',
-      'Empaque discreto y seguro'
+      'Envío GRATIS en compras mayores a $2.000',
+      'Despachamos en 24hs hábiles',
+      'Cobertura a todo Uruguay (DAC, Mirtrans)',
+      'Tiempo estimado agencia: 24 a 48hs',
+      'Empaque seguro y discreto'
     ]
   },
   {
     id: 'returns',
-    title: 'Política de Devoluciones',
+    title: 'Cambios y Devoluciones',
+    iconName: 'ArrowPathRoundedSquareIcon',
     content: [
-      'Devoluciones aceptadas dentro de los 30 días',
-      'Producto debe estar en condiciones originales',
-      'Reembolso completo o cambio por otro producto',
-      'Gastos de envío de devolución a cargo del cliente',
-      'Proceso de devolución simple y rápido'
+      'Plazo: 5 días hábiles por arrepentimiento',
+      'Condición: Producto SELLADO y sin uso',
+      'El empaque debe estar intacto (film original)',
+      'No aceptamos productos abiertos (higiene)',
+      'Gestión simple contactando a soporte'
     ]
   },
   {
     id: 'warranty',
-    title: 'Garantía del Producto',
+    title: 'Garantía Oficial',
+    iconName: 'ShieldCheckIcon',
     content: [
-      'Garantía de 12 meses en todos los productos',
-      'Cubre defectos de fabricación',
-      'Soporte técnico gratuito',
-      'Reparación o reemplazo sin costo adicional',
-      'Atención al cliente en español'
+      '3 Meses (90 días) por defectos de fábrica',
+      'Respaldo local directo con nosotros',
+      'Cubre fallas de encendido o software',
+      'NO cubre daños por agua, golpes o mal uso',
+      'Soporte técnico real en Uruguay'
     ]
   }
 ];
@@ -57,36 +61,39 @@ export default function PolicySection() {
       {policies.map((policy) => (
         <div
           key={policy.id}
-          className="bg-card rounded-lg border border-border overflow-hidden"
+          className="bg-card border border-border rounded-lg overflow-hidden transition-all"
         >
           <button
             onClick={() => togglePolicy(policy.id)}
-            className="w-full flex items-center justify-between p-4 hover:bg-muted/50 transition-smooth focus-ring"
+            className="w-full flex items-center justify-between p-4 hover:bg-muted/50 transition-smooth focus:outline-none"
             aria-expanded={expandedPolicy === policy.id}
           >
-            <span className="text-base font-heading font-semibold text-foreground">
-              {policy.title}
-            </span>
+            <div className="flex items-center gap-3">
+              {/* Ícono representativo */}
+              <Icon 
+                name={policy.iconName as any} 
+                size={20} 
+                className="text-muted-foreground" 
+              />
+              <span className="text-sm font-bold text-foreground">
+                {policy.title}
+              </span>
+            </div>
             <Icon
               name="ChevronDownIcon"
-              size={20}
-              className={`text-foreground transition-transform ${
+              size={16}
+              className={`text-muted-foreground transition-transform duration-300 ${
                 expandedPolicy === policy.id ? 'rotate-180' : ''
               }`}
             />
           </button>
 
           {expandedPolicy === policy.id && (
-            <div className="px-4 pb-4 space-y-2">
+            <div className="px-4 pb-4 pl-11 space-y-2 animate-in slide-in-from-top-1 duration-200">
               {policy.content.map((item, index) => (
-                <div key={index} className="flex items-start gap-3">
-                  <Icon
-                    name="CheckCircleIcon"
-                    size={20}
-                    className="text-success flex-shrink-0 mt-0.5"
-                    variant="solid"
-                  />
-                  <p className="text-sm text-muted-foreground">{item}</p>
+                <div key={index} className="flex items-start gap-2">
+                  <div className="mt-1.5 w-1.5 h-1.5 rounded-full bg-primary flex-shrink-0" />
+                  <p className="text-xs text-muted-foreground leading-relaxed">{item}</p>
                 </div>
               ))}
             </div>

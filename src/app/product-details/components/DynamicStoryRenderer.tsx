@@ -1,115 +1,120 @@
-import React from 'react';
-import Image from 'next/image';
-import { StorySection } from '@/types/product';
+'use client';
 
-interface Props {
-  content: StorySection[] | null;
-}
+import AppImage from '@/components/ui/AppImage';
 
-export default function DynamicStoryRenderer({ content }: Props) {
+// Definimos los tipos exactos y los exportamos para usarlos en page.tsx
+export type StoryBlock = 
+  | { type: 'full_video'; image_url: string; video_url?: string; title?: string; subtitle?: string; description?: string; text_color?: 'light'|'dark' }
+  | { type: 'image_left'; image_url: string; title: string; description: string; text_color?: 'light'|'dark' }
+  | { type: 'image_right'; image_url: string; title: string; description: string; text_color?: 'light'|'dark' }
+  | { type: 'full_banner'; image_url: string; title?: string; description?: string; text_color?: 'light'|'dark' };
+
+export default function DynamicStoryRenderer({ content }: { content: StoryBlock[] }) {
   if (!content || !Array.isArray(content) || content.length === 0) return null;
 
   return (
-    <section className="w-full bg-white pb-16">
-      <div className="flex flex-col gap-20 md:gap-32">
-        {content.map((section, index) => (
-          <div key={index} className="w-full">
-            
-            {/* --- VIDEO CORREGIDO (Error 1 y 2) --- */}
-            {section.type === 'full_video' && (
-              <div className="relative w-full h-[60vh] min-h-[500px] md:h-[800px] overflow-hidden group bg-black">
-                <video
-                  className="absolute inset-0 w-full h-full object-cover"
-                  src={section.image_url}
-                  autoPlay
-                  muted
-                  loop
-                  playsInline
-                  // Eliminamos el poster que daba 404, o pon una URL real si la tienes
-                />
-                <div className="absolute inset-0 bg-black/40" />
-                <div className="absolute inset-0 flex flex-col items-center justify-center px-4 text-center z-10">
-                  <h2 className="text-5xl md:text-8xl font-extrabold tracking-tighter text-white drop-shadow-2xl mb-6">
-                    {section.title}
+    <div className="flex flex-col w-full bg-white">
+      {content.map((block, idx) => {
+        
+        // --- BLOQUE 1: VIDEO FULL PANTALLA ---
+        if (block.type === 'full_video') {
+          const videoSrc = block.video_url || block.image_url;
+          // Si el texto es 'light', usamos blanco. Si es 'dark' o indefinido, usamos negro (para fondos claros)
+          // Nota: En videos full screen, generalmente 'light' es mejor por el overlay oscuro.
+          const isLight = block.text_color === 'light' || !block.text_color; 
+
+          return (
+            <div key={idx} className="relative w-full h-[70vh] md:h-[90vh] overflow-hidden bg-black">
+              <video 
+                src={videoSrc} 
+                className="absolute inset-0 w-full h-full object-cover opacity-90"
+                autoPlay 
+                loop 
+                muted 
+                playsInline 
+              />
+              {/* Gradiente sutil para legibilidad */}
+              <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/10" />
+              
+              <div className="absolute inset-0 flex flex-col items-center justify-end pb-20 md:pb-32 px-4 text-center z-10">
+                {block.title && (
+                  <h2 className={`text-4xl md:text-7xl font-extrabold tracking-tighter mb-4 ${isLight ? 'text-white' : 'text-gray-900'}`}>
+                    {block.title}
                   </h2>
-                  {section.description && (
-                    <p className="text-xl md:text-3xl font-medium text-gray-100 max-w-4xl drop-shadow-lg leading-relaxed">
-                      {section.description}
-                    </p>
-                  )}
-                </div>
+                )}
+                {block.description && (
+                  <p className={`text-lg md:text-2xl max-w-3xl font-medium leading-relaxed ${isLight ? 'text-gray-100' : 'text-gray-800'}`}>
+                    {block.description}
+                  </p>
+                )}
               </div>
-            )}
+            </div>
+          );
+        }
 
-            {/* --- BANNER FOTO CORREGIDO (Error 3) --- */}
-            {section.type === 'full_banner' && (
-              <div className="relative w-full h-[60vh] min-h-[500px] md:h-[700px] overflow-hidden group">
-                <Image
-                  src={section.image_url}
-                  alt={section.title}
-                  fill
-                  className="object-cover"
-                  // ✅ SOLUCIÓN AL WARNING DE NEXT.JS
-                  sizes="100vw"
-                  priority={index === 0}
+        // --- BLOQUE 2: BANNER FULL (Imagen estática gigante) ---
+        if (block.type === 'full_banner') {
+          const isLight = block.text_color === 'light';
+          return (
+            <div key={idx} className="relative w-full h-[60vh] md:h-[80vh] bg-gray-100">
+              <div className="absolute inset-0">
+                <AppImage 
+                  src={block.image_url} 
+                  alt={block.title || 'Banner'} 
+                  className="w-full h-full object-cover" 
                 />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-80" />
-                <div className="absolute inset-0 flex flex-col items-center justify-end pb-20 md:pb-32 px-4 text-center z-10">
-                  <h2 className={`text-5xl md:text-7xl font-extrabold tracking-tight drop-shadow-lg mb-6 ${section.text_color === 'light' ? 'text-white' : 'text-gray-900'}`}>
-                    {section.title}
-                  </h2>
-                  {section.description && (
-                    <p className={`text-xl md:text-2xl font-medium max-w-3xl leading-relaxed drop-shadow-md ${section.text_color === 'light' ? 'text-gray-100' : 'text-gray-800'}`}>
-                      {section.description}
-                    </p>
-                  )}
-                </div>
               </div>
-            )}
+              {(block.title || block.description) && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-8 z-10 bg-black/10">
+                  {block.title && <h2 className={`text-4xl md:text-6xl font-bold mb-4 ${isLight ? 'text-white' : 'text-gray-900'}`}>{block.title}</h2>}
+                  {block.description && <p className={`text-xl md:text-2xl max-w-2xl ${isLight ? 'text-white' : 'text-gray-800'}`}>{block.description}</p>}
+                </div>
+              )}
+            </div>
+          );
+        }
 
-            {/* --- IMAGE LEFT CORREGIDO (Error 3) --- */}
-            {section.type === 'image_left' && (
-              <div className="max-w-[1200px] mx-auto px-6 flex flex-col md:flex-row items-center gap-10 md:gap-24">
-                <div className="w-full md:w-1/2 relative h-[400px] md:h-[600px] rounded-3xl overflow-hidden shadow-2xl">
-                  <Image 
-                    src={section.image_url} 
-                    alt={section.title} 
-                    fill 
-                    className="object-cover"
-                    // ✅ SOLUCIÓN: En móvil es 100vw, en escritorio es 50vw (600px)
-                    sizes="(max-width: 768px) 100vw, 600px"
-                  />
-                </div>
-                <div className="w-full md:w-1/2 space-y-6 text-center md:text-left">
-                  <h3 className="text-4xl md:text-5xl font-extrabold text-gray-900 leading-tight">{section.title}</h3>
-                  <p className="text-lg text-gray-600 leading-relaxed">{section.description}</p>
-                </div>
+        // --- BLOQUE 3: IMAGEN IZQUIERDA - TEXTO DERECHA ---
+        if (block.type === 'image_left') {
+          return (
+            <div key={idx} className="grid grid-cols-1 md:grid-cols-2 min-h-[500px] bg-white">
+              <div className="relative h-[400px] md:h-auto w-full">
+                <AppImage src={block.image_url} alt={block.title} className="w-full h-full object-cover" />
               </div>
-            )}
-
-            {/* --- IMAGE RIGHT CORREGIDO (Error 3) --- */}
-            {section.type === 'image_right' && (
-              <div className="max-w-[1200px] mx-auto px-6 flex flex-col-reverse md:flex-row items-center gap-10 md:gap-24">
-                <div className="w-full md:w-1/2 space-y-6 text-center md:text-left">
-                  <h3 className="text-4xl md:text-5xl font-extrabold text-gray-900 leading-tight">{section.title}</h3>
-                  <p className="text-lg text-gray-600 leading-relaxed">{section.description}</p>
-                </div>
-                <div className="w-full md:w-1/2 relative h-[400px] md:h-[600px] rounded-3xl overflow-hidden shadow-2xl">
-                  <Image 
-                    src={section.image_url} 
-                    alt={section.title} 
-                    fill 
-                    className="object-cover"
-                    // ✅ SOLUCIÓN
-                    sizes="(max-width: 768px) 100vw, 600px"
-                  />
-                </div>
+              <div className="flex flex-col justify-center p-12 md:p-24 space-y-6">
+                <h3 className="text-3xl md:text-4xl font-bold text-gray-900 leading-tight">
+                  {block.title}
+                </h3>
+                <p className="text-lg text-gray-600 leading-relaxed">
+                  {block.description}
+                </p>
               </div>
-            )}
+            </div>
+          );
+        }
 
-          </div>
-        ))}
-      </div>
-    </section>
+        // --- BLOQUE 4: TEXTO IZQUIERDA - IMAGEN DERECHA ---
+        if (block.type === 'image_right') {
+          return (
+            <div key={idx} className="grid grid-cols-1 md:grid-cols-2 min-h-[500px] bg-white">
+              {/* En móvil la imagen va primero visualmente */}
+              <div className="relative h-[400px] md:h-auto w-full md:order-2">
+                <AppImage src={block.image_url} alt={block.title} className="w-full h-full object-cover" />
+              </div>
+              <div className="flex flex-col justify-center p-12 md:p-24 space-y-6 md:order-1">
+                <h3 className="text-3xl md:text-4xl font-bold text-gray-900 leading-tight">
+                  {block.title}
+                </h3>
+                <p className="text-lg text-gray-600 leading-relaxed">
+                  {block.description}
+                </p>
+              </div>
+            </div>
+          );
+        }
+
+        return null;
+      })}
+    </div>
   );
 }

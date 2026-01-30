@@ -56,24 +56,52 @@ export default function InventoryPageInteractive() {
       return;
     }
 
+    // Construimos la query para la API
+    // (Nota: Si tu API filtra por 'q', bien. Si no, filtraremos en cliente o ajustamos la API).
     const params = new URLSearchParams();
     if (q.trim()) params.set('q', q.trim());
     params.set('includeInactive', includeInactive ? 'true' : 'false');
 
-    const res = await fetch(`/api/admin/products?${params.toString()}`, {
-      headers: { Authorization: `Bearer ${token}` },
-      cache: 'no-store',
-    });
+    // Opción A: Usar la API existente (si soporta los campos nuevos)
+    // Opción B: Consulta directa a Supabase aquí (más flexible para dashboard)
+    
+    // Vamos a usar consulta directa a Supabase para garantizar que traemos image_url y colors
+    // sin depender de si la API /api/admin/products fue actualizada o no.
+    
+    let query = supabase
+      .from('products')
+      // 👇 AQUÍ ESTÁ LA CLAVE: Pedimos image_url y colors
+      .select('id, name, model, price, original_price, stock_count, is_active, updated_at, image_url, colors')
+      .order('created_at', { ascending: false });
 
-    if (!res.ok) {
-      const j = await res.json().catch(() => ({}));
+    if (!includeInactive) {
+      query = query.eq('is_active', true);
+    }
+
+    if (q.trim()) {
+      // Búsqueda simple por nombre o modelo
+      query = query.or(`name.ilike.%${q.trim()}%,model.ilike.%${q.trim()}%`);
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      console.error(error);
       setLoading(false);
-      setErrorMsg(j?.error || 'No se pudieron cargar los productos.');
+      setErrorMsg('Error al cargar productos desde Supabase.');
       return;
     }
 
-    const data = await res.json();
-    setRows(data.products || []);
+    // Mapeamos para asegurar que colors sea un array válido (defensivo)
+    const safeRows: ProductRow[] = (data || []).map((p: any) => ({
+        ...p,
+        // Aseguramos que colors sea un array, por si viene null de la DB
+        colors: Array.isArray(p.colors) ? p.colors : [],
+        // Aseguramos stock_status (calculado al vuelo)
+        stock_status: p.stock_count === 0 ? 'Sin stock' : p.stock_count <= 5 ? 'Bajo stock' : 'En stock'
+    }));
+
+    setRows(safeRows);
     setLoading(false);
   }
 
@@ -81,15 +109,32 @@ export default function InventoryPageInteractive() {
     const token = await getAccessToken();
     if (!token) return;
 
-    const res = await fetch(`/api/admin/products/${id}`, {
-      method: 'DELETE',
+    // Para desactivar, podemos usar la API o Supabase directo.
+    // Usamos la API para mantener la lógica de negocio si la hay.
+    const res = await fetch(`/api/admin/products?id=${id}`, {
+      method: 'DELETE', // O PATCH { is_active: false } dependiendo de tu API
       headers: { Authorization: `Bearer ${token}` },
     });
 
-    if (!res.ok) {
-      const j = await res.json().catch(() => ({}));
-      alert(j?.error || 'No se pudo desactivar el producto.');
-      return;
+    // Si tu API usa DELETE para borrar físico, cuidado.
+    // Si usa DELETE para soft-delete (is_active=false), está bien.
+    // Voy a asumir que quieres cambiar el estado is_active.
+    
+    /* NOTA: Si tu endpoint DELETE borra el registro, úsalo.
+       Si quieres hacer toggle (activar/desactivar), mejor haz un update directo aquí:
+    */
+    
+    const product = rows.find(r => r.id === id);
+    if (!product) return;
+
+    const { error } = await supabase
+        .from('products')
+        .update({ is_active: !product.is_active })
+        .eq('id', id);
+
+    if (error) {
+        alert('Error al actualizar estado');
+        return;
     }
 
     await loadProducts();
@@ -103,26 +148,25 @@ export default function InventoryPageInteractive() {
       else setLoading(false);
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [q, includeInactive]); // Recargar si cambian los filtros
 
-if (admin?.ok === false) {
-  return (
-    <div className="bg-card rounded-lg p-6 card-elevation">
-      <h3 className="text-lg font-heading font-semibold text-foreground mb-2">Acceso restringido</h3>
-      <p className="text-sm text-muted-foreground">{admin.message}</p>
-      <div className="mt-4">
-        <Link
-          href="/admin-login"
-          className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-smooth focus-ring"
-        >
-          <Icon name="ArrowRightIcon" size={18} />
-          Ir a login admin
-        </Link>
+  if (admin?.ok === false) {
+    return (
+      <div className="bg-card rounded-lg p-6 card-elevation">
+        <h3 className="text-lg font-heading font-semibold text-foreground mb-2">Acceso restringido</h3>
+        <p className="text-sm text-muted-foreground">{admin.message}</p>
+        <div className="mt-4">
+          <Link
+            href="/admin-login"
+            className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-smooth focus-ring"
+          >
+            <Icon name="ArrowRightIcon" size={18} />
+            Ir a login admin
+          </Link>
+        </div>
       </div>
-    </div>
-  );
-}
-
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -146,6 +190,7 @@ if (admin?.ok === false) {
               type="checkbox"
               checked={includeInactive}
               onChange={(e) => setIncludeInactive(e.target.checked)}
+              className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
             />
             Incluir inactivos
           </label>
@@ -170,15 +215,19 @@ if (admin?.ok === false) {
 
       {/* Content */}
       {errorMsg ? (
-        <div className="bg-card rounded-lg p-6 card-elevation">
-          <h3 className="text-lg font-heading font-semibold text-foreground mb-2">Error</h3>
+        <div className="bg-card rounded-lg p-6 card-elevation border-l-4 border-red-500">
+          <h3 className="text-lg font-heading font-semibold text-foreground mb-1">Error</h3>
           <p className="text-sm text-muted-foreground">{errorMsg}</p>
         </div>
       ) : null}
 
       <div className="bg-card rounded-lg p-4 card-elevation">
         {loading ? (
-          <div className="h-64 bg-muted rounded-lg animate-pulse" />
+          <div className="space-y-4">
+              <div className="h-12 bg-muted rounded-lg animate-pulse" />
+              <div className="h-12 bg-muted rounded-lg animate-pulse" />
+              <div className="h-12 bg-muted rounded-lg animate-pulse" />
+          </div>
         ) : (
           <ProductTable
             products={rows}

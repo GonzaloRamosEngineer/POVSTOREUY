@@ -147,18 +147,18 @@ const HeroSection = ({ onCtaClick, basicStock, proStock }: HeroSectionProps) => 
                     playsInline
                     className="w-full h-full object-cover opacity-90 group-hover:opacity-100 transition-opacity"
                   >
-                    <source src="https://assets.mixkit.co/videos/preview/mixkit-person-recording-a-video-with-a-camera-4054-large.mp4" type="video/mp4" />
+                    <source src="https://kdzhyalorvjqxhybtdil.supabase.co/storage/v1/object/public/media/BannerVideo.mp4" type="video/mp4" />
                   </video>
                   
                   {/* Overlay oscuro para que resalte el botón de play */}
                   <div className="absolute inset-0 bg-black/40 group-hover:bg-black/20 transition-colors" />
 
-                  {/* Botón Play Central (Rojo) */}
+                  {/* Botón Play Central (Rojo)
                   <div className="absolute inset-0 flex items-center justify-center">
                     <button className="bg-red-600 hover:bg-red-500 text-white rounded-full p-5 shadow-[0_0_30px_rgba(220,38,38,0.5)] transform hover:scale-110 transition-all duration-300">
                       <Icon name="PlayIcon" size={36} variant="solid" />
                     </button>
-                  </div>
+                  </div> */}
                   
                   {/* Etiqueta flotante interior */}
                   <div className="absolute bottom-4 left-4 right-4">

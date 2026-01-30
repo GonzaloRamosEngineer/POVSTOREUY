@@ -1,110 +1,130 @@
-import React from 'react';
-import Link from 'next/link';
-import Image from 'next/image';
-import { Product } from '@/types/product';
+'use client';
+
+import AppImage from '@/components/ui/AppImage';
 import Icon from '@/components/ui/AppIcon';
 
-interface Props {
-  currentProduct: Product;
-  allProducts: Product[]; // Recibimos todos para filtrar y comparar
+interface SimpleProduct {
+  id: string;
+  name: string;
+  image_url: string;
+  price: number;
+  show_on_home?: boolean;
+  tech_specs: Record<string, string>;
 }
 
-export default function ProductComparison({ currentProduct, allProducts }: Props) {
-  // 1. Filtramos para comparar solo CÁMARAS (evitamos memorias SD, etc)
-  // Asumimos que las cámaras tienen "tech_specs" cargadas.
-  const cameras = allProducts.filter(p => p.tech_specs && Object.keys(p.tech_specs).length > 0);
+export default function ProductComparison({ 
+  currentProduct, 
+  otherProducts 
+}: { 
+  currentProduct: SimpleProduct; 
+  otherProducts: SimpleProduct[] 
+}) {
+  
+  const comparisonList = [currentProduct, ...otherProducts]
+    .filter((p) => p.show_on_home === true || p.id === currentProduct.id)
+    // Eliminamos duplicados por ID por si acaso
+    .filter((v, i, a) => a.findIndex(v2 => (v2.id === v.id)) === i)
+    .sort((a, b) => a.price - b.price); 
 
-  // Si no hay con qué comparar (solo hay 1 cámara), no mostramos la tabla
-  if (cameras.length < 2) return null;
+  const displayProducts = comparisonList.slice(0, 3);
 
-  // 2. Definimos qué características queremos comparar (El orden importa)
-  // Estas claves deben coincidir con las que pusimos en el SQL (tech_specs)
-  const featuresToCompare = [
-    "Resolución Video",
-    "Estabilización",
-    "Batería",
-    "Resistencia Agua",
-    "Ángulo",
-    "Peso"
+  const rows = [
+    { label: 'Resolución Máxima', key: 'Resolución Video', icon: 'VideoCameraIcon' },
+    { label: 'Estabilización', key: 'Estabilización', icon: 'BoltIcon' },
+    { label: 'Resistencia al Agua', key: 'Resistencia Agua', icon: 'DropIcon' },
+    { label: 'Duración Batería', key: 'Batería', icon: 'Battery50Icon' },
+    { label: 'Ángulo de Visión', key: 'Ángulo', icon: 'EyeIcon' },
+    { label: 'Sensor', key: 'Sensor', icon: 'CpuChipIcon' },
+    { label: 'Conectividad', key: 'Conectividad', icon: 'WifiIcon' },
+    { label: 'Peso', key: 'Peso', icon: 'ScaleIcon' },
   ];
 
   return (
-    <section className="w-full bg-white py-20 border-t border-gray-100">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6">
-        <h2 className="text-3xl md:text-5xl font-bold text-center mb-16 text-gray-900">
-          Compara los Modelos
-        </h2>
-
-        {/* CONTENEDOR DE LA TABLA CON SCROLL HORIZONTAL (Para móviles) */}
-        <div className="overflow-x-auto pb-6">
-          <table className="w-full min-w-[600px] border-collapse text-left">
-            <thead>
-              <tr>
-                {/* Columna vacía (Esquina superior izquierda) */}
-                <th className="p-4 w-1/4 bg-white sticky left-0 z-10 border-b border-gray-100"></th>
-                
-                {/* Cabeceras de Productos */}
-                {cameras.map((camera) => (
-                  <th key={camera.id} className="p-4 w-1/4 text-center align-bottom border-b border-gray-100 min-w-[200px]">
-                    <div className="flex flex-col items-center gap-4">
-                      <div className="relative w-32 h-32 md:w-40 md:h-40 mb-2">
-                        <Image 
-                          src={camera.image_url} 
-                          alt={camera.name} 
-                          fill 
-                          className="object-contain"
-                        />
+    // FIX 1: Agregamos 'pt-8' (padding top) para que la etiqueta flotante no se corte
+    <div className="overflow-x-auto pb-4 pt-8">
+      <div className="min-w-[700px]"> {/* Aumenté un poco el ancho mínimo para desktop */}
+        <table className="w-full text-left border-collapse">
+          <thead>
+            <tr>
+              <th className="p-4 w-1/4"></th>
+              
+              {displayProducts.map((p) => {
+                const isCurrent = p.id === currentProduct.id;
+                return (
+                  // Usamos 'group' aquí para efectos hover
+                  <th key={p.id} className={`p-4 w-1/4 align-bottom pb-10 relative rounded-t-3xl transition-colors group ${isCurrent ? 'bg-red-50/80' : 'hover:bg-gray-50'}`}>
+                    {isCurrent && (
+                      <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-red-600 text-white text-[10px] font-bold uppercase tracking-wider px-4 py-1.5 rounded-full shadow-md z-10 whitespace-nowrap">
+                        Viendo ahora
                       </div>
-                      <h3 className="text-xl font-bold text-gray-900 leading-tight">{camera.name}</h3>
-                      <p className="text-lg font-bold text-blue-600">${camera.price}</p>
+                    )}
+                    <div className="flex flex-col items-center text-center">
                       
-                      {/* Botón de acción */}
-                      {camera.id === currentProduct.id ? (
-                        <span className="px-4 py-1 bg-gray-100 text-gray-500 text-sm rounded-full font-medium">
-                          Viendo ahora
-                        </span>
-                      ) : (
-                        <Link 
-                          href={`/products/${camera.id}`}
-                          className="px-6 py-2 bg-black text-white text-sm rounded-full font-bold hover:bg-gray-800 transition-colors"
-                        >
-                          Ver Detalles
-                        </Link>
-                      )}
+                      {/* --- MAGIA PRO: Iluminación de Estudio --- */}
+                      <div className="relative h-44 w-full flex items-center justify-center mb-4 transition-transform duration-500 group-hover:scale-105">
+                        
+                        {/* 1. El "Foco" de luz de fondo (Spotlight) */}
+                        <div className={`absolute inset-4 rounded-full blur-2xl -z-10 transition-opacity duration-500
+                           ${isCurrent 
+                             ? 'bg-gradient-to-tr from-red-200/40 to-red-100/40 opacity-100' 
+                             : 'bg-gradient-to-tr from-gray-200/50 to-gray-100/50 opacity-0 group-hover:opacity-100'
+                           }`} 
+                        />
+
+                        {/* 2. La Imagen con sombra de flotación suave */}
+                        <div className="relative h-36 w-36 drop-shadow-[0_8px_12px_rgba(0,0,0,0.08)]">
+                          <AppImage src={p.image_url} alt={p.name} className="object-contain w-full h-full" />
+                        </div>
+                      </div>
+                      {/* --------------------------------------- */}
+
+                      <h3 className={`text-lg font-bold mb-2 transition-colors ${isCurrent ? 'text-red-700' : 'text-gray-900 group-hover:text-gray-700'}`}>
+                        {p.name}
+                      </h3>
+                      <p className="text-sm font-mono font-bold text-gray-900 bg-white/80 px-3 py-1 rounded-full shadow-sm border border-gray-100">
+                        ${p.price.toLocaleString('es-UY')}
+                      </p>
                     </div>
                   </th>
-                ))}
-              </tr>
-            </thead>
-            
-            <tbody>
-              {/* Filas de características */}
-              {featuresToCompare.map((feature, index) => (
-                <tr key={feature} className={index % 2 === 0 ? 'bg-gray-50' : 'bg-white'}>
+                );
+              })}
+            </tr>
+          </thead>
+          
+          <tbody className="divide-y divide-gray-100">
+            {rows.map((row, idx) => (
+              // Alternamos fondo de filas para mejor lectura
+              <tr key={row.key} className={`group transition-colors ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`}>
+                <td className="p-4 py-5">
+                  <div className="flex items-center gap-3 pl-2">
+                    <Icon name={row.icon as any} size={20} className="text-gray-400 group-hover:text-red-500 transition-colors" />
+                    <span className="text-sm font-bold text-gray-700">{row.label}</span>
+                  </div>
+                </td>
+
+                {displayProducts.map((p) => {
+                  const isCurrent = p.id === currentProduct.id;
+                  const value = p.tech_specs?.[row.key] || '-';
                   
-                  {/* Etiqueta de la característica (Sticky a la izquierda) */}
-                  <th className={`
-                    p-6 text-sm md:text-base font-bold text-gray-900 sticky left-0 z-10
-                    ${index % 2 === 0 ? 'bg-gray-50' : 'bg-white'}
-                    shadow-[4px_0_10px_-5px_rgba(0,0,0,0.1)] md:shadow-none
-                  `}>
-                    {feature}
-                  </th>
-
-                  {/* Valor de cada cámara */}
-                  {cameras.map((camera) => (
-                    <td key={camera.id} className="p-6 text-center text-sm md:text-base text-gray-600 border-l border-transparent">
-                      {/* Accedemos al tech_specs dinámicamente. Si no tiene el dato, ponemos un guión */}
-                      {camera.tech_specs ? camera.tech_specs[feature] || '-' : '-'}
+                  return (
+                    <td 
+                      key={p.id} 
+                      className={`p-4 py-5 text-center text-sm font-medium leading-relaxed transition-colors
+                        ${isCurrent 
+                          ? 'bg-red-50/80 text-gray-900 border-x border-red-100/50' // Resalte columna actual
+                          : 'text-gray-600 group-hover:bg-gray-100/50'}
+                        ${row.key === 'Resolución Video' ? 'font-bold text-base' : ''} // Destacar la resolución
+                      `}
+                    >
+                      {value}
                     </td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
+                  );
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
-    </section>
+    </div>
   );
 }

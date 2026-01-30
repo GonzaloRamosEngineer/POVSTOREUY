@@ -37,19 +37,19 @@ const FooterSection = () => {
               <li>
                 {/* CORREGIDO: Apunta al ancla de productos en la homepage */}
                 <Link
-                  href="/homepage#productos"
+                  href="/products/1aabfacb-5f35-4bcf-9e6d-0316483d8362"
                   className="text-sm text-muted-foreground hover:text-primary transition-smooth"
                 >
-                  POV Básico
+                  C100 Plus
                 </Link>
               </li>
               <li>
                 {/* CORREGIDO: Apunta al ancla de productos en la homepage */}
                 <Link
-                  href="/homepage#productos"
+                  href="/products/c98290bd-884f-49ce-9554-71a0210638f8"
                   className="text-sm text-muted-foreground hover:text-primary transition-smooth"
                 >
-                  POV Pro
+                  C200 Pro
                 </Link>
               </li>
               <li>
