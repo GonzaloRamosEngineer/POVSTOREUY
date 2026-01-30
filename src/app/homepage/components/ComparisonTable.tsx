@@ -1,19 +1,12 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import Icon from '@/components/ui/AppIcon';
-
-interface ComparisonItem {
-  category: string;
-  smartphone: string | boolean;
-  povCamera: string | boolean;
-  gopro: string | boolean;
-}
 
 const ComparisonTable = () => {
   const [isHydrated, setIsHydrated] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
-  const [expandedRow, setExpandedRow] = useState<number | null>(null);
 
   useEffect(() => {
     setIsHydrated(true);
@@ -23,231 +16,137 @@ const ComparisonTable = () => {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  const comparisonData: ComparisonItem[] = [
+  // DATOS REALES DE TUS PRODUCTOS
+  const products = [
     {
-      category: 'Resolución de Video',
-      smartphone: '1080p - 4K',
-      povCamera: '4K Ultra HD',
-      gopro: '4K - 5K',
+      id: 'c100-plus',
+      name: 'SJCAM C100+',
+      price: '$5.990',
+      badge: 'Bestseller',
+      badgeColor: 'bg-blue-900/30 text-blue-400 border border-blue-500/30',
+      link: '/products/1aabfacb-5f35-4bcf-9e6d-0316483d8362'
     },
     {
-      category: 'Estabilización',
-      smartphone: 'Digital básica',
-      povCamera: 'Estabilización avanzada',
-      gopro: 'HyperSmooth',
-    },
-    {
-      category: 'Tamaño y Peso',
-      smartphone: '150-200g',
-      povCamera: '45g ultra compacta',
-      gopro: '120-150g',
-    },
-    {
-      category: 'Batería',
-      smartphone: '2-4 horas',
-      povCamera: '3-5 horas',
-      gopro: '1.5-2.5 horas',
-    },
-    {
-      category: 'Resistencia al Agua',
-      smartphone: false,
-      povCamera: 'IPX4 resistente',
-      gopro: true,
-    },
-    {
-      category: 'Precio',
-      smartphone: '$15.000 - $50.000',
-      povCamera: '$3.990 - $5.990',
-      gopro: '$18.000 - $35.000',
-    },
-    {
-      category: 'Manos Libres',
-      smartphone: false,
-      povCamera: true,
-      gopro: true,
-    },
-    {
-      category: 'Ángulo POV Real',
-      smartphone: false,
-      povCamera: true,
-      gopro: 'Limitado',
-    },
+      id: 'c200-pro',
+      name: 'SJCAM C200',
+      price: '$8.490',
+      badge: 'Pro',
+      badgeColor: 'bg-red-900/30 text-red-400 border border-red-500/30',
+      link: '/products/c98290bd-884f-49ce-9554-71a0210638f8'
+    }
   ];
 
-  const renderValue = (value: string | boolean) => {
-    if (typeof value === 'boolean') {
-      return value ? (
-        <Icon name="CheckCircleIcon" size={24} className="text-success mx-auto drop-shadow-md" variant="solid" />
-      ) : (
-        <Icon name="XCircleIcon" size={24} className="text-muted-foreground/30 mx-auto" variant="solid" />
-      );
-    }
-    return <span className="text-sm md:text-base">{value}</span>;
-  };
+  const features = [
+    { label: 'Resolución Máxima', c100: '4K @ 30fps', c200: '4K Ultra / 2K Clear', icon: 'VideoCameraIcon' },
+    { label: 'Estabilización', c100: 'EIS (Giroscopio)', c200: 'SuperSmooth (6 Ejes)', icon: 'BoltIcon' },
+    { label: 'Resistencia al Agua', c100: '30m con carcasa', c200: 'IPX4 (Cuerpo) / 40m (Carcasa)', icon: 'ShieldCheckIcon' },
+    { label: 'Duración Batería', c100: '~2 horas', c200: '~3 horas', icon: 'BoltIcon' },
+    { label: 'Peso', c100: '42g (Pluma)', c200: '78g (Metálica)', icon: 'ScaleIcon' },
+    { label: 'Pantalla', c100: 'No (Control por App)', c200: 'Sí (1.28" LCD)', icon: 'DeviceTabletIcon' },
+    { label: 'Visión Nocturna', c100: 'Básica', c200: 'Super Night Vision', icon: 'MoonIcon' },
+    { label: 'Ideal para...', c100: 'Vlogs, Mascotas, Casco', c200: 'Cine, Deportes Extremos', icon: 'StarIcon' },
+  ];
 
-  if (!isHydrated) {
-    return (
-      /* TECH NOIR: Cambiado bg-muted/30 a bg-background para fondo negro puro */
-      <section className="py-16 px-4 bg-background border-t border-border">
-        <div className="max-w-7xl mx-auto">
-          <div className="text-center mb-12">
-            <h2 className="text-4xl md:text-5xl font-heading font-bold text-foreground mb-4">
-              ¿Por qué elegir <span className="text-primary">POV Camera</span>?
-            </h2>
-            <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-              Comparamos nuestra cámara con las alternativas más populares del mercado
-            </p>
-          </div>
-          <div className="bg-card rounded-xl shadow-2xl border border-border overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-muted/50">
-                  <tr>
-                    <th className="px-6 py-4 text-left text-sm font-semibold text-foreground">Característica</th>
-                    <th className="px-6 py-4 text-center text-sm font-semibold text-muted-foreground">Smartphone</th>
-                    {/* TECH NOIR: Borde rojo superior y brillo sutil */}
-                    <th className="px-6 py-4 text-center text-sm font-bold text-primary border-t-2 border-primary bg-primary/5 shadow-[0_0_20px_rgba(220,38,38,0.1)]">POV Camera</th>
-                    <th className="px-6 py-4 text-center text-sm font-semibold text-muted-foreground">GoPro/Insta360</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {comparisonData.map((item, index) => (
-                    <tr key={index} className="border-t border-border hover:bg-muted/10 transition-colors">
-                      <td className="px-6 py-4 font-medium text-foreground">{item.category}</td>
-                      <td className="px-6 py-4 text-center text-muted-foreground">{renderValue(item.smartphone)}</td>
-                      {/* TECH NOIR: Fondo sutil rojo y bordes laterales para resaltar la columna */}
-                      <td className="px-6 py-4 text-center text-foreground font-semibold bg-primary/5 border-x border-primary/10">{renderValue(item.povCamera)}</td>
-                      <td className="px-6 py-4 text-center text-muted-foreground">{renderValue(item.gopro)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
+  if (!isHydrated) return null;
+
+  return (
+    <section className="py-20 px-4 bg-neutral-950 relative overflow-hidden border-t border-neutral-900">
+      
+      {/* Elementos decorativos de fondo (Tech Noir) */}
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-full max-w-7xl pointer-events-none">
+        <div className="absolute top-20 left-20 w-64 h-64 bg-red-900/5 rounded-full blur-3xl" />
+        <div className="absolute bottom-20 right-20 w-80 h-80 bg-red-900/5 rounded-full blur-3xl" />
+      </div>
+
+      <div className="max-w-6xl mx-auto relative z-10">
+        <div className="text-center mb-16">
+          <h2 className="text-3xl md:text-5xl font-heading font-bold text-white mb-4">
+            Encuentra tu <span className="text-transparent bg-clip-text bg-gradient-to-r from-white to-neutral-600">Compañera Ideal</span>
+          </h2>
+          <p className="text-lg text-neutral-400 max-w-2xl mx-auto">
+            Ambas son increíbles, pero una está hecha para tu estilo de aventura.
+          </p>
         </div>
-      </section>
-    );
-  }
 
-  if (isMobile) {
-    return (
-      /* TECH NOIR: Fondo negro puro */
-      <section className="py-16 px-4 bg-background border-t border-border">
-        <div className="max-w-7xl mx-auto">
-          <div className="text-center mb-12">
-            <h2 className="text-4xl font-heading font-bold text-foreground mb-4">
-              ¿Por qué elegir <span className="text-primary">POV Camera</span>?
-            </h2>
-            <p className="text-lg text-muted-foreground">
-              Comparamos nuestra cámara con las alternativas más populares
-            </p>
-          </div>
+        {/* --- CONTENEDOR DE LA TABLA --- */}
+        <div className="bg-neutral-900/30 backdrop-blur-sm rounded-2xl border border-neutral-800 shadow-2xl overflow-hidden">
+          
+          {/* HEADER DE PRODUCTOS (SIN IMAGEN - Solo Tipografía) */}
+          <div className="grid grid-cols-3 divide-x divide-neutral-800 border-b border-neutral-800 bg-neutral-900/20">
+            {/* Columna 1: Label */}
+            <div className="p-6 flex items-center justify-center text-neutral-400 font-medium italic text-sm md:text-base">
+              Selecciona tu modelo
+            </div>
+            
+            {/* Columnas Productos */}
+            {products.map((p) => (
+              <div key={p.id} className="p-8 flex flex-col items-center text-center group cursor-pointer transition-colors hover:bg-neutral-800/30">
+                
+                {/* Badge Marketinero */}
+                <span className={`text-[10px] font-bold uppercase tracking-widest mb-2 px-2.5 py-1 rounded-full ${p.badgeColor}`}>
+                  {p.badge}
+                </span>
 
-          <div className="space-y-4">
-            {comparisonData.map((item, index) => (
-              /* TECH NOIR: Tarjetas con borde sutil */
-              <div key={index} className="bg-card border border-border rounded-lg shadow-md overflow-hidden">
-                <button
-                  onClick={() => setExpandedRow(expandedRow === index ? null : index)}
-                  className="w-full px-4 py-4 flex items-center justify-between text-left focus-ring hover:bg-muted/10 transition-colors"
+                {/* Título Grande */}
+                <h3 className="text-xl md:text-2xl font-bold text-white mb-1">{p.name}</h3>
+                
+                {/* Precio */}
+                <p className="text-red-500 font-mono font-bold text-lg md:text-xl mb-6">{p.price}</p>
+                
+                {/* Botón */}
+                <Link 
+                  href={p.link}
+                  className="hidden md:inline-flex px-6 py-2 rounded-full border border-neutral-700 text-white text-sm font-bold hover:bg-white hover:text-black transition-all"
                 >
-                  <span className="font-semibold text-foreground">{item.category}</span>
-                  <Icon
-                    name={expandedRow === index ? 'ChevronUpIcon' : 'ChevronDownIcon'}
-                    size={20}
-                    className="text-primary"
-                  />
-                </button>
-
-                {expandedRow === index && (
-                  <div className="px-4 pb-4 space-y-3 border-t border-border pt-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-muted-foreground">Smartphone</span>
-                      <div className="text-muted-foreground">{renderValue(item.smartphone)}</div>
-                    </div>
-                    {/* TECH NOIR: Resaltado rojo con borde sutil */}
-                    <div className="flex items-center justify-between bg-primary/10 border border-primary/20 px-3 py-2 rounded-md shadow-inner">
-                      <span className="text-sm font-bold text-primary">POV Camera</span>
-                      <div className="text-foreground font-bold">{renderValue(item.povCamera)}</div>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-muted-foreground">GoPro/Insta360</span>
-                      <div className="text-muted-foreground">{renderValue(item.gopro)}</div>
-                    </div>
-                  </div>
-                )}
+                  Ver Detalles
+                </Link>
               </div>
             ))}
           </div>
-        </div>
-      </section>
-    );
-  }
 
-  return (
-    /* TECH NOIR: Fondo negro puro */
-    <section className="py-16 px-4 bg-background border-t border-border">
-      <div className="max-w-7xl mx-auto">
-        <div className="text-center mb-12">
-          <h2 className="text-4xl md:text-5xl font-heading font-bold text-foreground mb-4">
-            ¿Por qué elegir <span className="text-primary">POV Camera</span>?
-          </h2>
-          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            Comparamos nuestra cámara con las alternativas más populares del mercado
-          </p>
-        </div>
+          {/* CUERPO DE LA TABLA */}
+          <div className="divide-y divide-neutral-800">
+            {features.map((feature, idx) => (
+              <div key={idx} className="grid grid-cols-3 divide-x divide-neutral-800 hover:bg-neutral-800/20 transition-colors">
+                
+                {/* Etiqueta (Columna 1) */}
+                <div className="p-4 md:p-6 flex items-center gap-3 text-sm md:text-base font-medium text-neutral-400">
+                  <div className="p-2 bg-neutral-800/50 rounded-lg hidden md:block">
+                    <Icon name={feature.icon as any} size={20} className="text-neutral-400" />
+                  </div>
+                  {feature.label}
+                </div>
 
-        <div className="bg-card rounded-xl shadow-2xl border border-border overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-muted/50">
-                <tr>
-                  <th className="px-6 py-4 text-left text-sm font-semibold text-foreground">
-                    Característica
-                  </th>
-                  <th className="px-6 py-4 text-center text-sm font-semibold text-muted-foreground">
-                    Smartphone
-                  </th>
-                  {/* TECH NOIR: Header con borde superior rojo e iluminación */}
-                  <th className="px-6 py-4 text-center text-sm font-bold text-primary bg-primary/10 border-t-2 border-primary shadow-[0_0_15px_rgba(220,38,38,0.15)]">
-                    <div className="flex items-center justify-center gap-2">
-                      <Icon name="VideoCameraIcon" size={20} className="text-primary drop-shadow-glow" variant="solid" />
-                      POV Camera
-                    </div>
-                  </th>
-                  <th className="px-6 py-4 text-center text-sm font-semibold text-muted-foreground">
-                    GoPro/Insta360
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {comparisonData.map((item, index) => (
-                  <tr
-                    key={index}
-                    className="border-t border-border hover:bg-muted/10 transition-smooth"
-                  >
-                    <td className="px-6 py-4 font-medium text-foreground">{item.category}</td>
-                    <td className="px-6 py-4 text-center text-muted-foreground">
-                      {renderValue(item.smartphone)}
-                    </td>
-                    {/* TECH NOIR: Columna con fondo rojo muy tenue y bordes para efecto "túnel" */}
-                    <td className="px-6 py-4 text-center text-foreground font-semibold bg-primary/5 border-x border-primary/10">
-                      {renderValue(item.povCamera)}
-                    </td>
-                    <td className="px-6 py-4 text-center text-muted-foreground">
-                      {renderValue(item.gopro)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                {/* Valor C100+ (Columna 2) */}
+                <div className="p-4 md:p-6 flex items-center justify-center text-center text-sm md:text-base font-semibold text-white">
+                  {feature.c100}
+                </div>
+
+                {/* Valor C200 (Columna 3) - Destacado */}
+                <div className="p-4 md:p-6 flex items-center justify-center text-center text-sm md:text-base font-bold text-white bg-red-900/10">
+                  {feature.c200}
+                </div>
+              </div>
+            ))}
           </div>
-        </div>
 
-        <div className="mt-8 text-center">
-          <p className="text-sm text-muted-foreground">
-            * Precios en pesos uruguayos (UYU). Datos actualizados a enero 2026.
-          </p>
+          {/* FOOTER MOBILE (Botones de acción para móvil) */}
+          <div className="md:hidden grid grid-cols-2 gap-4 p-4 border-t border-neutral-800 bg-neutral-950">
+            {products.map((p) => (
+              <Link 
+                key={p.id}
+                href={p.link}
+                className={`flex items-center justify-center px-4 py-3 rounded-lg text-sm font-bold text-center transition-all ${
+                  p.id === 'c200-pro' 
+                    ? 'bg-red-600 text-white hover:bg-red-500' 
+                    : 'bg-neutral-800 text-white hover:bg-neutral-700'
+                }`}
+              >
+                Ver {p.name.replace('SJCAM ', '')}
+              </Link>
+            ))}
+          </div>
+
         </div>
       </div>
     </section>

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import Link from 'next/link'; // <--- IMPORTANTE: Importamos Link
+import Link from 'next/link';
 import AppImage from '@/components/ui/AppImage';
 import Icon from '@/components/ui/AppIcon';
 
@@ -16,7 +16,7 @@ interface ProductCardProps {
   stockCount: number;
   badge?: string;
   onAddToCart: (productId: string) => void;
-  onViewDetails?: (productId: string) => void; // Lo hacemos opcional porque ya no lo vamos a necesitar obligatoriamente
+  onViewDetails?: (productId: string) => void;
 }
 
 const ProductCard = ({
@@ -41,7 +41,6 @@ const ProductCard = ({
   const discount = originalPrice ? Math.round(((originalPrice - price) / originalPrice) * 100) : 0;
   const isLowStock = stockCount <= 5;
   
-  // URL DE LA NUEVA PÁGINA PROFESIONAL
   const productUrl = `/products/${id}`; 
 
   if (!isHydrated) {
@@ -55,7 +54,7 @@ const ProductCard = ({
           />
         </div>
         <div className="p-6 space-y-4">
-          <h3 className="text-2xl font-heading font-bold text-white">{name}</h3>
+          <h3 className="text-2xl md:text-3xl font-heading font-bold text-white">{name}</h3>
           <div className="flex items-baseline gap-3">
             <span className="text-3xl font-mono font-bold text-red-500">${price.toLocaleString('es-UY')}</span>
           </div>
@@ -66,15 +65,14 @@ const ProductCard = ({
 
   return (
     <div 
-      // TECH NOIR: Tarjeta oscura con borde sutil. Hover: Borde Rojo + Glow Rojo
       className="group relative bg-neutral-900 rounded-2xl overflow-hidden border border-neutral-800 hover:border-red-600/50 shadow-xl hover:shadow-[0_0_30px_rgba(220,38,38,0.15)] transition-all duration-300 transform hover:-translate-y-1"
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
-      {/* Glow Effect Trasero (Rojo) */}
+      {/* Glow Effect Trasero */}
       <div className="absolute inset-0 bg-gradient-to-br from-red-600/0 via-transparent to-red-900/0 group-hover:from-red-600/5 group-hover:to-red-900/5 transition-all duration-500 pointer-events-none" />
       
-      {/* Image Section - AHORA ES UN LINK */}
+      {/* Image Section */}
       <Link href={productUrl} className="block relative h-80 bg-neutral-800 overflow-hidden cursor-pointer">
         <AppImage
           src={image}
@@ -85,23 +83,23 @@ const ProductCard = ({
         {/* Overlay on hover */}
         <div className="absolute inset-0 bg-black/20 group-hover:bg-black/40 transition-colors duration-300" />
         
-        {/* Badges - Estilo Tech */}
+        {/* Badges simplificados */}
         <div className="absolute top-4 left-4 flex flex-col gap-2 z-10">
           {badge && (
-            <span className="px-3 py-1 bg-white text-black text-xs font-bold rounded-md shadow-lg uppercase tracking-wider border border-white">
+            <span className="px-3 py-1 bg-white text-black text-xs font-bold rounded-lg shadow-lg uppercase tracking-wider">
               {badge}
             </span>
           )}
           {discount > 0 && (
-            <span className="px-3 py-1 bg-red-600 text-white text-xs font-bold rounded-md shadow-lg uppercase tracking-wider border border-red-500">
+            <span className="px-3 py-1 bg-red-600 text-white text-xs font-bold rounded-lg shadow-lg uppercase tracking-wider">
               -{discount}% OFF
             </span>
           )}
         </div>
 
-        {/* Stock Indicator (Red Alert) */}
+        {/* Stock Indicator */}
         {isLowStock && (
-          <div className="absolute bottom-4 right-4 px-3 py-1.5 bg-red-600/90 backdrop-blur-sm text-white text-[10px] font-bold rounded-full flex items-center gap-1.5 shadow-lg animate-pulse z-10 border border-red-500/50">
+          <div className="absolute bottom-4 right-4 px-3 py-1.5 bg-red-600/90 backdrop-blur-sm text-white text-[10px] font-bold rounded-full flex items-center gap-1.5 shadow-lg animate-pulse z-10">
             <Icon name="ExclamationTriangleIcon" size={14} variant="solid" />
             <span>ÚLTIMAS {stockCount}</span>
           </div>
@@ -116,9 +114,10 @@ const ProductCard = ({
       </Link>
 
       {/* Content Section */}
-      <div className="relative p-6 space-y-4 bg-neutral-900">
+      <div className="relative p-6 space-y-5 bg-neutral-900">
         <Link href={productUrl} className="block">
-           <h3 className="text-2xl font-heading font-bold text-white group-hover:text-red-500 transition-colors duration-300 cursor-pointer">
+           {/* Título más grande en desktop para mejor jerarquía visual */}
+           <h3 className="text-2xl md:text-3xl font-heading font-bold text-white group-hover:text-red-500 transition-colors duration-300 cursor-pointer leading-tight">
              {name}
            </h3>
         </Link>
@@ -155,7 +154,7 @@ const ProductCard = ({
         </ul>
 
         {/* Actions */}
-        <div className="pt-6 space-y-3">
+        <div className="pt-4 space-y-3">
           <button
             onClick={() => onAddToCart(id)}
             className="w-full px-6 py-3.5 bg-red-600 hover:bg-red-500 text-white text-center font-bold rounded-xl transition-all shadow-[0_4px_14px_0_rgba(220,38,38,0.39)] hover:shadow-[0_6px_20px_rgba(220,38,38,0.23)] hover:-translate-y-0.5 active:translate-y-0 uppercase tracking-wide flex items-center justify-center gap-2"
@@ -164,7 +163,6 @@ const ProductCard = ({
             <span>Comprar Ahora</span>
           </button>
           
-          {/* BOTÓN VER DETALLES - AHORA ES UN LINK DIRECTO */}
           <Link
             href={productUrl}
             className="block w-full px-6 py-3 bg-transparent hover:bg-white/5 text-neutral-400 hover:text-white text-center font-medium rounded-xl transition-all border border-neutral-700 hover:border-neutral-500"

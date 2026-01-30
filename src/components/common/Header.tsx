@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import Image from 'next/image'; // Import Next.js Image component
+import Image from 'next/image';
 import Icon from '@/components/ui/AppIcon';
 import AppImage from '@/components/ui/AppImage';
 import { readCart, CartItem } from '@/lib/cart';
@@ -16,11 +16,10 @@ const Header = ({ isAdminMode = false }: HeaderProps) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   
-  // ESTADO INTERNO DEL CARRITO
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [isHydrated, setIsHydrated] = useState(false);
 
-  // 1. Cargar carrito y Escuchar Cambios
+  // Cargar carrito y escuchar cambios
   useEffect(() => {
     setIsHydrated(true);
     setCartItems(readCart());
@@ -38,7 +37,6 @@ const Header = ({ isAdminMode = false }: HeaderProps) => {
     };
   }, []);
 
-  // Totales
   const cartItemCount = cartItems.reduce((total, item) => total + item.quantity, 0);
   const cartTotal = cartItems.reduce((total, item) => total + item.price * item.quantity, 0);
 
@@ -63,13 +61,21 @@ const Header = ({ isAdminMode = false }: HeaderProps) => {
     setIsCartOpen(false);
   };
 
-  if (!isHydrated) return <header className="h-16 bg-card" />;
+  // Links de navegación centralizados
+  const navLinks = [
+    { href: '/homepage', label: 'Productos', icon: 'ShoppingBagIcon' },
+    { href: '/support', label: 'Soporte', icon: 'LifebuoyIcon' },
+    { href: '/about', label: 'Nosotros', icon: 'UserGroupIcon' },
+    { href: '/contact', label: 'Contacto', icon: 'ChatBubbleLeftRightIcon' },
+  ];
+
+  if (!isHydrated) return <header className="h-16 bg-neutral-950" />;
 
   return (
     <>
       <header
         className={`fixed top-0 left-0 right-0 z-[100] transition-all duration-300 ${
-          scrolled ? 'bg-neutral-950/90 backdrop-blur-md shadow-lg border-b border-white/5' : 'bg-transparent'
+          scrolled ? 'bg-neutral-950/95 backdrop-blur-md shadow-lg border-b border-white/5' : 'bg-neutral-950/80 backdrop-blur-sm'
         }`}
       >
         <div className="max-w-[1400px] mx-auto">
@@ -81,15 +87,14 @@ const Header = ({ isAdminMode = false }: HeaderProps) => {
               className="flex items-center gap-3 hover:opacity-80 transition-opacity"
               onClick={handleNavigate}
             >
-              {/* NEW ICON IMPLEMENTATION */}
               <div className="relative w-10 h-10 flex-shrink-0">
                  <Image 
-                    src="/icon.png" // Path to your icon in public folder
+                    src="/icon.png"
                     alt="POV Store Logo"
                     width={40}
                     height={40}
                     className="object-contain"
-                    priority // Load this image immediately
+                    priority
                  />
               </div>
               
@@ -101,27 +106,16 @@ const Header = ({ isAdminMode = false }: HeaderProps) => {
 
             {/* Desktop Nav */}
             <nav className="hidden md:flex items-center gap-8">
-              <Link
-                href="/homepage"
-                className="text-sm font-bold tracking-wide text-neutral-300 hover:text-white hover:scale-105 transition-all"
-                onClick={handleNavigate}
-              >
-                MODELOS
-              </Link>
-              <Link
-                href="/support"
-                className="text-sm font-bold tracking-wide text-neutral-300 hover:text-white hover:scale-105 transition-all"
-                onClick={handleNavigate}
-              >
-                SOPORTE
-              </Link>
-              <Link
-                href="/about"
-                className="text-sm font-bold tracking-wide text-neutral-300 hover:text-white hover:scale-105 transition-all"
-                onClick={handleNavigate}
-              >
-                NOSOTROS
-              </Link>
+              {navLinks.map((link) => (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  className="text-sm font-bold tracking-wide text-neutral-300 hover:text-white hover:scale-105 transition-all uppercase"
+                  onClick={handleNavigate}
+                >
+                  {link.label}
+                </Link>
+              ))}
             </nav>
 
             {/* Actions */}
@@ -155,19 +149,62 @@ const Header = ({ isAdminMode = false }: HeaderProps) => {
 
       {/* Mobile Menu Overlay */}
       {isMobileMenuOpen && (
-        <div className="fixed inset-0 z-[90] bg-black pt-20 px-6 md:hidden">
-          <nav className="flex flex-col gap-6">
-            <Link
-              href="/homepage"
-              className="text-2xl font-bold text-white"
-              onClick={handleNavigate}
-            >
-              Modelos
-            </Link>
-            {isAdminMode && (
-                 <Link href="/admin-dashboard" className="text-lg text-neutral-400">Admin</Link>
-            )}
-          </nav>
+        <div className="fixed inset-0 z-[90] bg-neutral-950 md:hidden">
+          {/* Backdrop con patrón sutil */}
+          <div className="absolute inset-0 opacity-5 bg-[radial-gradient(#333_1px,transparent_1px)] [background-size:16px_16px]" />
+          
+          <div className="relative h-full pt-20 px-6 flex flex-col">
+            {/* Navigation Links */}
+            <nav className="flex-1 flex flex-col gap-2 py-6">
+              {navLinks.map((link, index) => (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  className="flex items-center gap-4 px-4 py-4 rounded-xl text-white hover:bg-neutral-900 transition-all group"
+                  onClick={handleNavigate}
+                  style={{ 
+                    animationDelay: `${index * 50}ms`,
+                    animation: 'slideIn 0.3s ease-out forwards'
+                  }}
+                >
+                  <div className="w-10 h-10 rounded-full bg-neutral-900 flex items-center justify-center group-hover:bg-red-600 transition-colors">
+                    <Icon name={link.icon as any} size={20} className="text-neutral-400 group-hover:text-white" />
+                  </div>
+                  <span className="text-lg font-semibold">{link.label}</span>
+                  <Icon name="ChevronRightIcon" size={20} className="ml-auto text-neutral-600 group-hover:text-white transition-colors" />
+                </Link>
+              ))}
+              
+              {/* Admin link si aplica */}
+              {isAdminMode && (
+                <Link 
+                  href="/admin-dashboard" 
+                  className="flex items-center gap-4 px-4 py-4 rounded-xl text-white hover:bg-neutral-900 transition-all group mt-4 border-t border-neutral-800 pt-6"
+                  onClick={handleNavigate}
+                >
+                  <div className="w-10 h-10 rounded-full bg-neutral-900 flex items-center justify-center group-hover:bg-blue-600 transition-colors">
+                    <Icon name="Cog6ToothIcon" size={20} className="text-neutral-400 group-hover:text-white" />
+                  </div>
+                  <span className="text-lg font-semibold">Admin Dashboard</span>
+                </Link>
+              )}
+            </nav>
+
+            {/* Footer con info adicional */}
+            <div className="border-t border-neutral-800 py-6 space-y-4">
+              <div className="flex items-center justify-center gap-6 text-sm text-neutral-500">
+                <a href="https://www.instagram.com/povstore.uy/" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">
+                  <Icon name="CameraIcon" size={20} />
+                </a>
+                <a href="https://www.tiktok.com/@povstore.uy" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">
+                  <Icon name="MusicalNoteIcon" size={20} />
+                </a>
+              </div>
+              <p className="text-center text-xs text-neutral-600">
+                POV Store Uruguay © 2026
+              </p>
+            </div>
+          </div>
         </div>
       )}
 
@@ -257,6 +294,20 @@ const Header = ({ isAdminMode = false }: HeaderProps) => {
           </div>
         </div>
       )}
+
+      {/* Animación para el mobile menu */}
+      <style jsx>{`
+        @keyframes slideIn {
+          from {
+            opacity: 0;
+            transform: translateX(-20px);
+          }
+          to {
+            opacity: 1;
+            transform: translateX(0);
+          }
+        }
+      `}</style>
     </>
   );
 };

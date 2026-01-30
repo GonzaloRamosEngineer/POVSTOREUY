@@ -3,8 +3,8 @@ import Icon from '@/components/ui/AppIcon';
 interface SocialLink {
   name: string;
   icon: string;
-  url: string;
-  followers: string;
+  url?: string;
+  isActive: boolean;
   color: string;
 }
 
@@ -13,85 +13,99 @@ const SocialMediaSection = () => {
     {
       name: 'Instagram',
       icon: 'CameraIcon',
-      url: 'https://instagram.com/povstoreuruguay',
-      followers: '12.5K',
-      color: 'from-purple-600 to-pink-600', // Un poco más oscuro para Tech Noir
+      url: 'https://www.instagram.com/povstore.uy/',
+      isActive: true,
+      color: 'from-purple-600 to-pink-600',
     },
     {
       name: 'TikTok',
       icon: 'MusicalNoteIcon',
-      url: 'https://tiktok.com/@povstoreuruguay',
-      followers: '8.3K',
+      url: 'https://www.tiktok.com/@povstore.uy',
+      isActive: true,
       color: 'from-cyan-600 to-blue-600',
-    },
-    {
-      name: 'YouTube',
-      icon: 'PlayIcon',
-      url: 'https://youtube.com/@povstoreuruguay',
-      followers: '5.2K',
-      color: 'from-red-600 to-red-700', // Rojo intenso
     },
     {
       name: 'Facebook',
       icon: 'UserGroupIcon',
-      url: 'https://facebook.com/povstoreuruguay',
-      followers: '9.1K',
+      isActive: false,
       color: 'from-blue-700 to-blue-800',
+    },
+    {
+      name: 'Twitter',
+      icon: 'ChatBubbleLeftRightIcon',
+      isActive: false,
+      color: 'from-sky-600 to-blue-600',
     },
   ];
 
   return (
     <section className="py-20 px-4 bg-black border-t border-neutral-900">
-      <div className="max-w-7xl mx-auto">
-        <div className="text-center mb-16">
-          <h2 className="text-3xl md:text-4xl font-heading font-bold text-white mb-4">
-            Seguinos en Redes Sociales
+      <div className="max-w-4xl mx-auto">
+        
+        {/* Header */}
+        <div className="text-center mb-12">
+          <h2 className="text-4xl md:text-5xl font-heading font-bold text-white mb-4">
+            Seguinos en <span className="text-transparent bg-clip-text bg-gradient-to-r from-white to-neutral-600">redes sociales</span>
           </h2>
-          <p className="text-lg text-neutral-400 max-w-2xl mx-auto">
-            Unite a nuestra comunidad de creadores y descubrí contenido exclusivo, tutoriales y ofertas especiales
+          <p className="text-lg text-neutral-400">
+            Tutoriales, reviews y ofertas exclusivas
           </p>
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
+        {/* Social Links */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-2xl mx-auto mb-12">
           {socialLinks.map((social, index) => (
-            <a
-              key={index}
-              href={social.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="group bg-neutral-900 border border-neutral-800 hover:border-neutral-700 rounded-xl p-6 text-center transition-all shadow-lg hover:shadow-[0_0_25px_rgba(255,255,255,0.05)] focus:ring-2 focus:ring-red-500 focus:ring-offset-2 focus:ring-offset-black"
-            >
-              <div className={`inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br ${social.color} rounded-full mb-4 group-hover:scale-110 transition-transform shadow-lg`}>
-                <Icon name={social.icon as any} size={28} className="text-white" variant="solid" />
+            social.isActive ? (
+              <a
+                key={index}
+                href={social.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="group bg-neutral-900/30 border border-neutral-800 hover:border-neutral-700 rounded-2xl p-6 text-center transition-all"
+              >
+                <div className={`inline-flex items-center justify-center w-12 h-12 bg-gradient-to-br ${social.color} rounded-full mb-3 group-hover:scale-110 transition-transform`}>
+                  <Icon name={social.icon as any} size={20} className="text-white" variant="solid" />
+                </div>
+                <h3 className="text-sm font-semibold text-white group-hover:text-red-500 transition-colors">
+                  {social.name}
+                </h3>
+              </a>
+            ) : (
+              <div
+                key={index}
+                className="bg-neutral-900/30 border border-neutral-800 rounded-2xl p-6 text-center relative overflow-hidden"
+              >
+                <div className="inline-flex items-center justify-center w-12 h-12 bg-neutral-800 rounded-full mb-3 opacity-50">
+                  <Icon name={social.icon as any} size={20} className="text-neutral-500" variant="solid" />
+                </div>
+                <h3 className="text-sm font-semibold text-neutral-500 mb-1">
+                  {social.name}
+                </h3>
+                <span className="text-xs text-neutral-600 uppercase tracking-wider">
+                  Próximamente
+                </span>
               </div>
-              <h3 className="text-lg font-heading font-semibold text-white mb-1 group-hover:text-red-500 transition-colors">
-                {social.name}
-              </h3>
-              <p className="text-sm text-neutral-500 mb-4 group-hover:text-neutral-400">{social.followers} seguidores</p>
-              <div className="flex items-center justify-center gap-2 text-red-500 text-sm font-medium opacity-80 group-hover:opacity-100">
-                <span>Seguir</span>
-                <Icon name="ArrowRightIcon" size={16} className="group-hover:translate-x-1 transition-transform" />
-              </div>
-            </a>
+            )
           ))}
         </div>
 
-        <div className="mt-16 text-center">
-          <p className="text-neutral-500 mb-6">
-            Etiquetanos en tus videos con <span className="text-red-500 font-semibold">#POVStoreUruguay</span>
+        {/* Hashtag */}
+        <div className="text-center">
+          <p className="text-neutral-500 mb-4">
+            Etiquetanos con <span className="text-red-500 font-semibold">#POVStoreUruguay</span>
           </p>
-          <div className="flex flex-wrap justify-center gap-3">
-            <span className="px-4 py-2 bg-neutral-900 border border-neutral-800 rounded-full text-sm text-neutral-300 hover:border-red-500/50 hover:text-white transition-colors cursor-default">
-              #POV4K
-            </span>
-            <span className="px-4 py-2 bg-neutral-900 border border-neutral-800 rounded-full text-sm text-neutral-300 hover:border-red-500/50 hover:text-white transition-colors cursor-default">
-              #CreadorUruguayo
-            </span>
-            <span className="px-4 py-2 bg-neutral-900 border border-neutral-800 rounded-full text-sm text-neutral-300 hover:border-red-500/50 hover:text-white transition-colors cursor-default">
-              #ContenidoCreativo
-            </span>
+          <div className="flex flex-wrap justify-center gap-2">
+            {['#POV4K', '#ActionCamera', '#ContentCreator'].map((tag) => (
+              <span 
+                key={tag}
+                className="px-3 py-1.5 bg-neutral-900/30 border border-neutral-800 rounded-full text-xs text-neutral-400 hover:border-neutral-700 hover:text-neutral-300 transition-colors"
+              >
+                {tag}
+              </span>
+            ))}
           </div>
         </div>
+
       </div>
     </section>
   );

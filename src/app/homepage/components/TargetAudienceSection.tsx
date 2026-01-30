@@ -6,101 +6,132 @@ interface AudienceCard {
   description: string;
   image: string;
   alt: string;
-  benefits: string[];
+  tags: string[];
   icon: string;
 }
 
 const TargetAudienceSection = () => {
   const audienceData: AudienceCard[] = [
     {
-      title: 'Creadores de Contenido',
-      description: 'YouTubers, TikTokers e influencers que necesitan capturar momentos auténticos desde su perspectiva',
+      title: 'Creadores',
+      description: 'Dale a tus vlogs el ángulo POV auténtico que atrapa a la audiencia.',
       image: "https://img.rocket.new/generatedImages/rocket_gen_img_1cbf2955b-1764705968076.png",
-      alt: 'Young content creator filming video with camera in modern studio setup with ring light',
-      benefits: ['POV auténtico', 'Manos libres', 'Calidad 4K'],
+      alt: 'Content creator filming POV',
+      tags: ['TikTok Ready', '4K', 'Manos Libres'],
       icon: 'VideoCameraIcon'
     },
     {
-      title: 'Deportistas y Aventureros',
-      description: 'Captura tus aventuras extremas, deportes y actividades al aire libre con total libertad',
+      title: 'Aventureros',
+      description: 'Desde la cima de la montaña hasta el fondo del mar. Resistencia total.',
       image: "https://images.unsplash.com/photo-1499749463928-0ea25b91e19a",
-      alt: 'Athletic person mountain biking on rugged trail with action camera mounted on helmet',
-      benefits: ['Resistente', 'Compacta', 'Estabilización'],
+      alt: 'Mountain biker POV',
+      tags: ['IPX4/IP68', 'Estabilización', 'Robusta'],
       icon: 'BoltIcon'
     },
     {
-      title: 'Viajeros y Bloggers',
-      description: 'Documenta tus viajes y experiencias sin cargar equipos pesados o costosos',
+      title: 'Viajeros',
+      description: 'Captura la esencia de tus viajes sin cargar equipos pesados.',
       image: "https://images.unsplash.com/photo-1443689959074-a047eeb9cc43",
-      alt: 'Female travel blogger exploring ancient temple ruins with backpack and camera gear',
-      benefits: ['Ligera', 'Portátil', 'Larga batería'],
+      alt: 'Travel blogger exploring',
+      tags: ['Ultraligera', 'Discreta', 'Batería Larga'],
       icon: 'GlobeAmericasIcon'
     },
     {
-      title: 'Emprendedores',
-      description: 'Crea contenido profesional para tu negocio sin invertir en equipos caros',
+      title: 'Profesionales',
+      description: 'Herramienta clave para mostrar procesos, tutoriales y reviews.',
       image: "https://img.rocket.new/generatedImages/rocket_gen_img_1666b152c-1767844909390.png",
-      alt: 'Young entrepreneur recording product review video in home office with professional lighting',
-      benefits: ['Económica', 'Profesional', 'Fácil de usar'],
+      alt: 'Entrepreneur recording',
+      tags: ['Alta Calidad', 'Fácil Uso', 'Versátil'],
       icon: 'BriefcaseIcon'
     }
   ];
 
   return (
-    <section className="py-24 px-4 bg-neutral-950 border-t border-neutral-900">
-      <div className="max-w-7xl mx-auto">
-        <div className="text-center mb-16">
-          <h2 className="text-4xl md:text-5xl font-heading font-bold text-white mb-6">
-            Diseñada para <span className="text-red-600">Creadores como Vos</span>
-          </h2>
-          <p className="text-lg text-neutral-400 max-w-2xl mx-auto">
-            Sea cual sea tu pasión, nuestra cámara POV se adapta a tu estilo de vida
-          </p>
+    // CAMBIO 1: Fondo oscuro profundo (neutral-950) en lugar de blanco
+    <section className="py-24 px-4 bg-neutral-950 relative overflow-hidden">
+      
+      {/* Elementos decorativos de fondo sutiles (opcional, para profundidad) */}
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-full max-w-7xl pointer-events-none opacity-20">
+         <div className="absolute top-20 left-[-10%] w-[500px] h-[500px] bg-red-600/10 rounded-full blur-3xl" />
+      </div>
+
+      <div className="max-w-7xl mx-auto relative z-10">
+        
+        {/* HEADER OSCURO */}
+        <div className="flex flex-col md:flex-row justify-between items-end mb-12 gap-6">
+          <div className="max-w-2xl">
+            {/* CAMBIO 2: Texto blanco para el título */}
+            <h2 className="text-4xl md:text-6xl font-heading font-bold text-white tracking-tight leading-tight mb-4">
+              Diseñada para <br/>
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-red-500 to-orange-500">
+                Tu Estilo de Vida.
+              </span>
+            </h2>
+            {/* CAMBIO 3: Texto gris claro para el subtítulo */}
+            <p className="text-lg text-neutral-400">
+              No importa qué historia quieras contar, tenemos la herramienta para capturarla.
+            </p>
+          </div>
+          
+          <div className="hidden md:block">
+            <button className="flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-neutral-500 hover:text-red-500 transition-colors group">
+              Explorar Usos
+              <Icon name="ArrowRightIcon" size={16} className="transform group-hover:translate-x-1 transition-transform" />
+            </button>
+          </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          {audienceData.map((audience, index) =>
-            <div
-              key={index}
-              className="bg-black rounded-2xl overflow-hidden border border-neutral-800 hover:border-red-900/50 shadow-lg hover:shadow-[0_0_30px_rgba(220,38,38,0.1)] transition-all duration-300 group"
-            >
-              <div className="relative h-72 overflow-hidden">
-                <AppImage
-                  src={audience.image}
-                  alt={audience.alt}
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out grayscale group-hover:grayscale-0"
-                />
+        {/* GRID "BENTO" STYLE (Las tarjetas ya eran oscuras por dentro, no necesitan cambios) */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 h-auto md:h-[500px]">
+          {audienceData.map((item, index) => {
+            return (
+              <div
+                key={index}
+                // Agregamos un borde muy sutil oscuro para definir las tarjetas en el fondo negro
+                className="group relative h-[400px] md:h-full rounded-3xl overflow-hidden cursor-pointer shadow-lg hover:shadow-2xl hover:shadow-red-900/20 transition-all duration-500 border border-neutral-900/50"
+              >
+                {/* IMAGEN DE FONDO */}
+                <div className="absolute inset-0 w-full h-full">
+                  <AppImage
+                    src={item.image}
+                    alt={item.alt}
+                    className="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-110 grayscale group-hover:grayscale-0"
+                  />
+                  {/* Overlay Gradiente Pro (Negro abajo -> Transparente arriba) */}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/50 to-transparent opacity-90 transition-opacity" />
+                </div>
 
-                <div className="absolute inset-0 bg-gradient-to-t from-black via-black/60 to-transparent opacity-90" />
-                
-                <div className="absolute bottom-6 left-6 flex items-end gap-4">
-                  <div className="w-14 h-14 bg-red-600 rounded-xl flex items-center justify-center shadow-lg transform group-hover:-translate-y-2 transition-transform duration-300">
-                    <Icon name={audience.icon as any} size={28} className="text-white" variant="solid" />
+                {/* CONTENIDO FLOTANTE (Texto blanco sobre fondo oscuro) */}
+                <div className="absolute inset-0 p-6 flex flex-col justify-end items-start text-white">
+                  
+                  {/* Icono flotante superior */}
+                  <div className="absolute top-6 right-6 w-10 h-10 bg-white/10 backdrop-blur-md rounded-full flex items-center justify-center border border-white/20 group-hover:bg-red-600 group-hover:border-red-600 transition-colors duration-300">
+                    <Icon name={item.icon as any} size={20} className="text-white" />
                   </div>
-                  <h3 className="text-2xl font-heading font-bold text-white mb-1 group-hover:text-red-500 transition-colors">
-                    {audience.title}
-                  </h3>
+
+                  {/* Textos */}
+                  <div className="transform translate-y-2 group-hover:translate-y-0 transition-transform duration-300 w-full">
+                    <h3 className="text-3xl font-bold mb-2 text-white group-hover:text-red-500 transition-colors">{item.title}</h3>
+                    <p className="text-neutral-300 text-sm leading-relaxed mb-4 opacity-0 group-hover:opacity-100 transition-opacity duration-300 delay-75 line-clamp-2">
+                      {item.description}
+                    </p>
+
+                    {/* Tags / Benefits (Glassmorphism) */}
+                    <div className="flex flex-wrap gap-2">
+                      {item.tags.slice(0, 2).map((tag, idx) => (
+                        <span 
+                          key={idx} 
+                          className="px-3 py-1 bg-white/5 backdrop-blur-sm border border-white/10 rounded-full text-[10px] font-bold uppercase tracking-wider text-neutral-200 group-hover:bg-red-600/20 group-hover:border-red-500/30 group-hover:text-white transition-all"
+                        >
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
                 </div>
               </div>
-
-              <div className="p-8 space-y-6">
-                <p className="text-neutral-400 text-lg leading-relaxed border-l-2 border-red-900/30 pl-4 group-hover:border-red-600 transition-colors">
-                  {audience.description}
-                </p>
-
-                <div className="flex flex-wrap gap-2">
-                  {audience.benefits.map((benefit, idx) =>
-                    <span
-                      key={idx}
-                      className="px-4 py-1.5 bg-neutral-900 border border-neutral-800 text-neutral-300 text-sm font-medium rounded-full group-hover:border-red-900/50 group-hover:text-white transition-colors"
-                    >
-                      {benefit}
-                    </span>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
+            );
+          })}
         </div>
       </div>
     </section>
