@@ -104,10 +104,10 @@ export default function ProductInfo({
           <Icon name="WifiIcon" size={20} className="text-primary" variant="solid" />
           <span className="text-sm text-foreground">WiFi integrado</span>
         </div>
-        <div className="flex items-center gap-2 p-3 bg-muted rounded-md">
+        {/* <div className="flex items-center gap-2 p-3 bg-muted rounded-md">
           <Icon name="ShieldCheckIcon" size={20} className="text-primary" variant="solid" />
           <span className="text-sm text-foreground">Garantía 1 año</span>
-        </div>
+        </div> */}
       </div>
     </div>
   );

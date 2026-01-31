@@ -49,7 +49,7 @@ const FooterSection = () => {
                   href="/products/c98290bd-884f-49ce-9554-71a0210638f8"
                   className="text-sm text-muted-foreground hover:text-primary transition-smooth"
                 >
-                  C200 Pro
+                  C200
                 </Link>
               </li>
               <li>

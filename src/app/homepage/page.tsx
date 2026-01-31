@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
   title: 'POV Store Uruguay - Cámaras 4K para Creadores de Contenido',
-  description: 'Cámaras POV mini 4K profesionales a precios accesibles. Perfectas para YouTubers, TikTokers e influencers uruguayos. Envío gratis y garantía 12 meses.',
+  description: 'Cámaras POV mini 4K profesionales a precios accesibles. Perfectas para YouTubers, TikTokers e influencers uruguayos. Envío gratis y despacho en 24hs.',
 };
 
 export default function Homepage() {

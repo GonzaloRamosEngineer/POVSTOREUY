@@ -306,7 +306,7 @@ export default function ProductDetailsInteractive({ productInitial, galleryIniti
 
               <div className="flex items-center gap-3 text-sm text-gray-600 px-2">
                  <Icon name="TruckIcon" size={20} className="text-green-600" />
-                 <span>Envío gratis en compras mayores a $2000</span>
+                 <span>Despacho en 24 / 48 hs</span>
               </div>
           </div>
         </div>

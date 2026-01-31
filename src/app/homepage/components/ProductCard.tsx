@@ -154,22 +154,16 @@ const ProductCard = ({
         </ul>
 
         {/* Actions */}
-        <div className="pt-4 space-y-3">
-          <button
-            onClick={() => onAddToCart(id)}
-            className="w-full px-6 py-3.5 bg-red-600 hover:bg-red-500 text-white text-center font-bold rounded-xl transition-all shadow-[0_4px_14px_0_rgba(220,38,38,0.39)] hover:shadow-[0_6px_20px_rgba(220,38,38,0.23)] hover:-translate-y-0.5 active:translate-y-0 uppercase tracking-wide flex items-center justify-center gap-2"
-          >
-            <Icon name="ShoppingCartIcon" size={18} variant="solid" />
-            <span>Comprar Ahora</span>
-          </button>
-          
-          <Link
-            href={productUrl}
-            className="block w-full px-6 py-3 bg-transparent hover:bg-white/5 text-neutral-400 hover:text-white text-center font-medium rounded-xl transition-all border border-neutral-700 hover:border-neutral-500"
-          >
-            Ver Detalles
-          </Link>
-        </div>
+<div className="pt-4">
+  <Link
+    href={productUrl}
+    className="w-full px-6 py-3.5 bg-red-600 hover:bg-red-500 text-white text-center font-bold rounded-xl transition-all shadow-[0_4px_14px_0_rgba(220,38,38,0.39)] hover:shadow-[0_6px_20px_rgba(220,38,38,0.23)] hover:-translate-y-0.5 active:translate-y-0 uppercase tracking-wide flex items-center justify-center gap-2"
+  >
+    <Icon name="ShoppingCartIcon" size={18} variant="solid" />
+    <span>Comprar Ahora</span>
+  </Link>
+</div>
+
       </div>
     </div>
   );

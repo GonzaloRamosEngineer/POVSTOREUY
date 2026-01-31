@@ -118,8 +118,8 @@ const HeroSection = ({ onCtaClick, basicStock, proStock }: HeroSectionProps) => 
                 <span>Envío gratis</span>
               </div>
               <div className="flex items-center gap-2">
-                <Icon name="ShieldCheckIcon" size={18} className="text-red-500" />
-                <span>Garantía 12 meses</span>
+                <Icon name="ClockIcon" size={18} className="text-red-500" />
+                <span>Despacho en 24 / 48 hs</span>
               </div>
               <div className="flex items-center gap-2">
                 <Icon name="CreditCardIcon" size={18} className="text-red-500" />
