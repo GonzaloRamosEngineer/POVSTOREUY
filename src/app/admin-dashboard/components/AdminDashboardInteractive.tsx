@@ -401,14 +401,16 @@ export default function AdminDashboardInteractive() {
     <div className="space-y-8">
       {/* Métricas Operativas */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <MetricCard title="Pedidos Entregados" value={String(metrics.completedOrders)} change={0} icon="CheckBadgeIcon" trend="up" />
-        <MetricCard title="Pendientes (PAGADOS)" value={String(metrics.pendingPaid)} change={0} icon="CurrencyDollarIcon" trend="up" />
+        <MetricCard title="Volumen Total" value={String(metrics.totalOrders)} change={12.5} icon="ShoppingBagIcon" trend="up" />
         <MetricCard title="Pendientes (SIN PAGO)" value={String(metrics.pendingUnpaid)} change={0} icon="ClockIcon" trend="down" />
+        <MetricCard title="Pendientes (PAGADOS)" value={String(metrics.pendingPaid)} change={0} icon="CurrencyDollarIcon" trend="up" />
+        <MetricCard title="Pedidos Entregados" value={String(metrics.completedOrders)} change={0} icon="CheckBadgeIcon" trend="up" />
+        
       </div>
 
       {/* Métricas de Negocio */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <MetricCard title="Volumen Total" value={String(metrics.totalOrders)} change={12.5} icon="ShoppingBagIcon" trend="up" />
+        
         <MetricCard title="Caja Real (UYU)" value={toCurrencyUYU(metrics.revenue)} change={8.2} icon="CurrencyDollarIcon" trend="up" />
         <MetricCard title="Stock Total" value={String(metrics.stockTotal)} change={-2.4} icon="CubeIcon" trend="down" />
         <MetricCard title="Tasa Conversión" value={`${((metrics.completedOrders / (metrics.totalOrders || 1)) * 100).toFixed(1)}%`} change={1.2} icon="ChartBarIcon" trend="up" />
