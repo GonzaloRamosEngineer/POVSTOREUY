@@ -52,25 +52,59 @@ export default function OrderDetailsModal({ orderId, isOpen, onClose }: OrderDet
   const [updating, setUpdating] = useState(false);
   const [trackingInput, setTrackingInput] = useState('');
 
-  // ✅ Función robusta para formatear el número para WhatsApp
+  useEffect(() => {
+    if (isOpen && orderId) fetchOrderDetails();
+  }, [isOpen, orderId]);
+
+  const fetchOrderDetails = async () => {
+    setLoading(true);
+    try {
+      const response = await fetch(`/api/admin/orders/${orderId}`);
+      const data = await response.json();
+      setOrderDetails(data);
+      setTrackingInput(data.tracking_number || '');
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ✅ Función de "magia" para WhatsApp en Uruguay
   const openWhatsApp = (phone: string) => {
-    // 1. Eliminar todo lo que no sea un número (espacios, guiones, paréntesis)
-    let cleanNumber = phone.replace(/\D/g, '');
+    let cleanNumber = phone.replace(/\D/g, ''); // Limpia todo lo que no sea número
     
-    // 2. Si el número empieza con '0', quitarlo (ej: 098... -> 98...)
     if (cleanNumber.startsWith('0')) {
-      cleanNumber = cleanNumber.substring(1);
+      cleanNumber = cleanNumber.substring(1); // Quita el 0 inicial (098 -> 98)
     }
     
-    // 3. Si no tiene el código de país de Uruguay (598), agregarlo
     if (!cleanNumber.startsWith('598')) {
-      cleanNumber = '598' + cleanNumber;
+      cleanNumber = '598' + cleanNumber; // Agrega el código de Uruguay si no está
     }
     
     window.open(`https://wa.me/${cleanNumber}`, '_blank');
   };
 
-  // ... (useEffect, fetchOrderDetails y handleUpdateOrder se mantienen igual)
+  const handleUpdateOrder = async (newStatus: string) => {
+    setUpdating(true);
+    try {
+      const response = await fetch(`/api/admin/orders/${orderId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus, tracking_number: trackingInput }),
+      });
+      if (response.ok) await fetchOrderDetails();
+    } catch (err) {
+      alert('Error al actualizar');
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  const getPreviousStatus = (status: string) => {
+    const steps: Record<string, string> = { processing: 'pending', ready: 'processing', shipped: 'ready', completed: 'shipped' };
+    return steps[status] || null;
+  };
 
   if (!isOpen) return null;
 
@@ -81,10 +115,10 @@ export default function OrderDetailsModal({ orderId, isOpen, onClose }: OrderDet
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-3 border-b border-border bg-card/50">
           <div className="flex items-center gap-2">
-            <h2 className="text-sm font-black uppercase tracking-tighter">Panel de Gestión</h2>
+            <h2 className="text-sm font-black uppercase tracking-tighter text-foreground">Panel de Gestión</h2>
             {orderDetails && <span className="text-[10px] bg-primary text-primary-foreground px-2 py-0.5 rounded font-mono">#{orderDetails.order_number}</span>}
           </div>
-          <button onClick={onClose} className="p-1 hover:bg-muted rounded-full transition-colors"><Icon name="XMarkIcon" size={18} /></button>
+          <button onClick={onClose} className="p-1 hover:bg-muted rounded-full transition-colors text-foreground"><Icon name="XMarkIcon" size={18} /></button>
         </div>
 
         <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6">
@@ -95,35 +129,96 @@ export default function OrderDetailsModal({ orderId, isOpen, onClose }: OrderDet
               
               {/* Columna Izquierda: Operaciones */}
               <div className="lg:col-span-8 space-y-6">
-                {/* ... (ACCIONES DE DESPACHO Y PRODUCTOS se mantienen igual) */}
+                
+                {/* ACCIONES DE DESPACHO */}
+                <div className="bg-card border-2 border-primary/10 rounded-2xl p-5 shadow-sm relative">
+                  <div className="flex justify-between items-center mb-5">
+                    <h3 className="text-xs font-black text-primary uppercase flex items-center gap-2">
+                      <Icon name="ClipboardDocumentCheckIcon" size={16} /> Flujo Operativo
+                    </h3>
+                    {getPreviousStatus(orderDetails.order_status) && (
+                      <button onClick={() => handleUpdateOrder(getPreviousStatus(orderDetails.order_status)!)} className="text-[9px] font-bold text-muted-foreground hover:text-error uppercase flex items-center gap-1">
+                        <Icon name="ArrowUturnLeftIcon" size={10} /> Volver a {getPreviousStatus(orderDetails.order_status)}
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="flex flex-wrap gap-3">
+                    {orderDetails.order_status === 'pending' && (
+                      <button onClick={() => handleUpdateOrder('processing')} className="flex-1 py-3 bg-accent text-white rounded-xl text-xs font-black uppercase hover:scale-[1.02] transition-transform">Procesar Pedido</button>
+                    )}
+                    {orderDetails.order_status === 'processing' && (
+                      <button onClick={() => handleUpdateOrder('ready')} className="flex-1 py-3 bg-purple-600 text-white rounded-xl text-xs font-black uppercase hover:scale-[1.02] transition-transform">Listo para Envío</button>
+                    )}
+                    {(orderDetails.order_status === 'ready' || orderDetails.order_status === 'shipped') && (
+                      <div className="flex flex-1 gap-2 min-w-[300px]">
+                        <input type="text" className="flex-1 p-3 border-2 border-muted rounded-xl text-xs bg-background focus:border-primary outline-none text-foreground" placeholder="Nro Tracking (UES, Mirtrans...)" value={trackingInput} onChange={(e) => setTrackingInput(e.target.value)} />
+                        <button onClick={() => handleUpdateOrder('shipped')} disabled={!trackingInput} className="px-6 py-3 bg-blue-600 text-white rounded-xl text-xs font-black uppercase disabled:opacity-50">Despachar</button>
+                      </div>
+                    )}
+                    {orderDetails.order_status === 'shipped' && (
+                      <button onClick={() => handleUpdateOrder('completed')} className="flex-1 py-3 bg-success text-white rounded-xl text-xs font-black uppercase">Confirmar Entrega</button>
+                    )}
+                  </div>
+                </div>
+
+                {/* PRODUCTOS */}
+                <div className="bg-card rounded-2xl border border-border overflow-hidden">
+                  <div className="px-4 py-2 bg-muted/20 border-b border-border text-[10px] font-black uppercase text-foreground">Artículos del Pedido</div>
+                  <div className="divide-y divide-border">
+                    {orderDetails.items?.map((item) => (
+                      <div key={item.id} className="flex items-center gap-4 p-4">
+                        <img src={item.product_image_url} className="w-12 h-12 object-cover rounded-lg border border-border" alt="" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-black truncate text-foreground">{item.product_name}</p>
+                          <p className="text-[10px] text-muted-foreground mt-1 uppercase">CANTIDAD: {item.quantity} • UNIT: ${Number(item.unit_price).toLocaleString('es-UY')}</p>
+                        </div>
+                        <p className="text-sm font-black text-primary">${Number(item.total_price).toLocaleString('es-UY')}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </div>
 
-              {/* Columna Derecha: Información de Referencia */}
+              {/* Columna Derecha: Información */}
               <div className="lg:col-span-4 space-y-6">
-                {/* Resumen de Pago */}
-                {/* ... (Se mantiene igual) */}
-
-                {/* Datos de Contacto */}
                 <div className="bg-card rounded-2xl border border-border p-5 space-y-4">
+                  <div className="flex justify-between items-baseline border-b border-border pb-4">
+                    <span className="text-[10px] font-black uppercase text-muted-foreground">Total Pedido</span>
+                    <span className="text-2xl font-black text-primary">${Number(orderDetails.total).toLocaleString('es-UY')}</span>
+                  </div>
+                  <div className="space-y-2">
+                    <p className="text-[9px] font-black text-muted-foreground uppercase">Estado del Pago</p>
+                    <div className={`p-2 rounded-lg border flex items-center justify-between ${orderDetails.payment_status === 'completed' ? 'border-success/20 bg-success/5 text-success' : 'border-warning/20 bg-warning/5 text-warning'}`}>
+                      <span className="text-[10px] font-black uppercase">{orderDetails.payment_status === 'completed' ? 'Pagado' : 'Pendiente'}</span>
+                      <Icon name={orderDetails.payment_status === 'completed' ? 'CheckCircleIcon' : 'ClockIcon'} size={14} />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-card rounded-2xl border border-border p-5 space-y-4 text-foreground">
                   <section>
                     <h4 className="text-[10px] font-black text-muted-foreground uppercase mb-2">Comprador</h4>
                     <p className="text-xs font-black leading-tight">{orderDetails.customer_name}</p>
                     <div className="flex items-center gap-2 mt-3 p-2 bg-muted/30 rounded-lg border border-border">
                       <Icon name="PhoneIcon" size={14} className="text-primary" />
-                      {/* Mostramos el número tal cual está en DB para visualización */}
                       <span className="text-xs font-mono font-bold">{orderDetails.customer_phone}</span>
                     </div>
                   </section>
-                  {/* ... (Sección de Envío se mantiene igual) */}
+                  <section className="pt-4 border-t border-border">
+                    <h4 className="text-[10px] font-black text-muted-foreground uppercase mb-2">Envío</h4>
+                    <p className="text-[10px] font-bold leading-relaxed">{orderDetails.shipping_address || 'RETIRO EN LOCAL'}</p>
+                    <p className="text-[10px] text-muted-foreground uppercase mt-1">{orderDetails.shipping_city}, {orderDetails.shipping_department}</p>
+                  </section>
                 </div>
               </div>
             </div>
           )}
         </div>
 
-        {/* Footer con WhatsApp Directo usando la nueva función */}
+        {/* Footer */}
         <div className="p-4 border-t border-border bg-card/80 flex justify-between items-center">
-          <button onClick={onClose} className="px-5 py-2 text-[10px] font-black uppercase border border-border rounded-xl hover:bg-muted transition-colors">Cerrar</button>
+          <button onClick={onClose} className="px-5 py-2 text-[10px] font-black uppercase border border-border rounded-xl hover:bg-muted transition-colors text-foreground">Cerrar</button>
           {orderDetails && (
             <button 
               onClick={() => openWhatsApp(orderDetails.customer_phone)}
