@@ -27,6 +27,21 @@ export default function OrdersTable({ orders, onRefresh }: OrdersTableProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
+  // ✅ Función robusta para formatear el número para WhatsApp (Uruguay 598)
+  const openWhatsApp = (phone: string) => {
+    let cleanNumber = phone.replace(/\D/g, ''); // Limpia todo lo que no sea número
+    
+    if (cleanNumber.startsWith('0')) {
+      cleanNumber = cleanNumber.substring(1); // Quita el 0 inicial (098 -> 98)
+    }
+    
+    if (!cleanNumber.startsWith('598')) {
+      cleanNumber = '598' + cleanNumber; // Agrega el código de Uruguay si no está
+    }
+    
+    window.open(`https://wa.me/${cleanNumber}`, '_blank');
+  };
+
   const handleRefresh = async () => {
     if (typeof onRefresh !== 'function') return;
     setIsRefreshing(true);
@@ -72,7 +87,7 @@ export default function OrdersTable({ orders, onRefresh }: OrdersTableProps) {
       </div>
 
       {/* --- VISTA DESKTOP: TABLA --- */}
-      <div className="hidden lg:block overflow-x-auto border border-border rounded-xl bg-card">
+      <div className="hidden lg:block overflow-x-auto border border-border rounded-xl bg-card text-foreground">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-border text-muted-foreground font-medium bg-muted/20">
@@ -87,10 +102,10 @@ export default function OrdersTable({ orders, onRefresh }: OrdersTableProps) {
           <tbody className="divide-y divide-border">
             {orders.map((order) => (
               <tr key={order.id} className="hover:bg-muted/30 transition-colors">
-                <td className="py-4 px-4 font-mono font-bold text-foreground">#{order.order_number}</td>
+                <td className="py-4 px-4 font-mono font-bold">#{order.order_number}</td>
                 <td className="py-4 px-4">
-                  <div className="flex flex-col">
-                    <span className="font-bold text-foreground">{order.customer_name}</span>
+                  <div className="flex flex-col text-foreground">
+                    <span className="font-bold">{order.customer_name}</span>
                     <span className="text-[10px] text-muted-foreground">{order.customer_email}</span>
                   </div>
                 </td>
@@ -100,8 +115,8 @@ export default function OrdersTable({ orders, onRefresh }: OrdersTableProps) {
                   </span>
                 </td>
                 <td className="py-4 px-4">
-                  <div className="flex flex-col gap-1">
-                    <span className="text-[10px] font-bold uppercase text-foreground">{order.payment_method}</span>
+                  <div className="flex flex-col gap-1 text-foreground">
+                    <span className="text-[10px] font-bold uppercase">{order.payment_method}</span>
                     <span className={`text-[9px] font-black underline ${order.payment_status === 'completed' ? 'text-success' : 'text-warning'}`}>
                       {order.payment_status === 'completed' ? 'PAGADO' : 'PENDIENTE'}
                     </span>
@@ -114,7 +129,7 @@ export default function OrdersTable({ orders, onRefresh }: OrdersTableProps) {
                       <Icon name="EyeIcon" size={18} />
                     </button>
                     <button 
-                      onClick={() => window.open(`https://wa.me/${order.customer_phone.replace(/\D/g, '')}`, '_blank')}
+                      onClick={() => openWhatsApp(order.customer_phone)}
                       className="p-2 hover:bg-success/10 rounded-lg text-success transition-colors"
                     >
                       <Icon name="ChatBubbleLeftRightIcon" size={18} />
@@ -127,7 +142,7 @@ export default function OrdersTable({ orders, onRefresh }: OrdersTableProps) {
         </table>
       </div>
 
-      {/* --- VISTA MOBILE: CARDS (ZOOM EFECTO) --- */}
+      {/* --- VISTA MOBILE: CARDS --- */}
       <div className="grid grid-cols-1 gap-4 lg:hidden">
         {orders.map((order) => (
           <div 
@@ -165,9 +180,9 @@ export default function OrdersTable({ orders, onRefresh }: OrdersTableProps) {
               <button 
                 onClick={(e) => {
                   e.stopPropagation();
-                  window.open(`https://wa.me/${order.customer_phone.replace(/\D/g, '')}`, '_blank');
+                  openWhatsApp(order.customer_phone);
                 }}
-                className="px-4 py-2 bg-[#25D366] text-white rounded-lg flex items-center justify-center"
+                className="px-4 py-2 bg-[#25D366] text-white rounded-lg flex items-center justify-center shadow-md active:scale-95"
               >
                 <Icon name="ChatBubbleLeftRightIcon" size={16} />
               </button>
