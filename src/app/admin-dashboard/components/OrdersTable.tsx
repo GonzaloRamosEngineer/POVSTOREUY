@@ -4,7 +4,6 @@ import { useState } from 'react';
 import Icon from '@/components/ui/AppIcon';
 import OrderDetailsModal from './OrderDetailsModal';
 
-// Interfaz para los datos que vienen de la base de datos
 interface Order {
   id: string; 
   order_number: string; 
@@ -20,7 +19,7 @@ interface Order {
 
 interface OrdersTableProps {
   orders: Order[];
-  onRefresh?: () => Promise<void>; // ✅ Ahora es opcional con el "?"
+  onRefresh?: () => Promise<void>;
 }
 
 export default function OrdersTable({ orders, onRefresh }: OrdersTableProps) {
@@ -29,19 +28,13 @@ export default function OrdersTable({ orders, onRefresh }: OrdersTableProps) {
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   const handleRefresh = async () => {
-    // ✅ Verificamos si la función existe antes de llamarla para evitar el crash
-    if (typeof onRefresh !== 'function') {
-      console.warn('La prop onRefresh no fue proporcionada al OrdersTable');
-      return;
-    }
-
+    if (typeof onRefresh !== 'function') return;
     setIsRefreshing(true);
     try {
       await onRefresh();
     } catch (err) {
       console.error('Error al refrescar:', err);
     } finally {
-      // Pequeño delay para suavizar la animación del icono
       setTimeout(() => setIsRefreshing(false), 600);
     }
   };
@@ -65,23 +58,20 @@ export default function OrdersTable({ orders, onRefresh }: OrdersTableProps) {
 
   return (
     <div className="space-y-4">
-      {/* Cabecera con botón de refresco */}
+      {/* Header con Botón de Refresh */}
       <div className="flex justify-between items-center px-2">
         <h2 className="text-lg font-bold text-foreground">Pedidos Recientes</h2>
         <button 
           onClick={handleRefresh}
           disabled={isRefreshing}
-          className="flex items-center gap-2 px-3 py-1.5 bg-card hover:bg-muted border border-border rounded-lg text-xs font-bold transition-all shadow-sm active:scale-95 disabled:opacity-50"
+          className="flex items-center gap-2 px-3 py-2 bg-card hover:bg-muted border border-border rounded-lg text-xs font-bold transition-all active:scale-95 disabled:opacity-50"
         >
-          <Icon 
-            name="ArrowPathIcon" 
-            size={14} 
-            className={`text-primary ${isRefreshing ? 'animate-spin' : ''}`} 
-          />
-          {isRefreshing ? 'Actualizando...' : 'Actualizar'}
+          <Icon name="ArrowPathIcon" size={14} className={`text-primary ${isRefreshing ? 'animate-spin' : ''}`} />
+          <span className="hidden sm:inline">{isRefreshing ? 'Actualizando...' : 'Actualizar'}</span>
         </button>
       </div>
 
+      {/* --- VISTA DESKTOP: TABLA --- */}
       <div className="hidden lg:block overflow-x-auto border border-border rounded-xl bg-card">
         <table className="w-full text-sm">
           <thead>
@@ -97,9 +87,7 @@ export default function OrdersTable({ orders, onRefresh }: OrdersTableProps) {
           <tbody className="divide-y divide-border">
             {orders.map((order) => (
               <tr key={order.id} className="hover:bg-muted/30 transition-colors">
-                <td className="py-4 px-4 font-mono font-bold text-foreground">
-                  #{order.order_number}
-                </td>
+                <td className="py-4 px-4 font-mono font-bold text-foreground">#{order.order_number}</td>
                 <td className="py-4 px-4">
                   <div className="flex flex-col">
                     <span className="font-bold text-foreground">{order.customer_name}</span>
@@ -114,22 +102,15 @@ export default function OrdersTable({ orders, onRefresh }: OrdersTableProps) {
                 <td className="py-4 px-4">
                   <div className="flex flex-col gap-1">
                     <span className="text-[10px] font-bold uppercase text-foreground">{order.payment_method}</span>
-                    <span className={`text-[9px] font-black underline ${
-                      order.payment_status === 'completed' ? 'text-success' : 'text-warning'
-                    }`}>
+                    <span className={`text-[9px] font-black underline ${order.payment_status === 'completed' ? 'text-success' : 'text-warning'}`}>
                       {order.payment_status === 'completed' ? 'PAGADO' : 'PENDIENTE'}
                     </span>
                   </div>
                 </td>
-                <td className="py-4 px-4 text-right font-black text-primary">
-                  ${Number(order.total).toLocaleString('es-UY')}
-                </td>
+                <td className="py-4 px-4 text-right font-black text-primary">${Number(order.total).toLocaleString('es-UY')}</td>
                 <td className="py-4 px-4">
                   <div className="flex justify-center gap-2">
-                    <button 
-                      onClick={() => handleViewDetails(order.order_number)} 
-                      className="p-2 hover:bg-muted rounded-lg text-primary transition-colors"
-                    >
+                    <button onClick={() => handleViewDetails(order.order_number)} className="p-2 hover:bg-muted rounded-lg text-primary transition-colors">
                       <Icon name="EyeIcon" size={18} />
                     </button>
                     <button 
@@ -144,6 +125,55 @@ export default function OrdersTable({ orders, onRefresh }: OrdersTableProps) {
             ))}
           </tbody>
         </table>
+      </div>
+
+      {/* --- VISTA MOBILE: CARDS (ZOOM EFECTO) --- */}
+      <div className="grid grid-cols-1 gap-4 lg:hidden">
+        {orders.map((order) => (
+          <div 
+            key={order.id} 
+            onClick={() => handleViewDetails(order.order_number)}
+            className="bg-card border border-border rounded-xl p-4 shadow-sm active:scale-[0.98] transition-all duration-200 hover:border-primary/30"
+          >
+            <div className="flex justify-between items-start mb-3">
+              <div className="flex flex-col">
+                <span className="text-[10px] font-mono font-bold text-muted-foreground">#{order.order_number}</span>
+                <span className="font-bold text-foreground">{order.customer_name}</span>
+              </div>
+              <span className={`px-2 py-1 rounded-full text-[9px] font-black uppercase ${getStatusColor(order.order_status)}`}>
+                {order.order_status}
+              </span>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-2 border-t border-border pt-3 mt-3">
+              <div>
+                <p className="text-[9px] text-muted-foreground uppercase font-bold">Pago ({order.payment_method})</p>
+                <p className={`text-xs font-black ${order.payment_status === 'completed' ? 'text-success' : 'text-warning'}`}>
+                  {order.payment_status === 'completed' ? 'PAGADO' : 'PENDIENTE'}
+                </p>
+              </div>
+              <div className="text-right">
+                <p className="text-[9px] text-muted-foreground uppercase font-bold">Monto Total</p>
+                <p className="text-sm font-black text-primary">${Number(order.total).toLocaleString('es-UY')}</p>
+              </div>
+            </div>
+
+            <div className="flex gap-2 mt-4">
+              <button className="flex-1 py-2 bg-muted text-foreground rounded-lg text-xs font-bold flex items-center justify-center gap-2">
+                <Icon name="EyeIcon" size={14} /> Detalles
+              </button>
+              <button 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  window.open(`https://wa.me/${order.customer_phone.replace(/\D/g, '')}`, '_blank');
+                }}
+                className="px-4 py-2 bg-[#25D366] text-white rounded-lg flex items-center justify-center"
+              >
+                <Icon name="ChatBubbleLeftRightIcon" size={16} />
+              </button>
+            </div>
+          </div>
+        ))}
       </div>
 
       {/* Modal de Gestión */}
