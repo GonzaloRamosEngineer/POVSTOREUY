@@ -2,114 +2,141 @@
 
 import { useState } from 'react';
 import Icon from '@/components/ui/AppIcon';
+import OrderDetailsModal from './OrderDetailsModal';
 
+// Interfaz para los datos que vienen de la base de datos
 interface Order {
-  id: string;
-  customer: string;
-  email: string;
-  product: string;
-  amount: number;
-  status: 'pending' | 'completed' | 'processing' | 'cancelled';
-  paymentMethod: string;
-  date: string;
+  id: string; 
+  order_number: string; 
+  customer_name: string;
+  customer_email: string;
+  customer_phone: string;
+  total: number;
+  order_status: 'pending' | 'completed' | 'processing' | 'cancelled' | 'ready' | 'shipped';
+  payment_method: string;
+  payment_status: 'pending' | 'completed' | 'failed';
+  created_at: string;
 }
 
 interface OrdersTableProps {
   orders: Order[];
+  onRefresh?: () => Promise<void>; // ✅ Ahora es opcional con el "?"
 }
 
-export default function OrdersTable({ orders }: OrdersTableProps) {
-  const [expandedOrder, setExpandedOrder] = useState<string | null>(null);
+export default function OrdersTable({ orders, onRefresh }: OrdersTableProps) {
+  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'completed':
-        return 'bg-success/10 text-success';
-      case 'processing':
-        return 'bg-accent/10 text-accent';
-      case 'pending':
-        return 'bg-warning/10 text-warning';
-      case 'cancelled':
-        return 'bg-error/10 text-error';
-      default:
-        return 'bg-muted text-muted-foreground';
+  const handleRefresh = async () => {
+    // ✅ Verificamos si la función existe antes de llamarla para evitar el crash
+    if (typeof onRefresh !== 'function') {
+      console.warn('La prop onRefresh no fue proporcionada al OrdersTable');
+      return;
+    }
+
+    setIsRefreshing(true);
+    try {
+      await onRefresh();
+    } catch (err) {
+      console.error('Error al refrescar:', err);
+    } finally {
+      // Pequeño delay para suavizar la animación del icono
+      setTimeout(() => setIsRefreshing(false), 600);
     }
   };
 
-  const getStatusText = (status: string) => {
-    switch (status) {
-      case 'completed':
-        return 'Completado';
-      case 'processing':
-        return 'Procesando';
-      case 'pending':
-        return 'Pendiente';
-      case 'cancelled':
-        return 'Cancelado';
-      default:
-        return status;
-    }
+  const handleViewDetails = (orderNumber: string) => {
+    setSelectedOrderId(orderNumber);
+    setIsModalOpen(true);
+  };
+
+  const getStatusColor = (status: string) => {
+    const colors: Record<string, string> = {
+      completed: 'bg-success/10 text-success',
+      processing: 'bg-accent/10 text-accent',
+      ready: 'bg-purple-500/10 text-purple-600',
+      shipped: 'bg-blue-500/10 text-blue-600',
+      pending: 'bg-warning/10 text-warning',
+      cancelled: 'bg-error/10 text-error',
+    };
+    return colors[status] || 'bg-muted text-muted-foreground';
   };
 
   return (
-    <>
-      {/* Desktop Table */}
-      <div className="hidden lg:block overflow-x-auto">
-        <table className="w-full">
+    <div className="space-y-4">
+      {/* Cabecera con botón de refresco */}
+      <div className="flex justify-between items-center px-2">
+        <h2 className="text-lg font-bold text-foreground">Pedidos Recientes</h2>
+        <button 
+          onClick={handleRefresh}
+          disabled={isRefreshing}
+          className="flex items-center gap-2 px-3 py-1.5 bg-card hover:bg-muted border border-border rounded-lg text-xs font-bold transition-all shadow-sm active:scale-95 disabled:opacity-50"
+        >
+          <Icon 
+            name="ArrowPathIcon" 
+            size={14} 
+            className={`text-primary ${isRefreshing ? 'animate-spin' : ''}`} 
+          />
+          {isRefreshing ? 'Actualizando...' : 'Actualizar'}
+        </button>
+      </div>
+
+      <div className="hidden lg:block overflow-x-auto border border-border rounded-xl bg-card">
+        <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-border">
-              <th className="text-left py-4 px-4 text-sm font-medium text-muted-foreground">ID Pedido</th>
-              <th className="text-left py-4 px-4 text-sm font-medium text-muted-foreground">Cliente</th>
-              <th className="text-left py-4 px-4 text-sm font-medium text-muted-foreground">Producto</th>
-              <th className="text-left py-4 px-4 text-sm font-medium text-muted-foreground">Monto</th>
-              <th className="text-left py-4 px-4 text-sm font-medium text-muted-foreground">Estado</th>
-              <th className="text-left py-4 px-4 text-sm font-medium text-muted-foreground">Pago</th>
-              <th className="text-left py-4 px-4 text-sm font-medium text-muted-foreground">Fecha</th>
-              <th className="text-left py-4 px-4 text-sm font-medium text-muted-foreground">Acciones</th>
+            <tr className="border-b border-border text-muted-foreground font-medium bg-muted/20">
+              <th className="py-4 px-4 text-left">Pedido</th>
+              <th className="py-4 px-4 text-left">Cliente</th>
+              <th className="py-4 px-4 text-left">Estado</th>
+              <th className="py-4 px-4 text-left">Pago</th>
+              <th className="py-4 px-4 text-right">Monto</th>
+              <th className="py-4 px-4 text-center">Acciones</th>
             </tr>
           </thead>
-          <tbody>
+          <tbody className="divide-y divide-border">
             {orders.map((order) => (
-              <tr key={order.id} className="border-b border-border hover:bg-muted/50 transition-smooth">
-                <td className="py-4 px-4">
-                  <span className="text-sm font-mono text-foreground">#{order.id}</span>
+              <tr key={order.id} className="hover:bg-muted/30 transition-colors">
+                <td className="py-4 px-4 font-mono font-bold text-foreground">
+                  #{order.order_number}
                 </td>
                 <td className="py-4 px-4">
                   <div className="flex flex-col">
-                    <span className="text-sm font-medium text-foreground">{order.customer}</span>
-                    <span className="text-xs text-muted-foreground">{order.email}</span>
+                    <span className="font-bold text-foreground">{order.customer_name}</span>
+                    <span className="text-[10px] text-muted-foreground">{order.customer_email}</span>
                   </div>
                 </td>
                 <td className="py-4 px-4">
-                  <span className="text-sm text-foreground">{order.product}</span>
-                </td>
-                <td className="py-4 px-4">
-                  <span className="text-sm font-mono font-medium text-primary">${order.amount.toLocaleString('es-UY')}</span>
-                </td>
-                <td className="py-4 px-4">
-                  <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(order.status)}`}>
-                    {getStatusText(order.status)}
+                  <span className={`px-2 py-1 rounded-full text-[10px] font-black uppercase ${getStatusColor(order.order_status)}`}>
+                    {order.order_status}
                   </span>
                 </td>
                 <td className="py-4 px-4">
-                  <span className="text-sm text-foreground">{order.paymentMethod}</span>
+                  <div className="flex flex-col gap-1">
+                    <span className="text-[10px] font-bold uppercase text-foreground">{order.payment_method}</span>
+                    <span className={`text-[9px] font-black underline ${
+                      order.payment_status === 'completed' ? 'text-success' : 'text-warning'
+                    }`}>
+                      {order.payment_status === 'completed' ? 'PAGADO' : 'PENDIENTE'}
+                    </span>
+                  </div>
+                </td>
+                <td className="py-4 px-4 text-right font-black text-primary">
+                  ${Number(order.total).toLocaleString('es-UY')}
                 </td>
                 <td className="py-4 px-4">
-                  <span className="text-sm text-muted-foreground">{order.date}</span>
-                </td>
-                <td className="py-4 px-4">
-                  <div className="flex items-center gap-2">
-                    <button
-                      className="flex items-center justify-center w-8 h-8 rounded-md hover:bg-muted transition-smooth focus-ring"
-                      aria-label="Ver detalles del pedido"
+                  <div className="flex justify-center gap-2">
+                    <button 
+                      onClick={() => handleViewDetails(order.order_number)} 
+                      className="p-2 hover:bg-muted rounded-lg text-primary transition-colors"
                     >
-                      <Icon name="EyeIcon" size={18} className="text-foreground" />
+                      <Icon name="EyeIcon" size={18} />
                     </button>
-                    <button
-                      className="flex items-center justify-center w-8 h-8 rounded-md hover:bg-muted transition-smooth focus-ring"
-                      aria-label="Editar pedido"
+                    <button 
+                      onClick={() => window.open(`https://wa.me/${order.customer_phone.replace(/\D/g, '')}`, '_blank')}
+                      className="p-2 hover:bg-success/10 rounded-lg text-success transition-colors"
                     >
-                      <Icon name="PencilIcon" size={18} className="text-foreground" />
+                      <Icon name="ChatBubbleLeftRightIcon" size={18} />
                     </button>
                   </div>
                 </td>
@@ -119,65 +146,17 @@ export default function OrdersTable({ orders }: OrdersTableProps) {
         </table>
       </div>
 
-      {/* Mobile Cards */}
-      <div className="lg:hidden space-y-4">
-        {orders.map((order) => (
-          <div key={order.id} className="bg-card rounded-lg p-4 card-elevation">
-            <div className="flex items-start justify-between mb-3">
-              <div className="flex-1">
-                <span className="text-xs font-mono text-muted-foreground">#{order.id}</span>
-                <h4 className="text-sm font-medium text-foreground mt-1">{order.customer}</h4>
-                <p className="text-xs text-muted-foreground mt-0.5">{order.email}</p>
-              </div>
-              <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(order.status)}`}>
-                {getStatusText(order.status)}
-              </span>
-            </div>
-
-            <div className="space-y-2 mb-3">
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-muted-foreground">Producto:</span>
-                <span className="text-sm text-foreground">{order.product}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-muted-foreground">Monto:</span>
-                <span className="text-sm font-mono font-medium text-primary">${order.amount.toLocaleString('es-UY')}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-muted-foreground">Pago:</span>
-                <span className="text-sm text-foreground">{order.paymentMethod}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-muted-foreground">Fecha:</span>
-                <span className="text-sm text-muted-foreground">{order.date}</span>
-              </div>
-            </div>
-
-            <button
-              onClick={() => setExpandedOrder(expandedOrder === order.id ? null : order.id)}
-              className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-muted hover:bg-muted/80 rounded-md transition-smooth focus-ring"
-            >
-              <Icon name="EyeIcon" size={18} className="text-foreground" />
-              <span className="text-sm font-medium text-foreground">
-                {expandedOrder === order.id ? 'Ocultar detalles' : 'Ver detalles'}
-              </span>
-            </button>
-
-            {expandedOrder === order.id && (
-              <div className="mt-3 pt-3 border-t border-border space-y-2">
-                <button className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-primary hover:bg-primary/90 text-primary-foreground rounded-md transition-smooth focus-ring">
-                  <Icon name="PencilIcon" size={18} />
-                  <span className="text-sm font-medium">Editar pedido</span>
-                </button>
-                <button className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-accent hover:bg-accent/90 text-accent-foreground rounded-md transition-smooth focus-ring">
-                  <Icon name="EnvelopeIcon" size={18} />
-                  <span className="text-sm font-medium">Contactar cliente</span>
-                </button>
-              </div>
-            )}
-          </div>
-        ))}
-      </div>
-    </>
+      {/* Modal de Gestión */}
+      {selectedOrderId && (
+        <OrderDetailsModal
+          orderId={selectedOrderId}
+          isOpen={isModalOpen}
+          onClose={() => {
+            setIsModalOpen(false);
+            setSelectedOrderId(null);
+          }}
+        />
+      )}
+    </div>
   );
 }
