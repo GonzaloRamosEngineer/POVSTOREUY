@@ -33,7 +33,7 @@ export const metadata: Metadata = {
     title: 'Soporte y Ayuda | POV Store Uruguay',
     description:
       'Manuales, guías y soporte post-venta para que aproveches tu cámara SJCAM desde el primer día.',
-    images: ['/images/og-support.jpg'],
+    images: ['/images/og-support.png'],
   },
 };
 
