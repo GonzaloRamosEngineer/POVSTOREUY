@@ -20,7 +20,7 @@ export const metadata: Metadata = {
     type: 'website',
     images: [
       {
-        url: 'https://povstore.uy/images/og-support.jpg',
+        url: 'https://povstore.uy/images/og-support.png',
         width: 1200,
         height: 630,
         alt: 'Centro de Soporte y Ayuda POV Store Uruguay',
