@@ -5,7 +5,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import Icon from '@/components/ui/AppIcon';
 import AppImage from '@/components/ui/AppImage';
-import { readCart, CartItem } from '@/lib/cart';
+import { readCart, CartItem, clearCart } from '@/lib/cart';
 
 interface HeaderProps {
   isAdminMode?: boolean;
@@ -61,7 +61,7 @@ const Header = ({ isAdminMode = false }: HeaderProps) => {
   // Función para vaciar el carrito
   const handleClearCart = () => {
     if (confirm('¿Estás seguro de que querés vaciar todo el carrito?')) {
-      localStorage.removeItem('cart');
+      clearCart();
       setCartItems([]);
       window.dispatchEvent(new Event('cart-updated'));
       window.dispatchEvent(new Event('storage'));

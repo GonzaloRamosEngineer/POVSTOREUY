@@ -69,7 +69,7 @@ export default function SupportPage() {
           <div className="bg-neutral-900 rounded-2xl p-6 border border-neutral-800">
             <h3 className="font-bold text-white mb-4 flex items-center gap-2">
               <Icon name="DocumentTextIcon" size={20} className="text-yellow-500" />
-              Manuales de Usuario
+              Manuales y Guias de Usuario
             </h3>
             <div className="space-y-3">
               <a href="/documents/manual-c100plus.pdf" download className="flex items-center justify-between p-3 rounded-lg bg-black/40 hover:bg-black/60 border border-neutral-800 hover:border-neutral-700 transition-all group">
@@ -80,6 +80,20 @@ export default function SupportPage() {
                 <span className="text-sm text-neutral-300">Descargar Manual C200</span>
                 <Icon name="ArrowDownTrayIcon" size={16} className="text-neutral-500 group-hover:text-white" />
               </a>
+
+
+              <a href="/documents/guia-configuracion-c100+.pdf" download className="flex items-center justify-between p-3 rounded-lg bg-black/40 hover:bg-black/60 border border-neutral-800 hover:border-neutral-700 transition-all group">
+                <span className="text-sm text-neutral-300">Descargar Guia de Configuración C100+</span>
+                <Icon name="ArrowDownTrayIcon" size={16} className="text-neutral-500 group-hover:text-white" />
+              </a>
+              <a href="/documents/guia-configuracion-c200.pdf" download className="flex items-center justify-between p-3 rounded-lg bg-black/40 hover:bg-black/60 border border-neutral-800 hover:border-neutral-700 transition-all group">
+                <span className="text-sm text-neutral-300">Descargar Guia de Configuración C200</span>
+                <Icon name="ArrowDownTrayIcon" size={16} className="text-neutral-500 group-hover:text-white" />
+              </a>
+
+
+
+
             </div>
           </div>
 
