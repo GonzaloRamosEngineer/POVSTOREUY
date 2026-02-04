@@ -128,90 +128,96 @@ export async function PATCH(
           mp_status: currentOrder.mp_status
         });
         
-        // Validar que existe payment_id
+        // ✅ CASO 1: Si NO hay payment_id, el usuario nunca pagó (abandonó la orden)
         if (!currentOrder.payment_id) {
-          console.error('❌ No hay payment_id en la orden');
-          return NextResponse.json(
-            { error: 'No se encontró payment_id de MercadoPago para cancelar' },
-            { status: 400 }
-          );
-        }
-
-        // ✅ Llamar a la API de MercadoPago para cancelar el pago
-        try {
-          const mpAccessToken = process.env.MP_ACCESS_TOKEN;
+          console.log('⚠️ No hay payment_id - Usuario abandonó sin pagar. Solo cancelando en DB...');
           
-          if (!mpAccessToken) {
-            console.error('❌ No se encontró MP_ACCESS_TOKEN en variables de entorno');
-            console.error('❌ Variables disponibles:', Object.keys(process.env).filter(k => k.includes('MP') || k.includes('MERCADO')));
+          // Solo actualizar nuestra DB (no hay nada que cancelar en MercadoPago)
+          updateData.payment_status = 'failed';
+          updateData.mp_status = 'cancelled';
+          updateData.mp_status_detail = 'abandoned_by_user';
+          
+          console.log('✅ Orden cancelada en DB (sin interacción con MP)');
+        } 
+        // ✅ CASO 2: Si HAY payment_id, intentar cancelar en MercadoPago
+        else {
+          console.log('💳 Payment ID encontrado - Cancelando en MercadoPago...');
+          
+          try {
+            const mpAccessToken = process.env.MP_ACCESS_TOKEN;
+            
+            if (!mpAccessToken) {
+              console.error('❌ No se encontró MP_ACCESS_TOKEN en variables de entorno');
+              console.error('❌ Variables disponibles:', Object.keys(process.env).filter(k => k.includes('MP') || k.includes('MERCADO')));
+              return NextResponse.json(
+                { error: 'Configuración de MercadoPago no disponible. Verifica las variables de entorno.' },
+                { status: 500 }
+              );
+            }
+
+            console.log(`🔑 Token MP encontrado (primeros 10 chars): ${mpAccessToken.substring(0, 10)}...`);
+            console.log(`🎯 URL a llamar: https://api.mercadopago.com/v1/payments/${currentOrder.payment_id}`);
+
+            // Cancelar el pago en MercadoPago
+            const cancelResponse = await fetch(
+              `https://api.mercadopago.com/v1/payments/${currentOrder.payment_id}`,
+              {
+                method: 'PUT',
+                headers: {
+                  'Authorization': `Bearer ${mpAccessToken}`,
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  status: 'cancelled'
+                })
+              }
+            );
+
+            console.log(`📡 Respuesta MP - Status: ${cancelResponse.status} ${cancelResponse.statusText}`);
+
+            if (!cancelResponse.ok) {
+              const errorData = await cancelResponse.json().catch(() => ({}));
+              console.error('❌ Error al cancelar pago en MercadoPago:');
+              console.error('   Status:', cancelResponse.status);
+              console.error('   Data:', JSON.stringify(errorData, null, 2));
+              
+              // Intentar obtener más detalles del error
+              const errorMessage = errorData.message || errorData.error || 'Error desconocido';
+              
+              return NextResponse.json(
+                { 
+                  error: `Error al cancelar en MercadoPago: ${errorMessage}`,
+                  details: errorData,
+                  status_code: cancelResponse.status
+                },
+                { status: 400 }
+              );
+            }
+
+            const mpData = await cancelResponse.json();
+            console.log('✅ Pago cancelado exitosamente en MercadoPago:');
+            console.log('   ID:', mpData.id);
+            console.log('   Status:', mpData.status);
+            console.log('   Status Detail:', mpData.status_detail);
+
+            // Actualizar estados en nuestra DB
+            updateData.payment_status = 'failed';
+            updateData.mp_status = 'cancelled';
+            updateData.mp_status_detail = 'cancelled_by_admin';
+            
+          } catch (mpError: any) {
+            console.error('❌ Error crítico al cancelar pago MercadoPago:');
+            console.error('   Tipo:', mpError.name);
+            console.error('   Mensaje:', mpError.message);
+            console.error('   Stack:', mpError.stack);
             return NextResponse.json(
-              { error: 'Configuración de MercadoPago no disponible. Verifica tu archivo .env.local' },
+              { 
+                error: 'Error al comunicarse con MercadoPago',
+                details: mpError.message
+              },
               { status: 500 }
             );
           }
-
-          console.log(`🔑 Token MP encontrado (primeros 10 chars): ${mpAccessToken.substring(0, 10)}...`);
-          console.log(`🎯 URL a llamar: https://api.mercadopago.com/v1/payments/${currentOrder.payment_id}`);
-
-          // Cancelar el pago en MercadoPago
-          const cancelResponse = await fetch(
-            `https://api.mercadopago.com/v1/payments/${currentOrder.payment_id}`,
-            {
-              method: 'PUT',
-              headers: {
-                'Authorization': `Bearer ${mpAccessToken}`,
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                status: 'cancelled'
-              })
-            }
-          );
-
-          console.log(`📡 Respuesta MP - Status: ${cancelResponse.status} ${cancelResponse.statusText}`);
-
-          if (!cancelResponse.ok) {
-            const errorData = await cancelResponse.json().catch(() => ({}));
-            console.error('❌ Error al cancelar pago en MercadoPago:');
-            console.error('   Status:', cancelResponse.status);
-            console.error('   Data:', JSON.stringify(errorData, null, 2));
-            
-            // Intentar obtener más detalles del error
-            const errorMessage = errorData.message || errorData.error || 'Error desconocido';
-            
-            return NextResponse.json(
-              { 
-                error: `Error al cancelar en MercadoPago: ${errorMessage}`,
-                details: errorData,
-                status_code: cancelResponse.status
-              },
-              { status: 400 }
-            );
-          }
-
-          const mpData = await cancelResponse.json();
-          console.log('✅ Pago cancelado exitosamente en MercadoPago:');
-          console.log('   ID:', mpData.id);
-          console.log('   Status:', mpData.status);
-          console.log('   Status Detail:', mpData.status_detail);
-
-          // Actualizar estados en nuestra DB
-          updateData.payment_status = 'failed';
-          updateData.mp_status = 'cancelled';
-          updateData.mp_status_detail = 'cancelled_by_admin';
-          
-        } catch (mpError: any) {
-          console.error('❌ Error crítico al cancelar pago MercadoPago:');
-          console.error('   Tipo:', mpError.name);
-          console.error('   Mensaje:', mpError.message);
-          console.error('   Stack:', mpError.stack);
-          return NextResponse.json(
-            { 
-              error: 'Error al comunicarse con MercadoPago',
-              details: mpError.message
-            },
-            { status: 500 }
-          );
         }
       }
 
