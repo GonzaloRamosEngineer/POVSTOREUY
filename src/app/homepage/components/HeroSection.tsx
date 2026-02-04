@@ -87,8 +87,8 @@ const HeroSection = ({ onCtaClick, basicStock, proStock }: HeroSectionProps) => 
             </h1>
 
             <p className="text-lg md:text-2xl text-neutral-300 max-w-2xl mx-auto lg:mx-0 font-light leading-relaxed">
-              Cámaras POV mini 4K para creadores de contenido. <br className="hidden md:block" />
-              <span className="text-white font-medium">Calidad profesional, precio accesible.</span>
+              Cámaras POV ultraligeras. <br className="hidden md:block" />
+              <span className="text-white font-medium">Captura tus viajes, paseos y aventuras en alta definición</span>
             </p>
 
             {/* Botones de Acción */}
