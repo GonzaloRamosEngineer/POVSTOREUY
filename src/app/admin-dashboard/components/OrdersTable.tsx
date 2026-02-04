@@ -10,6 +10,7 @@ interface Order {
   customer_name: string;
   customer_email: string;
   customer_phone: string;
+  shipping_address: string; // ✅ NUEVO: Necesario para detectar retiro
   total: number;
   order_status: 'pending' | 'completed' | 'processing' | 'cancelled' | 'ready' | 'shipped';
   payment_method: string;
@@ -71,6 +72,9 @@ export default function OrdersTable({ orders, onRefresh }: OrdersTableProps) {
     return colors[status] || 'bg-muted text-muted-foreground';
   };
 
+  // ✅ NUEVO: Helper para detectar si es retiro
+  const isPickup = (order: Order) => !order.shipping_address;
+
   return (
     <div className="space-y-4">
       {/* Header con Botón de Refresh */}
@@ -94,6 +98,7 @@ export default function OrdersTable({ orders, onRefresh }: OrdersTableProps) {
               <th className="py-4 px-4 text-left">Pedido</th>
               <th className="py-4 px-4 text-left">Cliente</th>
               <th className="py-4 px-4 text-left">Estado</th>
+              <th className="py-4 px-4 text-left">Entrega</th> {/* ✅ NUEVA COLUMNA */}
               <th className="py-4 px-4 text-left">Pago</th>
               <th className="py-4 px-4 text-right">Monto</th>
               <th className="py-4 px-4 text-center">Acciones</th>
@@ -113,6 +118,20 @@ export default function OrdersTable({ orders, onRefresh }: OrdersTableProps) {
                   <span className={`px-2 py-1 rounded-full text-[10px] font-black uppercase ${getStatusColor(order.order_status)}`}>
                     {order.order_status}
                   </span>
+                </td>
+                {/* ✅ NUEVA COLUMNA: Tipo de Entrega */}
+                <td className="py-4 px-4">
+                  {isPickup(order) ? (
+                    <span className="inline-flex items-center gap-1 px-2 py-1 bg-purple-500/10 text-purple-600 rounded-full text-[10px] font-black uppercase">
+                      <Icon name="BuildingStorefrontIcon" size={12} />
+                      Retiro
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 px-2 py-1 bg-blue-500/10 text-blue-600 rounded-full text-[10px] font-black uppercase">
+                      <Icon name="TruckIcon" size={12} />
+                      Envío
+                    </span>
+                  )}
                 </td>
                 <td className="py-4 px-4">
                   <div className="flex flex-col gap-1 text-foreground">
@@ -155,9 +174,23 @@ export default function OrdersTable({ orders, onRefresh }: OrdersTableProps) {
                 <span className="text-[10px] font-mono font-bold text-muted-foreground">#{order.order_number}</span>
                 <span className="font-bold text-foreground">{order.customer_name}</span>
               </div>
-              <span className={`px-2 py-1 rounded-full text-[9px] font-black uppercase ${getStatusColor(order.order_status)}`}>
-                {order.order_status}
-              </span>
+              <div className="flex flex-col items-end gap-1">
+                <span className={`px-2 py-1 rounded-full text-[9px] font-black uppercase ${getStatusColor(order.order_status)}`}>
+                  {order.order_status}
+                </span>
+                {/* ✅ NUEVO: Indicador de tipo de entrega en mobile */}
+                {isPickup(order) ? (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-purple-500/10 text-purple-600 rounded-full text-[8px] font-black uppercase">
+                    <Icon name="BuildingStorefrontIcon" size={10} />
+                    Retiro
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-500/10 text-blue-600 rounded-full text-[8px] font-black uppercase">
+                    <Icon name="TruckIcon" size={10} />
+                    Envío
+                  </span>
+                )}
+              </div>
             </div>
             
             <div className="grid grid-cols-2 gap-2 border-t border-border pt-3 mt-3">
