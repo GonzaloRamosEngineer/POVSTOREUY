@@ -77,50 +77,51 @@ function AddonDetailModal({
 
   return (
     <div 
-      className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+      className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center sm:p-4"
       onClick={onClose}
     >
       <div 
-        className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl"
+        className="bg-white rounded-t-3xl sm:rounded-2xl w-full sm:max-w-2xl max-h-[95vh] sm:max-h-[90vh] overflow-y-auto shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="sticky top-0 bg-white border-b px-6 py-4 flex items-center justify-between z-10">
-          <div className="flex items-center gap-3">
+        <div className="sticky top-0 bg-white border-b px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between z-10 rounded-t-3xl sm:rounded-t-2xl">
+          <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
             {addon.badge && (
-              <span className="px-2 py-1 bg-blue-100 text-blue-700 text-xs font-bold rounded">
+              <span className="px-2 py-1 bg-blue-100 text-blue-700 text-[10px] sm:text-xs font-bold rounded whitespace-nowrap">
                 {addon.badge}
               </span>
             )}
-            <h3 className="text-lg font-bold text-gray-900">Detalles del Accesorio</h3>
+            <h3 className="text-sm sm:text-lg font-bold text-gray-900 truncate">Detalles del Accesorio</h3>
           </div>
           <button 
             onClick={onClose}
-            className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+            className="p-2 hover:bg-gray-100 rounded-full transition-colors flex-shrink-0"
+            aria-label="Cerrar"
           >
-            <Icon name="XMarkIcon" size={24} className="text-gray-500" />
+            <Icon name="XMarkIcon" size={20} className="text-gray-500 sm:w-6 sm:h-6" />
           </button>
         </div>
 
         {/* Content */}
-        <div className="p-6 space-y-6">
+        <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
           {/* Image Gallery */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="col-span-2 aspect-square bg-gray-50 rounded-xl overflow-hidden border">
+          <div className="grid grid-cols-1 gap-3 sm:gap-4">
+            <div className="aspect-square bg-gray-50 rounded-xl overflow-hidden border">
               <AppImage 
                 src={addon.image_url} 
                 alt={addon.name}
-                className="w-full h-full object-contain p-4"
+                className="w-full h-full object-contain p-3 sm:p-4"
               />
             </div>
             {addon.gallery && addon.gallery.length > 0 && (
-              <div className="col-span-2 grid grid-cols-4 gap-2">
+              <div className="grid grid-cols-4 gap-2">
                 {addon.gallery.slice(0, 4).map((img, idx) => (
                   <div key={idx} className="aspect-square bg-gray-50 rounded-lg overflow-hidden border">
                     <AppImage 
                       src={img} 
                       alt={`${addon.name} ${idx + 1}`}
-                      className="w-full h-full object-contain p-2"
+                      className="w-full h-full object-contain p-1 sm:p-2"
                     />
                   </div>
                 ))}
@@ -129,22 +130,22 @@ function AddonDetailModal({
           </div>
 
           {/* Product Info */}
-          <div className="space-y-3">
+          <div className="space-y-2 sm:space-y-3">
             <div>
-              <h2 className="text-2xl font-bold text-gray-900">{addon.name}</h2>
+              <h2 className="text-xl sm:text-2xl font-bold text-gray-900">{addon.name}</h2>
               {addon.model && (
-                <p className="text-sm text-gray-500 font-medium mt-1">{addon.model}</p>
+                <p className="text-xs sm:text-sm text-gray-500 font-medium mt-1">{addon.model}</p>
               )}
             </div>
 
             {/* Price */}
-            <div className="flex items-baseline gap-3">
-              <span className="text-3xl font-bold text-gray-900">
+            <div className="flex flex-wrap items-baseline gap-2 sm:gap-3">
+              <span className="text-2xl sm:text-3xl font-bold text-gray-900">
                 ${Number(addon.price).toLocaleString('es-UY')}
               </span>
               {addon.original_price && addon.original_price > addon.price && (
                 <>
-                  <span className="text-lg text-gray-400 line-through">
+                  <span className="text-base sm:text-lg text-gray-400 line-through">
                     ${Number(addon.original_price).toLocaleString('es-UY')}
                   </span>
                   <span className="px-2 py-1 bg-green-100 text-green-700 text-xs font-bold rounded">
@@ -156,12 +157,12 @@ function AddonDetailModal({
 
             {/* Stock Status */}
             <div className="flex items-center gap-2">
-              <div className={`w-2 h-2 rounded-full ${
+              <div className={`w-2 h-2 rounded-full flex-shrink-0 ${
                 addon.stock_count > 5 ? 'bg-green-500' : 
                 addon.stock_count > 0 ? 'bg-yellow-500' : 
                 'bg-red-500'
               }`} />
-              <span className={`text-sm font-medium ${
+              <span className={`text-xs sm:text-sm font-medium ${
                 addon.stock_count > 5 ? 'text-green-700' : 
                 addon.stock_count > 0 ? 'text-yellow-700' : 
                 'text-red-700'
@@ -175,9 +176,9 @@ function AddonDetailModal({
 
           {/* Description */}
           {addon.description && (
-            <div className="pt-4 border-t">
-              <h4 className="text-sm font-bold text-gray-900 mb-2">Descripción</h4>
-              <p className="text-sm text-gray-600 leading-relaxed whitespace-pre-line">
+            <div className="pt-3 sm:pt-4 border-t">
+              <h4 className="text-xs sm:text-sm font-bold text-gray-900 mb-2">Descripción</h4>
+              <p className="text-xs sm:text-sm text-gray-600 leading-relaxed whitespace-pre-line">
                 {addon.description}
               </p>
             </div>
@@ -185,18 +186,21 @@ function AddonDetailModal({
 
           {/* Features */}
           {features.length > 0 && (
-            <div className="pt-4 border-t">
-              <h4 className="text-sm font-bold text-gray-900 mb-3">Características</h4>
+            <div className="pt-3 sm:pt-4 border-t">
+              <h4 className="text-xs sm:text-sm font-bold text-gray-900 mb-3">Características</h4>
               <ul className="space-y-2">
                 {features.map((feature, idx) => (
-                  <li key={idx} className="flex items-start gap-2 text-sm text-gray-700">
-                    <Icon name="CheckCircleIcon" size={20} className="text-green-500 flex-shrink-0 mt-0.5" />
-                    <span>{feature}</span>
+                  <li key={idx} className="flex items-start gap-2 text-xs sm:text-sm text-gray-700">
+                    <Icon name="CheckCircleIcon" size={18} className="text-green-500 flex-shrink-0 mt-0.5 sm:w-5 sm:h-5" />
+                    <span className="flex-1">{feature}</span>
                   </li>
                 ))}
               </ul>
             </div>
           )}
+
+          {/* Padding bottom para evitar que el contenido quede pegado al borde en móvil */}
+          <div className="h-4 sm:h-0" />
         </div>
       </div>
     </div>
@@ -343,8 +347,8 @@ export default function ProductDetailsInteractive({ productInitial, galleryIniti
         />
       )}
 
-      <div className="max-w-[1400px] mx-auto px-4 lg:px-6 py-8 space-y-12">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+      <div className="max-w-[1400px] mx-auto px-3 sm:px-4 lg:px-6 py-4 sm:py-6 lg:py-8 space-y-8 sm:space-y-12">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6 lg:gap-8">
           
           {/* COLUMNA 1: Galería */}
           <div className="lg:col-span-5">
@@ -367,18 +371,18 @@ export default function ProductDetailsInteractive({ productInitial, galleryIniti
 
             {/* Selector de Colores */}
             {product.colors && product.colors.length > 0 && (
-              <div className="pt-4 border-t">
-                  <div className="flex justify-between items-center mb-3">
-                      <h3 className="text-sm font-medium text-gray-900">
+              <div className="pt-3 sm:pt-4 border-t">
+                  <div className="flex justify-between items-center mb-2 sm:mb-3">
+                      <h3 className="text-xs sm:text-sm font-medium text-gray-900">
                           Color: <span className="text-gray-500 font-normal">{selectedColor?.name}</span>
                       </h3>
                       {selectedColor && (
-                          <span className={`text-xs font-bold ${selectedColor.stock && selectedColor.stock > 0 ? 'text-green-600' : 'text-red-500'}`}>
+                          <span className={`text-[10px] sm:text-xs font-bold ${selectedColor.stock && selectedColor.stock > 0 ? 'text-green-600' : 'text-red-500'}`}>
                               {selectedColor.stock && selectedColor.stock > 0 ? 'Disponible' : 'Agotado'}
                           </span>
                       )}
                   </div>
-                  <div className="flex gap-3 flex-wrap">
+                  <div className="flex gap-2 sm:gap-3 flex-wrap">
                       {product.colors.map((c) => {
                           const isOutOfStock = (c.stock !== undefined && c.stock <= 0);
                           return (
@@ -386,12 +390,13 @@ export default function ProductDetailsInteractive({ productInitial, galleryIniti
                                   key={c.name}
                                   onClick={() => setSelectedColor(c)}
                                   className={`
-                                      relative w-10 h-10 rounded-full border shadow-sm transition-all focus:outline-none
+                                      relative w-9 h-9 sm:w-10 sm:h-10 rounded-full border shadow-sm transition-all focus:outline-none
                                       ${selectedColor?.name === c.name ? 'ring-2 ring-offset-2 ring-blue-600 border-white scale-110' : 'border-gray-200 hover:scale-105'}
                                       ${isOutOfStock ? 'opacity-50 grayscale' : ''}
                                   `}
                                   style={{ backgroundColor: c.hex }}
                                   title={`${c.name} ${isOutOfStock ? '(Sin Stock)' : ''}`}
+                                  aria-label={`Seleccionar color ${c.name}`}
                               >
                                   {isOutOfStock && (
                                       <div className="absolute inset-0 flex items-center justify-center">
@@ -408,21 +413,27 @@ export default function ProductDetailsInteractive({ productInitial, galleryIniti
 
           {/* COLUMNA 3: Compra */}
           <div className="lg:col-span-3">
-            <div className="sticky top-24 space-y-6">
-                <div className="bg-white p-6 rounded-xl border shadow-sm space-y-6">
+            <div className="lg:sticky lg:top-24 space-y-4 sm:space-y-6">
+                <div className="bg-white p-4 sm:p-6 rounded-xl border shadow-sm space-y-4 sm:space-y-6">
                     <div>
-                        <p className="text-sm text-gray-500 mb-1">Precio Total</p>
-                        <div className="text-3xl font-bold text-gray-900">${totalPrice.toLocaleString('es-UY')}</div>
-                        {selectedAddonIds.length > 0 && <p className="text-xs text-green-600 mt-1 font-medium">Incluye {selectedAddonIds.length} accesorio(s)</p>}
+                        <p className="text-xs sm:text-sm text-gray-500 mb-1">Precio Total</p>
+                        <div className="text-2xl sm:text-3xl font-bold text-gray-900">
+                          ${totalPrice.toLocaleString('es-UY')}
+                        </div>
+                        {selectedAddonIds.length > 0 && (
+                          <p className="text-[10px] sm:text-xs text-green-600 mt-1 font-medium">
+                            Incluye {selectedAddonIds.length} accesorio(s)
+                          </p>
+                        )}
                     </div>
 
-                    {/* Addons List - MEJORADO */}
+                    {/* Addons List - VERSIÓN PILL/BADGE */}
                     {addonsData.length > 0 && (
                       <div className="border rounded-lg overflow-hidden">
                           <div className="bg-gray-50 px-3 py-2 text-xs font-bold text-gray-700 border-b uppercase">
                             Agrega Accesorios
                           </div>
-                          <div className="divide-y max-h-[220px] overflow-y-auto">
+                          <div className="divide-y max-h-[220px] sm:max-h-[280px] overflow-y-auto">
                               {addonsData.map(addon => {
                                 const features = normalizeFeatures(addon.features);
                                 const isSelected = selectedAddonIds.includes(addon.id);
@@ -431,58 +442,64 @@ export default function ProductDetailsInteractive({ productInitial, galleryIniti
                                 return (
                                   <div 
                                     key={addon.id} 
-                                    className={`relative group ${isOutOfStock ? 'opacity-60' : ''}`}
+                                    className={`relative ${isOutOfStock ? 'opacity-60' : ''}`}
                                   >
-                                    <label className="flex items-center gap-3 p-3 hover:bg-gray-50 cursor-pointer">
+                                    {/* Item principal */}
+                                    <label className="flex items-start gap-2 sm:gap-3 p-2 sm:p-3 hover:bg-gray-50 cursor-pointer">
                                         <input 
                                           type="checkbox" 
                                           checked={isSelected} 
                                           onChange={() => toggleAddon(addon.id)} 
                                           disabled={isOutOfStock}
-                                          className="w-4 h-4 text-blue-600 rounded disabled:cursor-not-allowed" 
+                                          className="w-4 h-4 text-blue-600 rounded disabled:cursor-not-allowed flex-shrink-0 mt-1" 
                                         />
-                                        <div className="w-12 h-12 border rounded bg-white p-1 flex-shrink-0">
+                                        <div className="w-10 h-10 sm:w-12 sm:h-12 border rounded bg-white p-0.5 sm:p-1 flex-shrink-0">
                                           <AppImage 
                                             src={addon.image_url} 
                                             alt={addon.name} 
                                             className="object-contain w-full h-full" 
                                           />
                                         </div>
-                                        <div className="flex-1 min-w-0">
-                                            <p className="text-xs font-medium text-gray-900 truncate">
+                                        <div className="flex-1 min-w-0 space-y-1">
+                                            <p className="text-[11px] sm:text-xs font-medium text-gray-900 line-clamp-2 pr-1">
                                               {addon.name}
                                             </p>
-                                            <div className="flex items-center gap-2 mt-0.5">
-                                              <p className="text-xs text-gray-500 font-mono">
+                                            <div className="flex items-center gap-1.5 flex-wrap">
+                                              <p className="text-[11px] sm:text-xs text-gray-500 font-mono">
                                                 +${Number(addon.price).toLocaleString('es-UY')}
                                               </p>
                                               {addon.badge && (
-                                                <span className="px-1.5 py-0.5 bg-blue-100 text-blue-700 text-[10px] font-bold rounded">
+                                                <span className="px-1 sm:px-1.5 py-0.5 bg-blue-100 text-blue-700 text-[9px] sm:text-[10px] font-bold rounded whitespace-nowrap">
                                                   {addon.badge}
                                                 </span>
                                               )}
                                             </div>
+                                            {/* Pill "Ver más" debajo del nombre */}
+                                            <button
+                                              onClick={(e) => {
+                                                e.preventDefault();
+                                                openAddonModal(addon);
+                                              }}
+                                              className="inline-flex items-center gap-1 
+                                                       px-2 py-0.5 
+                                                       bg-blue-50 hover:bg-blue-100
+                                                       border border-blue-200 hover:border-blue-300
+                                                       text-blue-700 text-[10px] sm:text-xs font-semibold 
+                                                       rounded-full
+                                                       transition-all duration-200
+                                                       active:scale-95"
+                                              title="Ver información completa"
+                                            >
+                                              <Icon name="EyeIcon" size={10} className="sm:w-3 sm:h-3" />
+                                              <span>Ver más</span>
+                                            </button>
                                             {isOutOfStock && (
-                                              <p className="text-[10px] text-red-500 font-medium mt-0.5">
+                                              <p className="text-[9px] sm:text-[10px] text-red-500 font-medium">
                                                 Sin stock
                                               </p>
                                             )}
                                         </div>
                                     </label>
-                                    
-                                    {/* Botón de info */}
-                                    <button
-                                      onClick={(e) => {
-                                        e.preventDefault();
-                                        openAddonModal(addon);
-                                      }}
-                                      className="absolute top-3 right-3 p-1.5 bg-white border border-gray-200 rounded-full 
-                                               hover:bg-blue-50 hover:border-blue-300 transition-all opacity-0 group-hover:opacity-100
-                                               shadow-sm hover:shadow"
-                                      title="Ver detalles"
-                                    >
-                                      <Icon name="InformationCircleIcon" size={16} className="text-blue-600" />
-                                    </button>
                                   </div>
                                 );
                               })}
@@ -492,12 +509,24 @@ export default function ProductDetailsInteractive({ productInitial, galleryIniti
 
                     {/* Cantidad */}
                     <div className="flex items-center justify-between border rounded-md p-1">
-                        <button onClick={() => setQuantity(Math.max(1, quantity - 1))} className="p-2 text-gray-500 hover:text-blue-600" disabled={stockStatus === 'out-of-stock'}>
-                            <Icon name="MinusIcon" size={16} />
+                        <button 
+                          onClick={() => setQuantity(Math.max(1, quantity - 1))} 
+                          className="p-2 sm:p-2.5 text-gray-500 hover:text-blue-600 active:bg-gray-100 rounded transition-colors" 
+                          disabled={stockStatus === 'out-of-stock'}
+                          aria-label="Disminuir cantidad"
+                        >
+                            <Icon name="MinusIcon" size={16} className="sm:w-5 sm:h-5" />
                         </button>
-                        <span className="font-bold text-gray-900 text-sm">{quantity}</span>
-                        <button onClick={() => setQuantity(Math.min(currentStock, quantity + 1))} className="p-2 text-gray-500 hover:text-blue-600" disabled={quantity >= currentStock || stockStatus === 'out-of-stock'}>
-                            <Icon name="PlusIcon" size={16} />
+                        <span className="font-bold text-gray-900 text-sm sm:text-base min-w-[3ch] text-center">
+                          {quantity}
+                        </span>
+                        <button 
+                          onClick={() => setQuantity(Math.min(currentStock, quantity + 1))} 
+                          className="p-2 sm:p-2.5 text-gray-500 hover:text-blue-600 active:bg-gray-100 rounded transition-colors" 
+                          disabled={quantity >= currentStock || stockStatus === 'out-of-stock'}
+                          aria-label="Aumentar cantidad"
+                        >
+                            <Icon name="PlusIcon" size={16} className="sm:w-5 sm:h-5" />
                         </button>
                     </div>
 
@@ -505,23 +534,27 @@ export default function ProductDetailsInteractive({ productInitial, galleryIniti
                     <button 
                       onClick={handleAddToCart}
                       disabled={stockStatus === 'out-of-stock'}
-                      className={`w-full py-4 rounded-lg font-bold text-lg shadow-md transition-all flex items-center justify-center gap-2
+                      className={`w-full py-3 sm:py-4 rounded-lg font-bold text-base sm:text-lg shadow-md transition-all flex items-center justify-center gap-2
                           ${stockStatus === 'out-of-stock' 
                               ? 'bg-gray-200 text-gray-400 cursor-not-allowed shadow-none' 
                               : 'bg-blue-600 hover:bg-blue-700 text-white hover:shadow-lg active:scale-95'
                           }`}
                     >
-                      <Icon name="ShoppingCartIcon" size={24} />
-                      <span>{stockStatus === 'out-of-stock' ? 'Sin Stock' : 'Agregar al Carrito'}</span>
+                      <Icon name="ShoppingCartIcon" size={20} className="sm:w-6 sm:h-6" />
+                      <span className="truncate">
+                        {stockStatus === 'out-of-stock' ? 'Sin Stock' : 'Agregar al Carrito'}
+                      </span>
                     </button>
                     
                     {stockStatus === 'out-of-stock' && (
-                        <p className="text-center text-xs text-red-500 font-medium">Variante agotada temporalmente.</p>
+                        <p className="text-center text-[10px] sm:text-xs text-red-500 font-medium">
+                          Variante agotada temporalmente.
+                        </p>
                     )}
                 </div>
 
-                <div className="flex items-center gap-3 text-sm text-gray-600 px-2">
-                   <Icon name="TruckIcon" size={20} className="text-green-600" />
+                <div className="flex items-center gap-2 sm:gap-3 text-xs sm:text-sm text-gray-600 px-2 justify-center lg:justify-start">
+                   <Icon name="TruckIcon" size={18} className="text-green-600 sm:w-5 sm:h-5 flex-shrink-0" />
                    <span>Despacho en 24 / 48 hs</span>
                 </div>
             </div>
