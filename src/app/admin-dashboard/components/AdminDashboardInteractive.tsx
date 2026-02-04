@@ -24,6 +24,7 @@ interface OrderRow {
   payment_method: string;
   payment_status: PaymentStatus;
   created_at: string;
+  shipping_address: string | null; // ✅ AGREGADO
 }
 
 interface OrderItemRow {
@@ -67,6 +68,7 @@ interface OrderUI {
   payment_status: PaymentStatus;
   date: string;
   created_at: string;
+  shipping_address: string; // ✅ AGREGADO para que OrdersTable lo reciba
 }
 
 interface InventoryItem {
@@ -218,9 +220,10 @@ export default function AdminDashboardInteractive() {
     const fromDate = new Date(now);
     fromDate.setDate(now.getDate() - 30);
 
+    // ✅ CORREGIDO: Agregado shipping_address al SELECT
     const { data: orderRows, error: oErr } = await supabase
       .from('orders')
-      .select('*')
+      .select('id, order_number, customer_name, customer_email, customer_phone, total, order_status, payment_method, payment_status, created_at, shipping_address')
       .gte('created_at', fromDate.toISOString())
       .order('created_at', { ascending: false });
 
@@ -249,12 +252,25 @@ export default function AdminDashboardInteractive() {
         : '—';
 
       return {
-        id: row.id, customer: row.customer_name, email: row.customer_email, product: productLabel,
-        amount: Number(row.total || 0), status: row.order_status, date: formatUYDate(row.created_at),
-        order_number: row.order_number, customer_name: row.customer_name, customer_email: row.customer_email,
-        customer_phone: row.customer_phone, total: Number(row.total || 0), order_status: row.order_status,
-        payment_method: row.payment_method, paymentMethod: row.payment_method === 'mercadopago' ? 'MercadoPago' : 'Transferencia',
-        payment_status: row.payment_status, paymentStatus: row.payment_status, created_at: row.created_at
+        id: row.id, 
+        customer: row.customer_name, 
+        email: row.customer_email, 
+        product: productLabel,
+        amount: Number(row.total || 0), 
+        status: row.order_status, 
+        date: formatUYDate(row.created_at),
+        order_number: row.order_number, 
+        customer_name: row.customer_name, 
+        customer_email: row.customer_email,
+        customer_phone: row.customer_phone, 
+        total: Number(row.total || 0), 
+        order_status: row.order_status,
+        payment_method: row.payment_method, 
+        paymentMethod: row.payment_method === 'mercadopago' ? 'MercadoPago' : 'Transferencia',
+        payment_status: row.payment_status, 
+        paymentStatus: row.payment_status, 
+        created_at: row.created_at,
+        shipping_address: row.shipping_address || '' // ✅ CORREGIDO: Incluido en el mapeo
       };
     });
 
