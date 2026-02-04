@@ -36,6 +36,9 @@ interface OrderDetails {
   updated_at: string;
   mp_status: string | null;
   mp_status_detail: string | null;
+  mp_preference_id: string | null;
+  mp_init_point: string | null;
+  mp_sandbox_init_point: string | null;
   tracking_number?: string | null;
   items?: OrderItem[];
 }
@@ -52,6 +55,7 @@ export default function OrderDetailsModal({ orderId, isOpen, onClose }: OrderDet
   const [updating, setUpdating] = useState(false);
   const [trackingInput, setTrackingInput] = useState('');
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+  const [showCancelMPConfirm, setShowCancelMPConfirm] = useState(false);
 
   useEffect(() => {
     if (isOpen && orderId) fetchOrderDetails();
@@ -71,22 +75,20 @@ export default function OrderDetailsModal({ orderId, isOpen, onClose }: OrderDet
     }
   };
 
-  // ✅ Función de "magia" para WhatsApp en Uruguay
   const openWhatsApp = (phone: string) => {
-    let cleanNumber = phone.replace(/\D/g, ''); // Limpia todo lo que no sea número
+    let cleanNumber = phone.replace(/\D/g, '');
     
     if (cleanNumber.startsWith('0')) {
-      cleanNumber = cleanNumber.substring(1); // Quita el 0 inicial (098 -> 98)
+      cleanNumber = cleanNumber.substring(1);
     }
     
     if (!cleanNumber.startsWith('598')) {
-      cleanNumber = '598' + cleanNumber; // Agrega el código de Uruguay si no está
+      cleanNumber = '598' + cleanNumber;
     }
     
     window.open(`https://wa.me/${cleanNumber}`, '_blank');
   };
 
-  // ✅ Función para actualizar estado de pago
   const handleUpdatePaymentStatus = async (newPaymentStatus: string) => {
     setUpdating(true);
     try {
@@ -110,7 +112,6 @@ export default function OrderDetailsModal({ orderId, isOpen, onClose }: OrderDet
     }
   };
 
-  // ✅ NUEVO: Función para cancelar orden (solo transferencias)
   const handleCancelOrder = async () => {
     setUpdating(true);
     try {
@@ -119,7 +120,7 @@ export default function OrderDetailsModal({ orderId, isOpen, onClose }: OrderDet
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           status: 'cancelled',
-          cancel_payment: true // Flag para que el backend cancele también el pago
+          cancel_payment: true
         }),
       });
       
@@ -140,16 +141,43 @@ export default function OrderDetailsModal({ orderId, isOpen, onClose }: OrderDet
     }
   };
 
-  // ✅ Función que arma el payload dinámicamente según tipo de entrega
+  // ✅ NUEVO: Cancelar pago de MercadoPago
+  const handleCancelMercadoPago = async () => {
+    setUpdating(true);
+    try {
+      const response = await fetch(`/api/admin/orders/${orderId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          status: 'cancelled',
+          cancel_mp: true // ✅ Flag específico para MP
+        }),
+      });
+      
+      if (response.ok) {
+        await fetchOrderDetails();
+        setShowCancelMPConfirm(false);
+        alert('Pago de MercadoPago cancelado exitosamente');
+      } else {
+        const err = await response.json().catch(() => ({}));
+        console.error('PATCH error:', err);
+        alert(err.error || 'Error al cancelar el pago de MercadoPago');
+      }
+    } catch (err) {
+      console.error('Error:', err);
+      alert('Error al cancelar el pago de MercadoPago');
+    } finally {
+      setUpdating(false);
+    }
+  };
+
   const handleUpdateOrder = async (newStatus: string, newTracking?: string) => {
     setUpdating(true);
     try {
       const isPickup = !!orderDetails && !orderDetails.shipping_address;
 
-      // ✅ Construir payload dinámicamente
       const payload: any = { status: newStatus };
 
-      // ✅ Solo incluir tracking_number si NO es retiro Y hay un valor
       if (!isPickup) {
         const trackingValue = (newTracking ?? trackingInput).trim();
         if (trackingValue) {
@@ -182,7 +210,6 @@ export default function OrderDetailsModal({ orderId, isOpen, onClose }: OrderDet
     const isPickup = !orderDetails?.shipping_address;
     
     if (isPickup) {
-      // Flujo de retiro: pending → processing → ready → completed
       const pickupSteps: Record<string, string> = { 
         processing: 'pending', 
         ready: 'processing', 
@@ -190,7 +217,6 @@ export default function OrderDetailsModal({ orderId, isOpen, onClose }: OrderDet
       };
       return pickupSteps[status] || null;
     } else {
-      // Flujo de envío: pending → processing → ready → shipped → completed
       const shippingSteps: Record<string, string> = { 
         processing: 'pending', 
         ready: 'processing', 
@@ -201,13 +227,33 @@ export default function OrderDetailsModal({ orderId, isOpen, onClose }: OrderDet
     }
   };
 
+  // ✅ NUEVO: Helper para traducir estados MP
+  const getMPStatusDisplay = (mpStatus: string | null) => {
+    if (!mpStatus) return { text: 'N/A', color: 'text-muted-foreground' };
+    
+    const statusMap: Record<string, { text: string; color: string }> = {
+      approved: { text: 'Aprobado', color: 'text-success' },
+      pending: { text: 'Pendiente', color: 'text-warning' },
+      authorized: { text: 'Autorizado', color: 'text-blue-600' },
+      in_process: { text: 'En Proceso', color: 'text-accent' },
+      in_mediation: { text: 'En Mediación', color: 'text-orange-600' },
+      rejected: { text: 'Rechazado', color: 'text-error' },
+      cancelled: { text: 'Cancelado', color: 'text-error' },
+      refunded: { text: 'Reembolsado', color: 'text-purple-600' },
+      charged_back: { text: 'Contracargo', color: 'text-red-700' },
+    };
+    
+    return statusMap[mpStatus] || { text: mpStatus, color: 'text-muted-foreground' };
+  };
+
   if (!isOpen) return null;
 
-  // ✅ Detectar si es retiro en local
   const isPickup = orderDetails && !orderDetails.shipping_address;
   const isBankTransfer = orderDetails?.payment_method === 'bank_transfer';
+  const isMercadoPago = orderDetails?.payment_method === 'mercadopago';
   const isCancelled = orderDetails?.order_status === 'cancelled';
-  const canCancel = isBankTransfer && !isCancelled && orderDetails?.order_status !== 'completed';
+  const canCancelBankTransfer = isBankTransfer && !isCancelled && orderDetails?.order_status !== 'completed';
+  const canCancelMercadoPago = isMercadoPago && !isCancelled && orderDetails?.payment_status === 'pending';
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-2 md:p-4 bg-black/60 backdrop-blur-sm">
@@ -220,13 +266,11 @@ export default function OrderDetailsModal({ orderId, isOpen, onClose }: OrderDet
             {orderDetails && (
               <div className="flex items-center gap-2">
                 <span className="text-[10px] bg-primary text-primary-foreground px-2 py-0.5 rounded font-mono">#{orderDetails.order_number}</span>
-                {/* ✅ Etiqueta de tipo de entrega */}
                 {isPickup && (
                   <span className="text-[9px] bg-purple-600/20 text-purple-600 px-2 py-0.5 rounded font-black uppercase">
                     Retiro en Local
                   </span>
                 )}
-                {/* ✅ NUEVO: Etiqueta de cancelado */}
                 {isCancelled && (
                   <span className="text-[9px] bg-error/20 text-error px-2 py-0.5 rounded font-black uppercase">
                     Cancelado
@@ -247,7 +291,7 @@ export default function OrderDetailsModal({ orderId, isOpen, onClose }: OrderDet
               {/* Columna Izquierda: Operaciones */}
               <div className="lg:col-span-8 space-y-6">
                 
-                {/* ✅ GESTIÓN DE PAGO (solo para transferencias) */}
+                {/* ✅ GESTIÓN DE PAGO - TRANSFERENCIAS */}
                 {isBankTransfer && !isCancelled && (
                   <div className="bg-amber-50 dark:bg-amber-950/20 border-2 border-amber-400/30 rounded-2xl p-5 shadow-sm">
                     <div className="flex justify-between items-center mb-4">
@@ -257,9 +301,11 @@ export default function OrderDetailsModal({ orderId, isOpen, onClose }: OrderDet
                       <span className={`text-[9px] font-black px-2 py-1 rounded ${
                         orderDetails.payment_status === 'completed' 
                           ? 'bg-success/20 text-success' 
+                          : orderDetails.payment_status === 'failed'
+                          ? 'bg-error/20 text-error'
                           : 'bg-warning/20 text-warning'
                       }`}>
-                        {orderDetails.payment_status === 'completed' ? 'PAGADO' : 'PENDIENTE'}
+                        {orderDetails.payment_status === 'completed' ? 'PAGADO' : orderDetails.payment_status === 'failed' ? 'FALLIDO' : 'PENDIENTE'}
                       </span>
                     </div>
 
@@ -296,8 +342,120 @@ export default function OrderDetailsModal({ orderId, isOpen, onClose }: OrderDet
                   </div>
                 )}
 
-                {/* ✅ NUEVO: Zona de cancelación para transferencias */}
-                {canCancel && (
+                {/* ✅ NUEVO: INFORMACIÓN Y GESTIÓN DE MERCADOPAGO */}
+                {isMercadoPago && (
+                  <div className="bg-blue-50 dark:bg-blue-950/20 border-2 border-blue-400/30 rounded-2xl p-5 shadow-sm">
+                    <div className="flex justify-between items-center mb-4">
+                      <h3 className="text-xs font-black text-blue-700 dark:text-blue-400 uppercase flex items-center gap-2">
+                        <Icon name="CreditCardIcon" size={16} /> Información MercadoPago
+                      </h3>
+                      <span className={`text-[9px] font-black px-2 py-1 rounded ${
+                        orderDetails.payment_status === 'completed' 
+                          ? 'bg-success/20 text-success' 
+                          : orderDetails.payment_status === 'failed'
+                          ? 'bg-error/20 text-error'
+                          : 'bg-warning/20 text-warning'
+                      }`}>
+                        {orderDetails.payment_status === 'completed' ? 'PAGADO' : orderDetails.payment_status === 'failed' ? 'FALLIDO' : 'PENDIENTE'}
+                      </span>
+                    </div>
+
+                    {/* Datos de MercadoPago */}
+                    <div className="space-y-3 mb-4">
+                      {orderDetails.payment_id && (
+                        <div className="p-3 bg-white dark:bg-gray-900 border border-blue-200 dark:border-blue-800 rounded-lg">
+                          <p className="text-[9px] text-muted-foreground uppercase font-bold mb-1">Payment ID</p>
+                          <p className="text-xs font-mono font-black text-blue-600 dark:text-blue-400">{orderDetails.payment_id}</p>
+                        </div>
+                      )}
+
+                      {orderDetails.mp_status && (
+                        <div className="p-3 bg-white dark:bg-gray-900 border border-blue-200 dark:border-blue-800 rounded-lg">
+                          <p className="text-[9px] text-muted-foreground uppercase font-bold mb-1">Estado MP</p>
+                          <p className={`text-xs font-black ${getMPStatusDisplay(orderDetails.mp_status).color}`}>
+                            {getMPStatusDisplay(orderDetails.mp_status).text}
+                          </p>
+                        </div>
+                      )}
+
+                      {orderDetails.mp_status_detail && (
+                        <div className="p-3 bg-white dark:bg-gray-900 border border-blue-200 dark:border-blue-800 rounded-lg">
+                          <p className="text-[9px] text-muted-foreground uppercase font-bold mb-1">Detalle MP</p>
+                          <p className="text-xs font-medium text-foreground">{orderDetails.mp_status_detail}</p>
+                        </div>
+                      )}
+
+                      {orderDetails.mp_preference_id && (
+                        <div className="p-3 bg-white dark:bg-gray-900 border border-blue-200 dark:border-blue-800 rounded-lg">
+                          <p className="text-[9px] text-muted-foreground uppercase font-bold mb-1">Preference ID</p>
+                          <p className="text-xs font-mono text-foreground break-all">{orderDetails.mp_preference_id}</p>
+                        </div>
+                      )}
+
+                      {orderDetails.mp_init_point && (
+                        <div className="p-3 bg-white dark:bg-gray-900 border border-blue-200 dark:border-blue-800 rounded-lg">
+                          <p className="text-[9px] text-muted-foreground uppercase font-bold mb-2">Link de Pago</p>
+                          <a 
+                            href={orderDetails.mp_init_point} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="text-xs text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 break-all"
+                          >
+                            <Icon name="ArrowTopRightOnSquareIcon" size={12} />
+                            {orderDetails.mp_init_point}
+                          </a>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* ✅ Botón para cancelar pago MP pendiente */}
+                    {canCancelMercadoPago && !isCancelled && (
+                      <div className="pt-4 border-t border-blue-200 dark:border-blue-800">
+                        {!showCancelMPConfirm ? (
+                          <>
+                            <p className="text-[10px] text-blue-700 dark:text-blue-400 mb-3">
+                              Este pago está pendiente en MercadoPago. Puedes cancelarlo si el cliente no completa el pago.
+                            </p>
+                            <button 
+                              onClick={() => setShowCancelMPConfirm(true)}
+                              disabled={updating}
+                              className="w-full py-3 bg-error text-white rounded-xl text-xs font-black uppercase hover:scale-[1.02] transition-transform disabled:opacity-50 flex items-center justify-center gap-2"
+                            >
+                              <Icon name="XCircleIcon" size={16} />
+                              Cancelar Pago MercadoPago
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <p className="text-[10px] text-error mb-3 font-bold">
+                              ⚠️ Esto cancelará el pago en MercadoPago y la orden. ¿Continuar?
+                            </p>
+                            <div className="flex gap-2">
+                              <button 
+                                onClick={() => setShowCancelMPConfirm(false)}
+                                disabled={updating}
+                                className="flex-1 py-3 bg-muted text-foreground rounded-xl text-xs font-black uppercase hover:scale-[1.02] transition-transform disabled:opacity-50"
+                              >
+                                No, volver
+                              </button>
+                              <button 
+                                onClick={handleCancelMercadoPago}
+                                disabled={updating}
+                                className="flex-1 py-3 bg-error text-white rounded-xl text-xs font-black uppercase hover:scale-[1.02] transition-transform disabled:opacity-50 flex items-center justify-center gap-2"
+                              >
+                                <Icon name="CheckIcon" size={16} />
+                                Sí, Cancelar
+                              </button>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* ✅ CANCELACIÓN DE TRANSFERENCIAS */}
+                {canCancelBankTransfer && (
                   <div className="bg-red-50 dark:bg-red-950/20 border-2 border-red-400/30 rounded-2xl p-5 shadow-sm">
                     <div className="flex justify-between items-center mb-4">
                       <h3 className="text-xs font-black text-red-700 dark:text-red-400 uppercase flex items-center gap-2">
@@ -366,7 +524,6 @@ export default function OrderDetailsModal({ orderId, isOpen, onClose }: OrderDet
                     </div>
 
                     <div className="flex flex-wrap gap-3">
-                      {/* PENDING → PROCESSING */}
                       {orderDetails.order_status === 'pending' && (
                         <button 
                           onClick={() => handleUpdateOrder('processing')} 
@@ -377,7 +534,6 @@ export default function OrderDetailsModal({ orderId, isOpen, onClose }: OrderDet
                         </button>
                       )}
                       
-                      {/* PROCESSING → READY */}
                       {orderDetails.order_status === 'processing' && (
                         <button 
                           onClick={() => handleUpdateOrder('ready')} 
@@ -388,11 +544,9 @@ export default function OrderDetailsModal({ orderId, isOpen, onClose }: OrderDet
                         </button>
                       )}
                       
-                      {/* ✅ Flujo diferenciado según tipo de entrega */}
                       {orderDetails.order_status === 'ready' && (
                         <>
                           {isPickup ? (
-                            // Retiro: READY → COMPLETED (sin tracking)
                             <button 
                               onClick={() => handleUpdateOrder('completed')} 
                               disabled={updating}
@@ -401,7 +555,6 @@ export default function OrderDetailsModal({ orderId, isOpen, onClose }: OrderDet
                               Confirmar Retiro
                             </button>
                           ) : (
-                            // Envío: READY → SHIPPED (con tracking)
                             <div className="flex flex-1 gap-2 min-w-[300px]">
                               <input 
                                 type="text" 
@@ -422,7 +575,6 @@ export default function OrderDetailsModal({ orderId, isOpen, onClose }: OrderDet
                         </>
                       )}
                       
-                      {/* SHIPPED → COMPLETED (solo para envíos) */}
                       {orderDetails.order_status === 'shipped' && !isPickup && (
                         <button 
                           onClick={() => handleUpdateOrder('completed')} 
@@ -434,7 +586,6 @@ export default function OrderDetailsModal({ orderId, isOpen, onClose }: OrderDet
                       )}
                     </div>
 
-                    {/* ✅ Indicador visual del flujo según tipo */}
                     <div className="mt-4 pt-4 border-t border-border">
                       <p className="text-[9px] text-muted-foreground uppercase font-bold mb-2">Flujo actual:</p>
                       <div className="flex items-center gap-2 text-[9px] font-mono">
@@ -466,7 +617,7 @@ export default function OrderDetailsModal({ orderId, isOpen, onClose }: OrderDet
                   </div>
                 )}
 
-                {/* ✅ NUEVO: Mensaje si la orden está cancelada */}
+                {/* Mensaje si está cancelada */}
                 {isCancelled && (
                   <div className="bg-error/10 border-2 border-error/30 rounded-2xl p-8 text-center">
                     <Icon name="XCircleIcon" size={48} className="text-error mx-auto mb-4" />
