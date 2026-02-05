@@ -61,7 +61,7 @@ function normalizeFeatures(v: unknown): string[] {
   return [];
 }
 
-// --- Componente Modal de Addon - VERSIÓN MEJORADA RESPONSIVA ---
+// --- Componente Modal de Addon - VERSIÓN SIN SCROLL VISIBLE ---
 function AddonDetailModal({ 
   addon, 
   isOpen, 
@@ -88,33 +88,30 @@ function AddonDetailModal({
   if (!isOpen) return null;
 
   return (
-    <div 
-      className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[99999] flex items-center justify-center p-3 sm:p-4"
-      onClick={onClose}
-    >
-      {/* Modal Card - Compacto y 100% Responsivo */}
+    <>
       <div 
-        className="bg-white rounded-xl sm:rounded-2xl w-full max-w-4xl max-h-[95vh] sm:max-h-[90vh] shadow-2xl transform transition-all duration-300 ease-out flex flex-col overflow-hidden"
-        onClick={(e) => e.stopPropagation()}
+        className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[99999] flex items-center justify-center p-3 sm:p-4 overflow-y-auto"
+        onClick={onClose}
       >
-        {/* Header Fijo con botón cerrar */}
-        <div className="flex-shrink-0 relative">
+        {/* Modal Card - Sin Scroll Visible */}
+        <div 
+          className="bg-white rounded-xl sm:rounded-2xl w-full max-w-4xl my-auto shadow-2xl transform transition-all duration-300 ease-out"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Botón cerrar absoluto */}
           <button 
             onClick={onClose}
-            className="absolute top-2 right-2 sm:top-3 sm:right-3 z-10 p-1.5 sm:p-2 bg-white hover:bg-gray-100 rounded-full shadow-lg transition-all hover:scale-110 active:scale-95"
+            className="absolute top-2 right-2 sm:top-3 sm:right-3 z-10 p-1.5 sm:p-2 bg-white/95 hover:bg-white rounded-full shadow-lg transition-all hover:scale-110 active:scale-95"
             aria-label="Cerrar"
           >
             <Icon name="XMarkIcon" size={18} className="sm:w-5 sm:h-5 text-gray-700" />
           </button>
-        </div>
 
-        {/* Contenido con scroll */}
-        <div className="flex-1 overflow-y-auto">
           {/* Layout Grid Responsivo */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-0">
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-0">
             
-            {/* COLUMNA IZQUIERDA - Imagen */}
-            <div className="relative bg-gradient-to-br from-gray-50 to-gray-100 p-4 sm:p-6 md:p-8 flex items-center justify-center min-h-[250px] md:min-h-[400px]">
+            {/* COLUMNA IZQUIERDA - Imagen (2/5 del ancho en desktop) */}
+            <div className="md:col-span-2 relative bg-gradient-to-br from-gray-50 to-gray-100 rounded-t-xl md:rounded-l-xl md:rounded-tr-none p-4 sm:p-6 flex items-center justify-center min-h-[280px] sm:min-h-[350px]">
               {/* Badge */}
               {addon.badge && (
                 <div className="absolute top-3 left-3 z-10">
@@ -125,7 +122,7 @@ function AddonDetailModal({
               )}
 
               {/* Imagen Principal */}
-              <div className="w-full aspect-square max-w-[200px] sm:max-w-[250px] md:max-w-xs">
+              <div className="w-full aspect-square max-w-[200px] sm:max-w-[250px]">
                 <AppImage 
                   src={addon.image_url} 
                   alt={addon.name}
@@ -149,12 +146,12 @@ function AddonDetailModal({
               )}
             </div>
 
-            {/* COLUMNA DERECHA - Info */}
-            <div className="p-4 sm:p-6 md:p-8 space-y-3 sm:space-y-4">
+            {/* COLUMNA DERECHA - Info (3/5 del ancho en desktop) */}
+            <div className="md:col-span-3 p-4 sm:p-6 space-y-3 sm:space-y-4">
               
               {/* Título */}
               <div>
-                <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900 leading-tight">
+                <h2 className="text-xl sm:text-2xl font-bold text-gray-900 leading-tight pr-8">
                   {addon.name}
                 </h2>
                 {addon.model && (
@@ -162,10 +159,10 @@ function AddonDetailModal({
                 )}
               </div>
 
-              {/* Precio y Stock en la misma línea */}
+              {/* Precio y Stock */}
               <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b">
                 <div className="flex flex-wrap items-baseline gap-2">
-                  <span className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900">
+                  <span className="text-2xl sm:text-3xl font-bold text-gray-900">
                     ${Number(addon.price).toLocaleString('es-UY')}
                   </span>
                   {addon.original_price && addon.original_price > addon.price && (
@@ -199,22 +196,22 @@ function AddonDetailModal({
                 </div>
               </div>
 
-              {/* Descripción - Compacta */}
+              {/* Descripción */}
               {addon.description && (
                 <div className="pb-3 border-b">
                   <h4 className="text-xs sm:text-sm font-bold text-gray-900 mb-1.5 uppercase tracking-wide">Descripción</h4>
-                  <p className="text-xs sm:text-sm text-gray-600 leading-relaxed line-clamp-3">
+                  <p className="text-xs sm:text-sm text-gray-600 leading-relaxed">
                     {addon.description}
                   </p>
                 </div>
               )}
 
-              {/* Features - Ultra Compacto */}
+              {/* Features - TODAS VISIBLES */}
               {features.length > 0 && (
-                <div>
+                <div className="pb-2">
                   <h4 className="text-xs sm:text-sm font-bold text-gray-900 mb-2 uppercase tracking-wide">Características</h4>
                   <div className="space-y-1.5">
-                    {features.slice(0, 4).map((feature, idx) => (
+                    {features.map((feature, idx) => (
                       <div key={idx} className="flex items-start gap-2">
                         <div className="w-4 h-4 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0 mt-0.5">
                           <Icon name="CheckIcon" size={10} className="text-green-600" />
@@ -223,18 +220,20 @@ function AddonDetailModal({
                       </div>
                     ))}
                   </div>
-                  {features.length > 4 && (
-                    <p className="text-[10px] sm:text-xs text-gray-500 mt-2 italic">
-                      +{features.length - 4} características más
-                    </p>
-                  )}
                 </div>
               )}
             </div>
           </div>
         </div>
       </div>
-    </div>
+
+      {/* CSS para scroll invisible en el overlay */}
+      <style jsx global>{`
+        body:has(.modal-open) {
+          overflow: hidden;
+        }
+      `}</style>
+    </>
   );
 }
 
