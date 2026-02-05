@@ -1,3 +1,6 @@
+'use client';
+
+import { MarkdownText } from './ProductDetailsInteractive';
 import Icon from '@/components/ui/AppIcon';
 
 interface ProductInfoProps {
@@ -84,11 +87,11 @@ export default function ProductInfo({
       </div>
 
       {/* Description */}
-      <div className="prose prose-invert max-w-none">
-        <p className="text-base text-muted-foreground leading-relaxed">
-          {description}
-        </p>
-      </div>
+      {description && (
+        <div className="prose prose-invert max-w-none">
+          <MarkdownText text={description} className="text-base text-muted-foreground leading-relaxed" />
+        </div>
+      )}
 
       {/* Key Features */}
       <div className="grid grid-cols-2 gap-3">
@@ -104,10 +107,6 @@ export default function ProductInfo({
           <Icon name="WifiIcon" size={20} className="text-primary" variant="solid" />
           <span className="text-sm text-foreground">WiFi integrado</span>
         </div>
-        {/* <div className="flex items-center gap-2 p-3 bg-muted rounded-md">
-          <Icon name="ShieldCheckIcon" size={20} className="text-primary" variant="solid" />
-          <span className="text-sm text-foreground">Garantía 1 año</span>
-        </div> */}
       </div>
     </div>
   );
