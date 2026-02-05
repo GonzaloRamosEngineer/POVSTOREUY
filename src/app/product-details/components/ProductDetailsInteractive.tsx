@@ -61,7 +61,7 @@ function normalizeFeatures(v: unknown): string[] {
   return [];
 }
 
-// --- Componente Modal de Addon ---
+// --- Componente Modal de Addon - VERSIÓN MEJORADA RESPONSIVA ---
 function AddonDetailModal({ 
   addon, 
   isOpen, 
@@ -73,134 +73,165 @@ function AddonDetailModal({
 }) {
   const features = normalizeFeatures(addon.features);
   
+  // Prevenir scroll del body cuando el modal está abierto
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'unset';
+    }
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
+  }, [isOpen]);
+  
   if (!isOpen) return null;
 
   return (
     <div 
-      className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center sm:p-4"
+      className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[99999] flex items-center justify-center p-3 sm:p-4"
       onClick={onClose}
     >
+      {/* Modal Card - Compacto y 100% Responsivo */}
       <div 
-        className="bg-white rounded-t-3xl sm:rounded-2xl w-full sm:max-w-2xl max-h-[95vh] sm:max-h-[90vh] overflow-y-auto shadow-2xl"
+        className="bg-white rounded-xl sm:rounded-2xl w-full max-w-4xl max-h-[95vh] sm:max-h-[90vh] shadow-2xl transform transition-all duration-300 ease-out flex flex-col overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header */}
-        <div className="sticky top-0 bg-white border-b px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between z-10 rounded-t-3xl sm:rounded-t-2xl">
-          <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
-            {addon.badge && (
-              <span className="px-2 py-1 bg-blue-100 text-blue-700 text-[10px] sm:text-xs font-bold rounded whitespace-nowrap">
-                {addon.badge}
-              </span>
-            )}
-            <h3 className="text-sm sm:text-lg font-bold text-gray-900 truncate">Detalles del Accesorio</h3>
-          </div>
+        {/* Header Fijo con botón cerrar */}
+        <div className="flex-shrink-0 relative">
           <button 
             onClick={onClose}
-            className="p-2 hover:bg-gray-100 rounded-full transition-colors flex-shrink-0"
+            className="absolute top-2 right-2 sm:top-3 sm:right-3 z-10 p-1.5 sm:p-2 bg-white hover:bg-gray-100 rounded-full shadow-lg transition-all hover:scale-110 active:scale-95"
             aria-label="Cerrar"
           >
-            <Icon name="XMarkIcon" size={20} className="text-gray-500 sm:w-6 sm:h-6" />
+            <Icon name="XMarkIcon" size={18} className="sm:w-5 sm:h-5 text-gray-700" />
           </button>
         </div>
 
-        {/* Content */}
-        <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
-          {/* Image Gallery */}
-          <div className="grid grid-cols-1 gap-3 sm:gap-4">
-            <div className="aspect-square bg-gray-50 rounded-xl overflow-hidden border">
-              <AppImage 
-                src={addon.image_url} 
-                alt={addon.name}
-                className="w-full h-full object-contain p-3 sm:p-4"
-              />
-            </div>
-            {addon.gallery && addon.gallery.length > 0 && (
-              <div className="grid grid-cols-4 gap-2">
-                {addon.gallery.slice(0, 4).map((img, idx) => (
-                  <div key={idx} className="aspect-square bg-gray-50 rounded-lg overflow-hidden border">
-                    <AppImage 
-                      src={img} 
-                      alt={`${addon.name} ${idx + 1}`}
-                      className="w-full h-full object-contain p-1 sm:p-2"
-                    />
-                  </div>
-                ))}
+        {/* Contenido con scroll */}
+        <div className="flex-1 overflow-y-auto">
+          {/* Layout Grid Responsivo */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-0">
+            
+            {/* COLUMNA IZQUIERDA - Imagen */}
+            <div className="relative bg-gradient-to-br from-gray-50 to-gray-100 p-4 sm:p-6 md:p-8 flex items-center justify-center min-h-[250px] md:min-h-[400px]">
+              {/* Badge */}
+              {addon.badge && (
+                <div className="absolute top-3 left-3 z-10">
+                  <span className="px-2 py-1 sm:px-3 sm:py-1.5 bg-blue-600 text-white text-[10px] sm:text-xs font-bold rounded-full shadow-lg">
+                    {addon.badge}
+                  </span>
+                </div>
+              )}
+
+              {/* Imagen Principal */}
+              <div className="w-full aspect-square max-w-[200px] sm:max-w-[250px] md:max-w-xs">
+                <AppImage 
+                  src={addon.image_url} 
+                  alt={addon.name}
+                  className="w-full h-full object-contain drop-shadow-xl"
+                />
               </div>
-            )}
-          </div>
 
-          {/* Product Info */}
-          <div className="space-y-2 sm:space-y-3">
-            <div>
-              <h2 className="text-xl sm:text-2xl font-bold text-gray-900">{addon.name}</h2>
-              {addon.model && (
-                <p className="text-xs sm:text-sm text-gray-500 font-medium mt-1">{addon.model}</p>
+              {/* Mini Gallery Thumbnails */}
+              {addon.gallery && addon.gallery.length > 0 && (
+                <div className="absolute bottom-3 left-3 right-3 flex gap-1.5 sm:gap-2 justify-center">
+                  {addon.gallery.slice(0, 3).map((img, idx) => (
+                    <div key={idx} className="w-10 h-10 sm:w-12 sm:h-12 bg-white rounded-md shadow-md overflow-hidden border border-gray-200">
+                      <AppImage 
+                        src={img} 
+                        alt={`Vista ${idx + 1}`}
+                        className="w-full h-full object-contain p-0.5 sm:p-1"
+                      />
+                    </div>
+                  ))}
+                </div>
               )}
             </div>
 
-            {/* Price */}
-            <div className="flex flex-wrap items-baseline gap-2 sm:gap-3">
-              <span className="text-2xl sm:text-3xl font-bold text-gray-900">
-                ${Number(addon.price).toLocaleString('es-UY')}
-              </span>
-              {addon.original_price && addon.original_price > addon.price && (
-                <>
-                  <span className="text-base sm:text-lg text-gray-400 line-through">
-                    ${Number(addon.original_price).toLocaleString('es-UY')}
+            {/* COLUMNA DERECHA - Info */}
+            <div className="p-4 sm:p-6 md:p-8 space-y-3 sm:space-y-4">
+              
+              {/* Título */}
+              <div>
+                <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900 leading-tight">
+                  {addon.name}
+                </h2>
+                {addon.model && (
+                  <p className="text-xs sm:text-sm text-gray-500 font-medium mt-1">{addon.model}</p>
+                )}
+              </div>
+
+              {/* Precio y Stock en la misma línea */}
+              <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b">
+                <div className="flex flex-wrap items-baseline gap-2">
+                  <span className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900">
+                    ${Number(addon.price).toLocaleString('es-UY')}
                   </span>
-                  <span className="px-2 py-1 bg-green-100 text-green-700 text-xs font-bold rounded">
-                    {Math.round(((addon.original_price - addon.price) / addon.original_price) * 100)}% OFF
+                  {addon.original_price && addon.original_price > addon.price && (
+                    <>
+                      <span className="text-base sm:text-lg text-gray-400 line-through">
+                        ${Number(addon.original_price).toLocaleString('es-UY')}
+                      </span>
+                      <span className="px-2 py-0.5 bg-green-100 text-green-700 text-xs font-bold rounded-full">
+                        {Math.round(((addon.original_price - addon.price) / addon.original_price) * 100)}% OFF
+                      </span>
+                    </>
+                  )}
+                </div>
+                
+                {/* Stock Badge */}
+                <div className="flex items-center gap-1.5">
+                  <div className={`w-2 h-2 rounded-full ${
+                    addon.stock_count > 5 ? 'bg-green-500' : 
+                    addon.stock_count > 0 ? 'bg-yellow-500' : 
+                    'bg-red-500'
+                  }`} />
+                  <span className={`text-xs sm:text-sm font-semibold ${
+                    addon.stock_count > 5 ? 'text-green-700' : 
+                    addon.stock_count > 0 ? 'text-yellow-700' : 
+                    'text-red-700'
+                  }`}>
+                    {addon.stock_count > 5 ? 'En Stock' : 
+                     addon.stock_count > 0 ? `${addon.stock_count} unidades` : 
+                     'Sin Stock'}
                   </span>
-                </>
+                </div>
+              </div>
+
+              {/* Descripción - Compacta */}
+              {addon.description && (
+                <div className="pb-3 border-b">
+                  <h4 className="text-xs sm:text-sm font-bold text-gray-900 mb-1.5 uppercase tracking-wide">Descripción</h4>
+                  <p className="text-xs sm:text-sm text-gray-600 leading-relaxed line-clamp-3">
+                    {addon.description}
+                  </p>
+                </div>
+              )}
+
+              {/* Features - Ultra Compacto */}
+              {features.length > 0 && (
+                <div>
+                  <h4 className="text-xs sm:text-sm font-bold text-gray-900 mb-2 uppercase tracking-wide">Características</h4>
+                  <div className="space-y-1.5">
+                    {features.slice(0, 4).map((feature, idx) => (
+                      <div key={idx} className="flex items-start gap-2">
+                        <div className="w-4 h-4 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                          <Icon name="CheckIcon" size={10} className="text-green-600" />
+                        </div>
+                        <span className="text-xs sm:text-sm text-gray-700 flex-1 leading-snug">{feature}</span>
+                      </div>
+                    ))}
+                  </div>
+                  {features.length > 4 && (
+                    <p className="text-[10px] sm:text-xs text-gray-500 mt-2 italic">
+                      +{features.length - 4} características más
+                    </p>
+                  )}
+                </div>
               )}
             </div>
-
-            {/* Stock Status */}
-            <div className="flex items-center gap-2">
-              <div className={`w-2 h-2 rounded-full flex-shrink-0 ${
-                addon.stock_count > 5 ? 'bg-green-500' : 
-                addon.stock_count > 0 ? 'bg-yellow-500' : 
-                'bg-red-500'
-              }`} />
-              <span className={`text-xs sm:text-sm font-medium ${
-                addon.stock_count > 5 ? 'text-green-700' : 
-                addon.stock_count > 0 ? 'text-yellow-700' : 
-                'text-red-700'
-              }`}>
-                {addon.stock_count > 5 ? 'En Stock' : 
-                 addon.stock_count > 0 ? `Últimas ${addon.stock_count} unidades` : 
-                 'Sin Stock'}
-              </span>
-            </div>
           </div>
-
-          {/* Description */}
-          {addon.description && (
-            <div className="pt-3 sm:pt-4 border-t">
-              <h4 className="text-xs sm:text-sm font-bold text-gray-900 mb-2">Descripción</h4>
-              <p className="text-xs sm:text-sm text-gray-600 leading-relaxed whitespace-pre-line">
-                {addon.description}
-              </p>
-            </div>
-          )}
-
-          {/* Features */}
-          {features.length > 0 && (
-            <div className="pt-3 sm:pt-4 border-t">
-              <h4 className="text-xs sm:text-sm font-bold text-gray-900 mb-3">Características</h4>
-              <ul className="space-y-2">
-                {features.map((feature, idx) => (
-                  <li key={idx} className="flex items-start gap-2 text-xs sm:text-sm text-gray-700">
-                    <Icon name="CheckCircleIcon" size={18} className="text-green-500 flex-shrink-0 mt-0.5 sm:w-5 sm:h-5" />
-                    <span className="flex-1">{feature}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          {/* Padding bottom para evitar que el contenido quede pegado al borde en móvil */}
-          <div className="h-4 sm:h-0" />
         </div>
       </div>
     </div>
@@ -389,11 +420,7 @@ export default function ProductDetailsInteractive({ productInitial, galleryIniti
                               <button
                                   key={c.name}
                                   onClick={() => setSelectedColor(c)}
-                                  className={`
-                                      relative w-9 h-9 sm:w-10 sm:h-10 rounded-full border shadow-sm transition-all focus:outline-none
-                                      ${selectedColor?.name === c.name ? 'ring-2 ring-offset-2 ring-blue-600 border-white scale-110' : 'border-gray-200 hover:scale-105'}
-                                      ${isOutOfStock ? 'opacity-50 grayscale' : ''}
-                                  `}
+                                  className={`relative w-9 h-9 sm:w-10 sm:h-10 rounded-full border shadow-sm transition-all focus:outline-none ${selectedColor?.name === c.name ? 'ring-2 ring-offset-2 ring-blue-600 border-white scale-110' : 'border-gray-200 hover:scale-105'} ${isOutOfStock ? 'opacity-50 grayscale' : ''}`}
                                   style={{ backgroundColor: c.hex }}
                                   title={`${c.name} ${isOutOfStock ? '(Sin Stock)' : ''}`}
                                   aria-label={`Seleccionar color ${c.name}`}
@@ -480,14 +507,7 @@ export default function ProductDetailsInteractive({ productInitial, galleryIniti
                                                 e.preventDefault();
                                                 openAddonModal(addon);
                                               }}
-                                              className="inline-flex items-center gap-1 
-                                                       px-2 py-0.5 
-                                                       bg-blue-50 hover:bg-blue-100
-                                                       border border-blue-200 hover:border-blue-300
-                                                       text-blue-700 text-[10px] sm:text-xs font-semibold 
-                                                       rounded-full
-                                                       transition-all duration-200
-                                                       active:scale-95"
+                                              className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-50 hover:bg-blue-100 border border-blue-200 hover:border-blue-300 text-blue-700 text-[10px] sm:text-xs font-semibold rounded-full transition-all duration-200 active:scale-95"
                                               title="Ver información completa"
                                             >
                                               <Icon name="EyeIcon" size={10} className="sm:w-3 sm:h-3" />
@@ -534,11 +554,7 @@ export default function ProductDetailsInteractive({ productInitial, galleryIniti
                     <button 
                       onClick={handleAddToCart}
                       disabled={stockStatus === 'out-of-stock'}
-                      className={`w-full py-3 sm:py-4 rounded-lg font-bold text-base sm:text-lg shadow-md transition-all flex items-center justify-center gap-2
-                          ${stockStatus === 'out-of-stock' 
-                              ? 'bg-gray-200 text-gray-400 cursor-not-allowed shadow-none' 
-                              : 'bg-blue-600 hover:bg-blue-700 text-white hover:shadow-lg active:scale-95'
-                          }`}
+                      className={`w-full py-3 sm:py-4 rounded-lg font-bold text-base sm:text-lg shadow-md transition-all flex items-center justify-center gap-2 ${stockStatus === 'out-of-stock' ? 'bg-gray-200 text-gray-400 cursor-not-allowed shadow-none' : 'bg-blue-600 hover:bg-blue-700 text-white hover:shadow-lg active:scale-95'}`}
                     >
                       <Icon name="ShoppingCartIcon" size={20} className="sm:w-6 sm:h-6" />
                       <span className="truncate">
