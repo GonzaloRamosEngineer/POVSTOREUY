@@ -61,7 +61,39 @@ function normalizeFeatures(v: unknown): string[] {
   return [];
 }
 
-// --- Componente Modal de Addon - VERSIÓN SIN SCROLL VISIBLE ---
+// --- Componente de Markdown Simple ---
+function MarkdownText({ text }: { text: string }) {
+  const renderMarkdown = (content: string) => {
+    // Reemplazar **bold** con <strong>
+    let processed = content.replace(/\*\*(.*?)\*\*/g, '<strong class="font-bold">$1</strong>');
+    
+    // Reemplazar *italic* con <em>
+    processed = processed.replace(/\*(.*?)\*/g, '<em class="italic">$1</em>');
+    
+    // Reemplazar __underline__ con <u>
+    processed = processed.replace(/__(.*?)__/g, '<u class="underline">$1</u>');
+    
+    // Split por saltos de línea y crear párrafos
+    const paragraphs = processed.split('\n\n').filter(p => p.trim());
+    
+    return paragraphs.map((paragraph, idx) => {
+      // Reemplazar saltos de línea simples con <br>
+      const withBreaks = paragraph.replace(/\n/g, '<br />');
+      
+      return (
+        <p 
+          key={idx} 
+          className={idx > 0 ? 'mt-2' : ''}
+          dangerouslySetInnerHTML={{ __html: withBreaks }}
+        />
+      );
+    });
+  };
+
+  return <div className="text-xs sm:text-sm text-gray-600 leading-relaxed">{renderMarkdown(text)}</div>;
+}
+
+// --- Componente Modal de Addon - CON SOPORTE MARKDOWN ---
 function AddonDetailModal({ 
   addon, 
   isOpen, 
@@ -196,13 +228,11 @@ function AddonDetailModal({
                 </div>
               </div>
 
-              {/* Descripción */}
+              {/* Descripción con Soporte Markdown */}
               {addon.description && (
                 <div className="pb-3 border-b">
                   <h4 className="text-xs sm:text-sm font-bold text-gray-900 mb-1.5 uppercase tracking-wide">Descripción</h4>
-                  <p className="text-xs sm:text-sm text-gray-600 leading-relaxed">
-                    {addon.description}
-                  </p>
+                  <MarkdownText text={addon.description} />
                 </div>
               )}
 
