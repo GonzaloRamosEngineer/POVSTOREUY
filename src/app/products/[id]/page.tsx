@@ -1,19 +1,20 @@
 import { createClient } from '@supabase/supabase-js';
 import { notFound } from 'next/navigation';
 import Header from '@/components/common/Header'; 
-// ELIMINADO: import Footer from '@/components/common/Footer'; (Ya está en layout.tsx)
 
 // --- COMPONENTES DEL PRODUCTO ---
 import ProductDetailsInteractive from '@/app/product-details/components/ProductDetailsInteractive';
 import ProductStickyNav from '@/app/product-details/components/ProductStickyNav';
-// Importamos tipos para corregir error TS
 import DynamicStoryRenderer, { StoryBlock } from '@/app/product-details/components/DynamicStoryRenderer';
 import TechSpecsTable from '@/app/product-details/components/TechSpecsTable'; 
 import ProductComparison from '@/app/product-details/components/ProductComparison';
 import ProductFAQ from '@/app/product-details/components/ProductFAQ';
 import CommunitySection from '@/app/product-details/components/CommunitySection'; 
+import ProductReviewsSection from '@/app/product-details/components/ProductReviewsSection';
 
+// --- UTILIDADES Y TIPOS ---
 import { Product } from '@/types/product'; 
+import { normalizeReviewRow } from '@/lib/reviews';
 
 export const dynamic = 'force-dynamic';
 
@@ -45,7 +46,7 @@ export async function generateMetadata({ params }: Props) {
 export default async function ProductPage({ params }: Props) {
   const { id } = await params;
 
-  // 1. Traemos productos
+  // 1. Traemos todos los productos activos para comparativas y selección
   const { data: allProducts, error } = await supabase
     .from('products')
     .select('*')
@@ -54,17 +55,31 @@ export default async function ProductPage({ params }: Props) {
 
   if (error || !allProducts) notFound();
 
-  // 2. Producto actual
+  // 2. Identificamos el producto actual
   const rawProduct = allProducts.find((p) => p.id === id);
   if (!rawProduct) notFound();
 
-  // 3. Otros productos
+  // 3. Traemos las reseñas relacionadas con este producto
+  // Incluimos el full_name del perfil del usuario
+  const { data: reviewsData } = await supabase
+    .from('product_reviews')
+    .select(`
+      *,
+      user_profiles(full_name)
+    `)
+    .eq('product_id', id)
+    .order('created_at', { ascending: false });
+
+  // Normalizamos las reseñas para que el componente las entienda correctamente
+  const reviews = (reviewsData || []).map(normalizeReviewRow);
+
+  // 4. Filtramos otros productos para la comparativa
   const otherProducts = allProducts.filter(p => p.id !== id);
 
-  // Casting
+  // Casting de tipo para el producto principal
   const product = rawProduct as unknown as Product;
   
-  // 4. Galería
+  // 5. Formateamos la galería de imágenes y video
   const formattedGallery = [
     {
       id: 'main-image',
@@ -89,10 +104,8 @@ export default async function ProductPage({ params }: Props) {
   ];
 
   return (
-    // MODO CLARO: bg-white text-neutral-900
     <div className="min-h-screen bg-white text-neutral-900 selection:bg-red-100 selection:text-red-900">
       
-      {/* Si el Header también se duplica, borra esta línea <Header /> igual que hicimos con el Footer */}
       <Header />
       
       {/* 1. STICKY NAV */}
@@ -117,7 +130,7 @@ export default async function ProductPage({ params }: Props) {
         </div>
       )}
 
-      {/* 4. ESPECIFICACIONES (Sin título duplicado) */}
+      {/* 4. ESPECIFICACIONES */}
       <div id="specs" className="py-24 bg-gray-50 border-t border-gray-100">
          <div className="max-w-7xl mx-auto px-4">
             <TechSpecsTable specs={product.tech_specs} />
@@ -140,7 +153,7 @@ export default async function ProductPage({ params }: Props) {
       {/* 6. COMUNIDAD */}
       <CommunitySection />
 
-      {/* 7. PREGUNTAS FRECUENTES (Sin título duplicado) */}
+      {/* 7. PREGUNTAS FRECUENTES */}
       {product.faq_content && product.faq_content.length > 0 && (
         <div id="faq" className="py-24 bg-gray-50 border-t border-gray-100">
           <div className="max-w-4xl mx-auto px-4">
@@ -149,13 +162,11 @@ export default async function ProductPage({ params }: Props) {
         </div>
       )}
 
-      {/* 8. RESEÑAS */}
-      <div id="reviews" className="py-24 bg-white border-t border-gray-100 text-center">
-          <h2 className="text-3xl font-bold mb-4 text-gray-900">Opiniones de Clientes</h2>
-          <p className="text-gray-500">Próximamente: Sistema de reseñas integrado.</p>
+      {/* 8. RESEÑAS (Sustituido el marcador de posición por el componente real) */}
+      <div id="reviews" className="py-24 bg-white border-t border-gray-100">
+          <ProductReviewsSection reviews={reviews} />
       </div>
 
-      {/* FOOTER ELIMINADO AQUI PORQUE YA VIENE DEL LAYOUT GLOBAL */}
     </div>
   );
 }
