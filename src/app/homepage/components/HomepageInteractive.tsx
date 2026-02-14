@@ -10,17 +10,13 @@ import MobileStickyCTA from './MobileStickyCTA';
 import ComparisonTable from './ComparisonTable';
 import TargetAudienceSection from './TargetAudienceSection';
 import TestimonialsSection from './TestimonialsSection';
+import { normalizeReviewRow, type AppReview } from '@/lib/reviews';
 import NewsletterSection from './NewsletterSection';
 import SocialMediaSection from './SocialMediaSection';
 import { getSupabaseBrowserClient } from '@/lib/supabaseClient';
 
 // Helper del carrito
-import {
-  readCart,
-  upsertCartItem,
-  incrementItem,
-  type CartItem as CartItemType,
-} from '@/lib/cart';
+import { readCart, upsertCartItem, incrementItem, type CartItem as CartItemType } from '@/lib/cart';
 
 interface Product {
   id: string;
@@ -65,9 +61,13 @@ const HomepageInteractive = () => {
   const [productsError, setProductsError] = useState<string | null>(null);
 
   // NOTA: Ya no necesitamos el estado 'cartItems' aquí para pasarlo al Header.
-  // Solo lo necesitamos si quisiéramos validar stock vs carrito localmente, 
+  // Solo lo necesitamos si quisiéramos validar stock vs carrito localmente,
   // pero para simplificar, usaremos lectura directa.
   const [isHydrated, setIsHydrated] = useState(false);
+
+  const [homeReviews, setHomeReviews] = useState<AppReview[]>([]);
+  const [reviewsLoading, setReviewsLoading] = useState(true);
+  const [reviewsError, setReviewsError] = useState<string | null>(null);
 
   useEffect(() => {
     setIsHydrated(true);
@@ -82,7 +82,9 @@ const HomepageInteractive = () => {
 
       const { data, error } = await supabase
         .from('products')
-        .select('id,name,model,description,price,original_price,image_url,stock_count,features,badge,is_active,created_at')
+        .select(
+          'id,name,model,description,price,original_price,image_url,stock_count,features,badge,is_active,created_at'
+        )
         .eq('is_active', true)
         .eq('show_on_home', true)
         .order('created_at', { ascending: false });
@@ -113,7 +115,48 @@ const HomepageInteractive = () => {
     };
 
     loadProducts();
-    return () => { mounted = false; };
+    return () => {
+      mounted = false;
+    };
+  }, [supabase]);
+
+  // Load reviews for homepage
+  useEffect(() => {
+    let mounted = true;
+
+    const loadReviews = async () => {
+      setReviewsLoading(true);
+      setReviewsError(null);
+
+      const { data, error } = await supabase
+        .from('product_reviews')
+        .select(
+          'id, product_id, rating, review_text, is_verified_purchase, created_at, user_profiles(full_name), products!inner(name, model, show_on_home, is_active)'
+        )
+        .eq('products.show_on_home', true)
+        .eq('products.is_active', true)
+        .not('review_text', 'is', null)
+        .order('created_at', { ascending: false })
+        .limit(6);
+
+      if (!mounted) return;
+
+      if (error) {
+        console.error('Error loading homepage product reviews:', error);
+        setReviewsError(error.message || 'Error cargando reseñas.');
+        setReviewsLoading(false);
+        return;
+      }
+
+      const mapped = (data ?? []).map((r: any) => normalizeReviewRow(r));
+      setHomeReviews(mapped);
+      setReviewsLoading(false);
+    };
+
+    loadReviews();
+    return () => {
+      mounted = false;
+    };
   }, [supabase]);
 
   const totalStock = useMemo(
@@ -169,7 +212,6 @@ const HomepageInteractive = () => {
     // Ya no envolvemos en <body> o <html> porque eso está en layout.tsx
     // Usamos el fondo negro tech-noir
     <div className="bg-black text-neutral-200">
-      
       {/* HEADER ELIMINADO: Ya está en layout.tsx */}
 
       <main>
@@ -222,10 +264,10 @@ const HomepageInteractive = () => {
 
         <ComparisonTable />
         <TargetAudienceSection />
-        <TestimonialsSection />
+        <TestimonialsSection reviews={homeReviews} loading={reviewsLoading} error={reviewsError} />
         <NewsletterSection />
         <SocialMediaSection />
-        
+
         {/* FOOTER ELIMINADO: Ya está en layout.tsx */}
       </main>
     </div>
