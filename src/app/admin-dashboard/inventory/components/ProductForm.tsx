@@ -20,7 +20,6 @@ type StoryBlock =
 type TechSpec = { label: string; value: string };
 type FAQItem = { question: string; answer: string };
 
-// Variante de color
 type ColorVariant = {
   id: string;
   name: string;
@@ -39,15 +38,14 @@ type ProductPayload = {
   gallery: string[];
   video_url: string | null;
   stock_count: number;
-  features: string[]; // Bullet points simples
+  features: string[];
   badge: string | null;
   is_active: boolean;
   colors: ColorVariant[];
   addon_ids: string[];
   show_on_home: boolean;
-  // Nuevos campos JSON
   story_content: StoryBlock[];
-  tech_specs: Record<string, string>; // Se guarda como objeto en DB
+  tech_specs: Record<string, string>;
   faq_content: FAQItem[];
 };
 
@@ -120,14 +118,16 @@ export default function ProductForm({ mode, productId }: { mode: Mode; productId
     story_content: [], tech_specs: {}, faq_content: []
   });
   
-  const [featuresText, setFeaturesText] = useState(''); // Bullet points simples
-  
-  // Estados para editores complejos
-  const [specsList, setSpecsList] = useState<TechSpec[]>([]); // Array temporal para editar specs
+  const [featuresText, setFeaturesText] = useState(''); 
+  const [specsList, setSpecsList] = useState<TechSpec[]>([]); 
   const [newColorName, setNewColorName] = useState('');
   const [newColorHex, setNewColorHex] = useState('#000000');
   const [editingVariantIndex, setEditingVariantIndex] = useState<number | null>(null);
-  const [draggedImgIdx, setDraggedImgIdx] = useState<number | null>(null);
+
+  const STANDARD_SPECS = [
+    'Resolución Máxima', 'Estabilización', 'Resistencia al Agua', 
+    'Duración Batería', 'Ángulo de Visión', 'Sensor', 'Conectividad', 'Peso'
+  ];
 
   // --- SUBIDA DE ARCHIVOS ---
   const uploadToSupabase = async (file: File): Promise<string> => {
@@ -138,7 +138,29 @@ export default function ProductForm({ mode, productId }: { mode: Mode; productId
     return data.publicUrl;
   };
 
-  // --- LOGICA STORY BUILDER ---
+  // --- LÓGICA DE ORDENAMIENTO DE SPECS ---
+  const orderedSpecs = useMemo(() => {
+    return [...specsList].sort((a, b) => {
+        const aIsStandard = STANDARD_SPECS.includes(a.label);
+        const bIsStandard = STANDARD_SPECS.includes(b.label);
+        if (aIsStandard && !bIsStandard) return -1;
+        if (!aIsStandard && bIsStandard) return 1;
+        return 0;
+    });
+  }, [specsList]);
+
+  // --- ACCIONES DE SPECS ---
+  const updateSpec = (realIdx: number, field: 'label'|'value', val: string) => {
+      const newList = [...specsList];
+      newList[realIdx][field] = val;
+      setSpecsList(newList);
+  };
+
+  const removeSpec = (realIdx: number) => {
+      setSpecsList(specsList.filter((_, i) => i !== realIdx));
+  };
+
+  // --- LÓGICA STORY, FAQ Y VARIANTES ---
   const addStoryBlock = (type: StoryBlock['type']) => {
     const newBlock: any = { type };
     if (type === 'full_video') { newBlock.video_url = ''; newBlock.title = ''; }
@@ -158,16 +180,6 @@ export default function ProductForm({ mode, productId }: { mode: Mode; productId
     setForm(s => ({ ...s, story_content: s.story_content.filter((_, i) => i !== idx) }));
   };
 
-  // --- LOGICA TECH SPECS ---
-  const addSpec = () => setSpecsList([...specsList, { label: '', value: '' }]);
-  const updateSpec = (idx: number, field: 'label'|'value', val: string) => {
-      const newList = [...specsList];
-      newList[idx][field] = val;
-      setSpecsList(newList);
-  };
-  const removeSpec = (idx: number) => setSpecsList(specsList.filter((_, i) => i !== idx));
-
-  // --- LOGICA FAQ ---
   const addFAQ = () => setForm(s => ({ ...s, faq_content: [...s.faq_content, { question: '', answer: '' }] }));
   const updateFAQ = (idx: number, field: 'question'|'answer', val: string) => {
       setForm(s => {
@@ -178,25 +190,27 @@ export default function ProductForm({ mode, productId }: { mode: Mode; productId
   };
   const removeFAQ = (idx: number) => setForm(s => ({ ...s, faq_content: s.faq_content.filter((_, i) => i !== idx) }));
 
-  // --- MANEJADORES VARIANTES (Ya existentes) ---
   const addVariant = () => {
     if (!newColorName) return;
     const newVariant: ColorVariant = { id: Math.random().toString(36).substr(2, 9), name: newColorName, hex: newColorHex, images: [], stock: 0 };
     setForm(s => ({ ...s, colors: [...s.colors, newVariant] }));
     setNewColorName(''); setNewColorHex('#000000');
   };
+
   const removeVariant = (idx: number) => {
     setForm(s => ({ ...s, colors: s.colors.filter((_, i) => i !== idx) }));
     if (editingVariantIndex === idx) setEditingVariantIndex(null);
   };
+
   const updateVariantStock = (val: number, idx: number) => {
       setForm(s => {
           const newColors = [...s.colors];
           newColors[idx].stock = val;
-          const totalStock = newColors.reduce((acc, c) => acc + c.stock, 0);
+          const totalStock = newColors.reduce((acc, c) => acc + (c.stock || 0), 0);
           return { ...s, colors: newColors, stock_count: totalStock > 0 ? totalStock : s.stock_count };
       });
   };
+
   const handleVariantImageUpload = async (e: React.ChangeEvent<HTMLInputElement>, variantIdx: number) => {
     if (!e.target.files?.length) return;
     const files = Array.from(e.target.files);
@@ -209,6 +223,7 @@ export default function ProductForm({ mode, productId }: { mode: Mode; productId
     });
     e.target.value = '';
   };
+
   const toggleAddon = (id: string) => {
     setForm(s => {
         const exists = s.addon_ids.includes(id);
@@ -231,8 +246,6 @@ export default function ProductForm({ mode, productId }: { mode: Mode; productId
             });
             if (res.ok) {
                 const { product: p } = await res.json();
-                
-                // Parsear tech_specs de Objeto a Array para el editor
                 const loadedSpecs = p.tech_specs 
                     ? Object.entries(p.tech_specs).map(([k, v]) => ({ label: k, value: String(v) }))
                     : [];
@@ -259,7 +272,7 @@ export default function ProductForm({ mode, productId }: { mode: Mode; productId
             setLoading(false);
         }
     })();
-  }, []);
+  }, [productId, mode, supabase, router]);
 
   // --- GUARDAR ---
   const onSubmit = async () => {
@@ -267,13 +280,6 @@ export default function ProductForm({ mode, productId }: { mode: Mode; productId
       const { data: session } = await supabase.auth.getSession();
       if (!session.session) return;
 
-      let finalStock = form.stock_count;
-      if (form.colors.length > 0) {
-          const variantStock = form.colors.reduce((acc, c) => acc + (c.stock || 0), 0);
-          if (variantStock > 0) finalStock = variantStock;
-      }
-
-      // Convertir Array de Specs a Objeto para guardar
       const specsObject = specsList.reduce((acc, item) => {
           if (item.label && item.value) acc[item.label] = item.value;
           return acc;
@@ -281,16 +287,13 @@ export default function ProductForm({ mode, productId }: { mode: Mode; productId
 
       const payload = {
           ...form,
-          stock_count: finalStock,
+          stock_count: form.colors.length > 0 ? form.colors.reduce((acc, c) => acc + (c.stock || 0), 0) : form.stock_count,
           features: parseFeatures(featuresText),
           tech_specs: specsObject,
       };
 
-      const url = mode === 'create' ? '/api/admin/products' : `/api/admin/products?id=${productId}`;
-      const method = mode === 'create' ? 'POST' : 'PATCH';
-
-      const res = await fetch(url, {
-          method,
+      const res = await fetch(mode === 'create' ? '/api/admin/products' : `/api/admin/products?id=${productId}`, {
+          method: mode === 'create' ? 'POST' : 'PATCH',
           headers: { Authorization: `Bearer ${session.session.access_token}`, 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
       });
@@ -312,11 +315,11 @@ export default function ProductForm({ mode, productId }: { mode: Mode; productId
       <div className="sticky top-0 bg-white/95 backdrop-blur z-20 py-4 border-b flex justify-between items-center">
         <div>
             <h1 className="text-2xl font-bold text-gray-900">{mode === 'create' ? 'Crear Producto' : 'Editar Producto'}</h1>
-            <p className="text-sm text-gray-500">Gestión completa de contenido, inventario e historia.</p>
+            <p className="text-sm text-gray-500">Gestión de inventario y especificaciones comparativas.</p>
         </div>
         <div className="flex gap-3">
             <Link href="/admin-dashboard/inventory" className="px-4 py-2 border rounded-md hover:bg-gray-50 text-sm">Cancelar</Link>
-            <button onClick={onSubmit} disabled={saving} className="px-6 py-2 bg-black text-white rounded-md hover:bg-gray-800 disabled:opacity-50 flex items-center gap-2">
+            <button onClick={onSubmit} disabled={saving} className="px-6 py-2 bg-black text-white rounded-md hover:bg-gray-800 disabled:opacity-50">
                 {saving ? 'Guardando...' : 'Guardar Producto'}
             </button>
         </div>
@@ -326,7 +329,7 @@ export default function ProductForm({ mode, productId }: { mode: Mode; productId
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
         
-        {/* COLUMNA IZQUIERDA (Multimedia General) */}
+        {/* COLUMNA IZQUIERDA (Multimedia) */}
         <div className="lg:col-span-4 space-y-6">
             <div className="bg-white p-5 rounded-xl border shadow-sm">
                 <h3 className="font-bold text-gray-900 text-sm uppercase tracking-wide mb-1">Foto de Portada</h3>
@@ -342,7 +345,7 @@ export default function ProductForm({ mode, productId }: { mode: Mode; productId
                 <div className="grid grid-cols-3 gap-2 mt-3">
                     {form.gallery.map((url, idx) => (
                         <div key={idx} className="relative aspect-square rounded-md overflow-hidden border bg-gray-50 group">
-                            <img src={url} className="w-full h-full object-cover" />
+                            <img src={url} alt="Gallery item" className="w-full h-full object-cover" />
                             <button onClick={() => setForm(s => ({...s, gallery: s.gallery.filter((_, i) => i !== idx)}))} className="absolute top-1 right-1 bg-red-600 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
                                 <Icon name="XMarkIcon" size={10} />
                             </button>
@@ -355,74 +358,52 @@ export default function ProductForm({ mode, productId }: { mode: Mode; productId
             </div>
         </div>
 
-        {/* COLUMNA CENTRAL (Datos y Story) */}
+        {/* COLUMNA CENTRAL (Datos y Specs) */}
         <div className="lg:col-span-8 space-y-8">
             
-            {/* 1. Info Básica */}
             <div className="bg-white p-6 rounded-xl border shadow-sm space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                     <div><label className="block text-sm font-medium mb-1">Nombre</label><input value={form.name} onChange={e => setForm(s => ({...s, name: e.target.value}))} className="w-full p-2 border rounded-md" /></div>
-                    <div><label className="block text-sm font-medium mb-1">Modelo/SKU</label><input value={form.model} onChange={e => setForm(s => ({...s, model: e.target.value}))} className="w-full p-2 border rounded-md" /></div>
+                    <div><label className="block text-sm font-medium mb-1">Modelo</label><input value={form.model} onChange={e => setForm(s => ({...s, model: e.target.value}))} className="w-full p-2 border rounded-md" /></div>
                 </div>
                 <div><label className="block text-sm font-medium mb-1">Descripción Corta</label><textarea value={form.description} onChange={e => setForm(s => ({...s, description: e.target.value}))} className="w-full p-2 border rounded-md h-24" /></div>
                 <div className="grid grid-cols-3 gap-4">
                     <div><label className="block text-sm font-medium mb-1">Precio</label><input type="number" value={form.price} onChange={e => setForm(s => ({...s, price: Number(e.target.value)}))} className="w-full p-2 border rounded-md font-bold" /></div>
-                    <div><label className="block text-sm font-medium mb-1">Precio Tachado</label><input type="number" value={form.original_price || ''} onChange={e => setForm(s => ({...s, original_price: e.target.value ? Number(e.target.value) : null}))} className="w-full p-2 border rounded-md" /></div>
                     <div><label className="block text-sm font-medium mb-1 text-gray-500">Stock (Calc)</label><input disabled value={form.stock_count} className="w-full p-2 border rounded-md bg-gray-100 text-center" /></div>
                 </div>
             </div>
 
-            {/* 2. VARIANTES */}
+            {/* VARIANTES */}
             <div className="bg-white p-6 rounded-xl border shadow-sm border-l-4 border-l-blue-500">
-                <div className="flex justify-between items-center mb-6">
-                    <h3 className="text-lg font-bold text-gray-900">Variantes de Color</h3>
-                </div>
+                <h3 className="text-lg font-bold text-gray-900 mb-6">Variantes de Color</h3>
                 <div className="flex items-end gap-3 mb-6 p-4 bg-gray-50 rounded-lg">
-                    <div><label className="text-xs font-bold uppercase text-gray-500">Nombre</label><input value={newColorName} onChange={e => setNewColorName(e.target.value)} className="w-32 p-2 border rounded-md text-sm" placeholder="Ej: Blanco" /></div>
+                    <div><label className="text-xs font-bold uppercase text-gray-500">Color</label><input value={newColorName} onChange={e => setNewColorName(e.target.value)} className="w-32 p-2 border rounded-md text-sm" placeholder="Blanco" /></div>
                     <div><label className="text-xs font-bold uppercase text-gray-500">Hex</label><input type="color" value={newColorHex} onChange={e => setNewColorHex(e.target.value)} className="w-10 h-9 p-0 border rounded cursor-pointer" /></div>
                     <button onClick={addVariant} className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700">Agregar</button>
                 </div>
                 <div className="space-y-4">
                     {form.colors.map((color, idx) => (
-                        <div key={color.id || idx} className={`border rounded-lg overflow-hidden transition-all ${editingVariantIndex === idx ? 'ring-2 ring-blue-500' : ''}`}>
+                        <div key={color.id || idx} className="border rounded-lg overflow-hidden">
                             <div className="flex items-center justify-between p-3 bg-white">
                                 <div className="flex items-center gap-3">
                                     <div className="w-6 h-6 rounded-full border shadow-sm" style={{ backgroundColor: color.hex }} />
                                     <span className="font-bold text-gray-800">{color.name}</span>
-                                    <span className={`text-xs px-2 py-0.5 rounded-full ${color.stock > 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>Stock: {color.stock}</span>
-                                    <span className="text-xs text-gray-400">{color.images.length} fotos</span>
+                                    <span className="text-xs text-gray-400">Stock: {color.stock}</span>
                                 </div>
-                                <div className="flex items-center gap-2">
-                                    <button onClick={() => setEditingVariantIndex(editingVariantIndex === idx ? null : idx)} className="text-blue-600 hover:bg-blue-50 px-3 py-1.5 rounded-md text-sm font-medium">
-                                        {editingVariantIndex === idx ? 'Cerrar' : 'Gestionar'}
-                                    </button>
-                                    <button onClick={() => removeVariant(idx)} className="text-gray-400 hover:text-red-600 p-2"><Icon name="TrashIcon" size={18} /></button>
+                                <div className="flex gap-2">
+                                    <button onClick={() => setEditingVariantIndex(editingVariantIndex === idx ? null : idx)} className="text-blue-600 text-sm font-medium underline">Editar</button>
+                                    <button onClick={() => removeVariant(idx)} className="text-gray-400 hover:text-red-600"><Icon name="TrashIcon" size={18} /></button>
                                 </div>
                             </div>
                             {editingVariantIndex === idx && (
                                 <div className="p-4 bg-gray-50 border-t space-y-4">
-                                    <div>
-                                        <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Stock</label>
-                                        <input type="number" value={color.stock} onChange={e => updateVariantStock(Number(e.target.value), idx)} className="w-32 p-2 border rounded-md font-mono font-bold" />
-                                    </div>
-                                    <div>
-                                        <div className="flex justify-between items-end mb-2">
-                                            <label className="block text-xs font-bold text-gray-700 uppercase">Galería {color.name}</label>
-                                            <label className="text-xs text-blue-600 cursor-pointer hover:underline flex items-center gap-1">
-                                                <Icon name="PlusIcon" size={14} /> Agregar Fotos
-                                                <input type="file" multiple accept="image/*" className="hidden" onChange={(e) => handleVariantImageUpload(e, idx)} />
-                                            </label>
-                                        </div>
-                                        <div className="flex flex-wrap gap-3">
-                                            {color.images.map((img, imgIdx) => (
-                                                <div key={imgIdx} className="relative w-20 h-20 rounded-md overflow-hidden border bg-white group">
-                                                    <img src={img} className="w-full h-full object-cover" />
-                                                    <button onClick={() => { const newColors = [...form.colors]; newColors[idx].images = newColors[idx].images.filter((_, i) => i !== imgIdx); setForm(s => ({...s, colors: newColors})); }} className="absolute top-0.5 right-0.5 bg-red-600 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                        <Icon name="XMarkIcon" size={10} />
-                                                    </button>
-                                                </div>
-                                            ))}
-                                        </div>
+                                    <input type="number" value={color.stock} onChange={e => updateVariantStock(Number(e.target.value), idx)} className="w-24 p-2 border rounded-md" />
+                                    <label className="block text-xs text-blue-600 cursor-pointer">
+                                        + Subir Fotos
+                                        <input type="file" multiple className="hidden" onChange={(e) => handleVariantImageUpload(e, idx)} />
+                                    </label>
+                                    <div className="flex gap-2 flex-wrap">
+                                        {color.images.map((img, i) => <img key={i} src={img} className="w-12 h-12 object-cover rounded border" alt="" />)}
                                     </div>
                                 </div>
                             )}
@@ -431,103 +412,110 @@ export default function ProductForm({ mode, productId }: { mode: Mode; productId
                 </div>
             </div>
 
-            {/* 3. HISTORIA VISUAL (Nuevo Editor de Bloques) */}
-            <div className="bg-white p-6 rounded-xl border shadow-sm space-y-6">
-                <div className="flex justify-between items-center border-b pb-4">
-                    <h3 className="text-lg font-bold text-gray-900">Historia Visual ("Apple Style")</h3>
-                    <div className="flex gap-2">
-                        <button onClick={() => addStoryBlock('full_video')} className="px-3 py-1 bg-gray-100 hover:bg-gray-200 rounded text-xs font-medium">+ Video Full</button>
-                        <button onClick={() => addStoryBlock('image_left')} className="px-3 py-1 bg-gray-100 hover:bg-gray-200 rounded text-xs font-medium">+ Img Izq</button>
-                        <button onClick={() => addStoryBlock('image_right')} className="px-3 py-1 bg-gray-100 hover:bg-gray-200 rounded text-xs font-medium">+ Img Der</button>
-                    </div>
+            {/* 4. ESPECIFICACIONES TÉCNICAS (Orden Inteligente) */}
+            <div className="bg-white p-6 rounded-xl border shadow-sm space-y-6 border-l-4 border-l-red-600">
+                <div>
+                    <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                        <Icon name="ScaleIcon" size={20} className="text-red-600" />
+                        Especificaciones del Comparador
+                    </h3>
+                    <p className="text-[10px] text-gray-400 uppercase font-bold mt-1 tracking-wider">
+                        Ordenado por: Validados primero ↓
+                    </p>
                 </div>
-                <div className="space-y-6">
-                    {form.story_content.map((block, idx) => (
-                        <div key={idx} className="border rounded-lg p-4 bg-gray-50 relative group">
-                            <button onClick={() => removeStoryBlock(idx)} className="absolute top-2 right-2 text-gray-400 hover:text-red-500"><Icon name="TrashIcon" size={16}/></button>
-                            <span className="text-xs font-bold uppercase text-blue-600 mb-2 block">{block.type.replace('_', ' ')}</span>
-                            
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-xs text-gray-500 mb-1">Media URL (Video/Imagen)</label>
-                                    <div className="flex gap-2">
-                                        <input value={block.type === 'full_video' ? (block as any).video_url : (block as any).image_url} onChange={(e) => updateStoryBlock(idx, block.type === 'full_video' ? 'video_url' : 'image_url', e.target.value)} className="flex-1 p-2 border rounded-md text-sm" placeholder="https://..." />
-                                        <div className="w-10 h-10 relative">
-                                            <ImageUploader label="" onUpload={async (f) => { const url = await uploadToSupabase(f); updateStoryBlock(idx, block.type === 'full_video' ? 'video_url' : 'image_url', url); }} />
-                                        </div>
+
+                {/* Presets Obligatorios */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-2 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                    {STANDARD_SPECS.map((suggestion) => {
+                        const exists = specsList.find(s => s.label === suggestion);
+                        return (
+                            <button
+                                key={suggestion}
+                                type="button"
+                                onClick={() => {
+                                    if (!exists) setSpecsList([...specsList, { label: suggestion, value: '' }]);
+                                }}
+                                className={`px-2 py-1.5 rounded text-[11px] font-bold transition-all border ${
+                                    exists 
+                                    ? 'bg-red-600 border-red-600 text-white shadow-sm' 
+                                    : 'bg-white border-gray-300 text-gray-600 hover:border-red-400 hover:text-red-600'
+                                }`}
+                            >
+                                {exists ? '✓ ' : '+ '} {suggestion}
+                            </button>
+                        );
+                    })}
+                </div>
+
+                {/* Lista de Specs con el nuevo orden */}
+                <div className="space-y-3 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
+                    {orderedSpecs.map((spec) => {
+                        const isStandard = STANDARD_SPECS.includes(spec.label);
+                        const realIdx = specsList.findIndex(s => s === spec);
+
+                        return (
+                            <div key={spec.label + realIdx} className={`flex gap-3 items-center p-3 rounded-lg border transition-all ${
+                                isStandard ? 'bg-white border-gray-100 shadow-sm' : 'bg-amber-50/50 border-amber-100 italic'
+                            }`}>
+                                <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div className="relative">
+                                        <label className={`text-[9px] font-black uppercase absolute -top-2 left-2 px-1 ${
+                                            isStandard ? 'text-gray-400 bg-white' : 'text-amber-600 bg-amber-50'
+                                        }`}>
+                                            {isStandard ? 'Atributo Validado' : '⚠️ Etiqueta Personalizada'}
+                                        </label>
+                                        <input 
+                                            value={spec.label} 
+                                            onChange={(e) => updateSpec(realIdx, 'label', e.target.value)} 
+                                            className={`w-full p-2 border rounded-md text-sm font-bold outline-none ${
+                                                isStandard ? 'border-gray-100' : 'border-amber-200 focus:ring-amber-400'
+                                            }`}
+                                        />
+                                    </div>
+                                    <div className="relative">
+                                        <label className={`text-[9px] font-black uppercase absolute -top-2 left-2 px-1 ${
+                                            isStandard ? 'text-gray-400 bg-white' : 'text-amber-600 bg-amber-50'
+                                        }`}>
+                                            Valor
+                                        </label>
+                                        <input 
+                                            value={spec.value} 
+                                            onChange={(e) => updateSpec(realIdx, 'value', e.target.value)} 
+                                            className="w-full p-2 border border-gray-200 rounded-md text-sm focus:ring-2 focus:ring-red-500 outline-none" 
+                                            placeholder="Completar dato..."
+                                        />
                                     </div>
                                 </div>
-                                <div className="space-y-2">
-                                    <input value={block.title || ''} onChange={(e) => updateStoryBlock(idx, 'title', e.target.value)} className="w-full p-2 border rounded-md text-sm font-bold" placeholder="Título del Bloque" />
-                                    {block.type !== 'full_video' && (
-                                        <textarea value={(block as any).description || ''} onChange={(e) => updateStoryBlock(idx, 'description', e.target.value)} className="w-full p-2 border rounded-md text-sm h-20" placeholder="Descripción..." />
-                                    )}
-                                </div>
+                                <button 
+                                    type="button"
+                                    onClick={() => removeSpec(realIdx)} 
+                                    className="p-2 text-gray-300 hover:text-red-600 hover:bg-red-50 rounded-full transition-all"
+                                >
+                                    <Icon name="TrashIcon" size={18}/>
+                                </button>
                             </div>
-                        </div>
-                    ))}
-                    {form.story_content.length === 0 && <p className="text-sm text-gray-400 italic text-center">No hay bloques de historia. Agrega uno para empezar.</p>}
+                        );
+                    })}
                 </div>
             </div>
 
-            {/* 4. ESPECIFICACIONES TÉCNICAS (Nuevo Editor Key-Value) */}
+            {/* OTROS SECCIONES (STORY, FAQ, EXTRAS) */}
             <div className="bg-white p-6 rounded-xl border shadow-sm space-y-4">
-                <h3 className="text-lg font-bold text-gray-900 border-b pb-2">Especificaciones Técnicas (Comparador)</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {specsList.map((spec, idx) => (
-                        <div key={idx} className="flex gap-2 items-center">
-                            <input value={spec.label} onChange={(e) => updateSpec(idx, 'label', e.target.value)} className="w-1/3 p-2 border rounded-md text-sm bg-gray-50" placeholder="Ej: Batería" />
-                            <input value={spec.value} onChange={(e) => updateSpec(idx, 'value', e.target.value)} className="flex-1 p-2 border rounded-md text-sm" placeholder="Ej: 120 min" />
-                            <button onClick={() => removeSpec(idx)} className="text-gray-400 hover:text-red-500"><Icon name="XMarkIcon" size={16}/></button>
-                        </div>
-                    ))}
-                </div>
-                <button type="button" onClick={addSpec} className="text-sm text-blue-600 hover:underline font-medium">+ Agregar Especificación</button>
-            </div>
-
-            {/* 5. PREGUNTAS FRECUENTES (FAQ) */}
-            <div className="bg-white p-6 rounded-xl border shadow-sm space-y-4">
-                <h3 className="text-lg font-bold text-gray-900 border-b pb-2">Preguntas Frecuentes (FAQ)</h3>
-                <div className="space-y-4">
-                    {form.faq_content.map((faq, idx) => (
-                        <div key={idx} className="border rounded-lg p-3 bg-gray-50 relative group">
-                            <button onClick={() => removeFAQ(idx)} className="absolute top-2 right-2 text-gray-400 hover:text-red-500"><Icon name="XMarkIcon" size={14}/></button>
-                            <input value={faq.question} onChange={(e) => updateFAQ(idx, 'question', e.target.value)} className="w-full p-2 border rounded-md text-sm font-bold mb-2" placeholder="Pregunta" />
-                            <textarea value={faq.answer} onChange={(e) => updateFAQ(idx, 'answer', e.target.value)} className="w-full p-2 border rounded-md text-sm" placeholder="Respuesta" />
-                        </div>
-                    ))}
-                </div>
-                <button type="button" onClick={addFAQ} className="text-sm text-blue-600 hover:underline font-medium">+ Agregar Pregunta</button>
-            </div>
-
-            {/* 6. EXTRAS (Bullet Points Simples + Addons) */}
-            <div className="bg-white p-6 rounded-xl border shadow-sm space-y-4">
-                <h3 className="font-bold text-gray-900 border-b pb-2">Extras</h3>
-                <div>
-                    <label className="text-sm font-medium">Características Rápidas (Bullet Points)</label>
-                    <textarea value={featuresText} onChange={(e) => setFeaturesText(e.target.value)} className="w-full p-2 border rounded-md h-24 font-mono text-sm mt-1" placeholder="Una por línea..." />
-                </div>
-                <div>
-                    <label className="text-sm font-medium mb-2 block">Productos Adicionales (Upselling)</label>
-                    <div className="h-40 overflow-y-auto border rounded-md p-2 bg-gray-50">
-                        {allProducts.filter(p => p.id !== productId).map(prod => (
-                            <label key={prod.id} className="flex items-center gap-2 p-2 hover:bg-white rounded cursor-pointer">
-                                <input type="checkbox" checked={form.addon_ids.includes(prod.id)} onChange={() => toggleAddon(prod.id)} className="rounded border-gray-300 text-blue-600" />
-                                <span className="text-sm text-gray-700">{prod.name}</span>
-                            </label>
-                        ))}
+                <h3 className="text-lg font-bold border-b pb-2">Preguntas Frecuentes</h3>
+                {form.faq_content.map((faq, idx) => (
+                    <div key={idx} className="p-3 bg-gray-50 rounded relative">
+                        <button onClick={() => removeFAQ(idx)} className="absolute top-2 right-2 text-gray-400"><Icon name="XMarkIcon" size={14}/></button>
+                        <input value={faq.question} onChange={e => updateFAQ(idx, 'question', e.target.value)} className="w-full p-2 border rounded mb-2 text-sm" placeholder="Pregunta" />
+                        <textarea value={faq.answer} onChange={e => updateFAQ(idx, 'answer', e.target.value)} className="w-full p-2 border rounded text-sm" placeholder="Respuesta" />
                     </div>
-                </div>
+                ))}
+                <button onClick={addFAQ} className="text-blue-600 text-sm font-medium">+ Agregar FAQ</button>
             </div>
 
             <div className="bg-white p-6 rounded-xl border shadow-sm space-y-4">
-                <div className="flex items-center justify-between p-3 border rounded-lg bg-gray-50">
-                    <span className="font-medium text-gray-700">Producto Publicado</span>
-                    <input type="checkbox" checked={form.is_active} onChange={e => setForm(s => ({...s, is_active: e.target.checked}))} className="w-5 h-5 text-blue-600" />
-                </div>
-                <div className="flex items-center justify-between p-3 border rounded-lg bg-gray-50">
-                    <span className="font-medium text-gray-700">Mostrar en Homepage</span>
-                    <input type="checkbox" checked={form.show_on_home} onChange={e => setForm(s => ({...s, show_on_home: e.target.checked}))} className="w-5 h-5 text-blue-600" />
+                <div className="flex gap-4">
+                    <label className="flex items-center gap-2"><input type="checkbox" checked={form.is_active} onChange={e => setForm(s => ({...s, is_active: e.target.checked}))}/> Activo</label>
+                    <label className="flex items-center gap-2"><input type="checkbox" checked={form.show_on_home} onChange={e => setForm(s => ({...s, show_on_home: e.target.checked}))}/> Ver en Home</label>
                 </div>
             </div>
 
