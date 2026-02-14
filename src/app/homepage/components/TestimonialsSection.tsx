@@ -69,7 +69,7 @@ const TestimonialsSection = () => {
              {/* Botón de Acción (Notificarme) */}
              <button className="px-8 py-3 bg-white text-black font-bold rounded-full hover:bg-neutral-200 transition-colors shadow-[0_0_20px_rgba(255,255,255,0.1)] flex items-center gap-2 mx-auto">
                 <Icon name="BellIcon" size={18} />
-                Avisame cuando lance
+                Avisame cuando este listo!
              </button>
           </div>
         </div>
