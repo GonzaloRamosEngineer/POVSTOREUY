@@ -10,6 +10,28 @@ export const dynamic = 'force-dynamic';
 export const metadata: Metadata = {
   title: 'POV Store Uruguay - Cámaras 4K para Creadores de Contenido',
   description: 'Cámaras POV mini 4K profesionales a precios accesibles. Perfectas para YouTubers, TikTokers e influencers uruguayos. Envío gratis y despacho en 24hs.',
+  openGraph: {
+    title: 'POV Store Uruguay - Tu vida en primera persona',
+    description: 'Cámaras de acción 4K, ultraligeras y magnéticas. El kit más completo de Uruguay para creadores de contenido.',
+    url: 'https://povstore.uy', 
+    siteName: 'POV Store Uruguay',
+    images: [
+      {
+        url: 'https://povstore.uy/images/og-home.png', // Corregido dominio y extensión
+        width: 1200,
+        height: 630,
+        alt: 'POV Store Uruguay - Equipamiento para Creadores',
+      },
+    ],
+    locale: 'es_UY',
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'POV Store Uruguay',
+    description: 'Cámaras POV profesionales a precios accesibles.',
+    images: ['https://povstore.uy/images/og-home.png'], // Corregido
+  },
 };
 
 export default function Page() {
@@ -132,7 +154,7 @@ export default function ComingSoonPage() {
               <div className="w-32 h-32 sm:w-40 sm:h-40 md:w-48 md:h-48 rounded-full bg-gradient-to-r from-red-500/10 via-transparent to-red-500/10 animate-spin-slow" />
             </div>
             
-                      <div className="relative w-32 h-32 sm:w-40 sm:h-40 md:w-48 md:h-48 group-hover:scale-110 transition-transform duration-500">
+            <div className="relative w-32 h-32 sm:w-40 sm:h-40 md:w-48 md:h-48 group-hover:scale-110 transition-transform duration-500">
               <Image 
                 src="/images/logo-pov.png"
                 alt="POV Store Logo" 
@@ -401,7 +423,7 @@ function TimeUnit({ value, label, icon, isPrimary = false, isAnimated = false }:
           </div>
         </div>
       </div>
-      <div className="flex items-center gap-1 sm:gap-1.5 mt-1.5 sm:mt-2 md:mt-3">
+      <div className="flex items-center gap-1.5 mt-1.5 sm:mt-2 md:mt-3">
         {icon && <div className="text-red-500/70">{icon}</div>}
         <span className="text-[8px] sm:text-[10px] md:text-xs text-neutral-400 font-bold uppercase tracking-[0.15em] sm:tracking-[0.2em] group-hover:text-white transition-colors">
           {label}

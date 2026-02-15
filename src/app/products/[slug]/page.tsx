@@ -26,20 +26,59 @@ type Props = {
   params: Promise<{ slug: string }>;
 };
 
-// SEO Metadata
+// --- FUNCIÓN DE LIMPIEZA DE METADATA ---
+// Elimina sintaxis Markdown para que WhatsApp y buscadores muestren texto limpio
+function cleanMetadataText(text: string) {
+  if (!text) return '';
+  return text
+    .replace(/\*\*(.*?)\*\*/g, '$1') // Quita negritas
+    .replace(/\*(.*?)\*/g, '$1')     // Quita itálicas
+    .replace(/__(.*?)__/g, '$1')     // Quita subrayados
+    .replace(/\r?\n|\r/g, ' ')       // Quita saltos de línea y los cambia por espacios
+    .trim();
+}
+
+// --- SEO y Open Graph Metadata Dinámica ---
 export async function generateMetadata({ params }: Props) {
   const { slug } = await params;
   const { data: product } = await supabase
     .from('products')
-    .select('name, description')
+    .select('name, description, image_url')
     .eq('slug', slug)
     .single();
 
   if (!product) return { title: 'Producto no encontrado' };
 
+  const fullTitle = `${product.name} - POV Store Uruguay`;
+  // Aplicamos la limpieza profunda antes de recortar a 160 caracteres
+  const cleanDesc = cleanMetadataText(product.description || '').substring(0, 160);
+  const imageUrl = product.image_url;
+
   return {
-    title: `${product.name} - POV Store Uruguay`,
-    description: product.description?.substring(0, 160) || 'Cámaras de acción profesionales.',
+    title: fullTitle,
+    description: cleanDesc,
+    openGraph: {
+      title: fullTitle,
+      description: cleanDesc,
+      url: `https://povstore.uy/products/${slug}`, // Dominio oficial corregido
+      siteName: 'POV Store Uruguay',
+      images: [
+        {
+          url: imageUrl,
+          width: 1200,
+          height: 630,
+          alt: product.name,
+        },
+      ],
+      locale: 'es_UY',
+      type: 'website',
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: fullTitle,
+      description: cleanDesc,
+      images: [imageUrl],
+    },
   };
 }
 
