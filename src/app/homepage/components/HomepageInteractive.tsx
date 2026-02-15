@@ -24,6 +24,7 @@ import {
 
 interface Product {
   id: string;
+  slug: string; // Agregado para navegación SEO
   name: string;
   price: number;
   originalPrice?: number;
@@ -64,9 +65,6 @@ const HomepageInteractive = () => {
   const [loadingProducts, setLoadingProducts] = useState(true);
   const [productsError, setProductsError] = useState<string | null>(null);
 
-  // NOTA: Ya no necesitamos el estado 'cartItems' aquí para pasarlo al Header.
-  // Solo lo necesitamos si quisiéramos validar stock vs carrito localmente, 
-  // pero para simplificar, usaremos lectura directa.
   const [isHydrated, setIsHydrated] = useState(false);
 
   useEffect(() => {
@@ -80,9 +78,10 @@ const HomepageInteractive = () => {
       setLoadingProducts(true);
       setProductsError(null);
 
+      // --- CONSULTA ACTUALIZADA CON SLUG ---
       const { data, error } = await supabase
         .from('products')
-        .select('id,name,model,description,price,original_price,image_url,stock_count,features,badge,is_active,created_at')
+        .select('id,slug,name,model,description,price,original_price,image_url,stock_count,features,badge,is_active,created_at')
         .eq('is_active', true)
         .eq('show_on_home', true)
         .order('created_at', { ascending: false });
@@ -98,6 +97,7 @@ const HomepageInteractive = () => {
 
       const mapped: Product[] = (data ?? []).map((p: any) => ({
         id: p.id,
+        slug: p.slug, // Mapeo del slug para navegación
         name: p.name,
         price: Number(p.price),
         originalPrice: p.original_price != null ? Number(p.original_price) : undefined,
@@ -126,13 +126,13 @@ const HomepageInteractive = () => {
   const basicStock = basicProduct?.stockCount ?? 0;
   const proStock = proProduct?.stockCount ?? 0;
 
-  // --- LÓGICA DE CARRITO MEJORADA ---
+  // --- LÓGICA DE CARRITO ---
   const handleAddToCart = (productId: string) => {
     if (!isHydrated) return;
 
     const product = products.find((p) => p.id === productId);
     if (!product) return;
-    if ((product.stockCount ?? 0) <= 0) return; // Sin stock
+    if ((product.stockCount ?? 0) <= 0) return;
 
     const currentCart = readCart();
     const existing = currentCart.find((i) => i.id === productId);
@@ -151,13 +151,13 @@ const HomepageInteractive = () => {
       });
     }
 
-    // 🔥 EL SECRETO: Avisar al Header Global que hubo cambios
-    // Esto asegura que el numerito del carrito se actualice instantáneamente
     window.dispatchEvent(new Event('cart-updated'));
   };
 
-  const handleViewDetails = (productId: string) => {
-    router.push(`/products/${productId}`); // Corregí la ruta para que coincida con tu estructura Next.js
+  // --- REDIRECCIÓN ACTUALIZADA A SLUG ---
+  const handleViewDetails = (productSlug: string) => {
+    // CAMBIADO: Ahora usamos el slug para la navegación por código
+    router.push(`/products/${productSlug}`); 
   };
 
   const handleHeroCtaClick = () => {
@@ -166,12 +166,8 @@ const HomepageInteractive = () => {
   };
 
   return (
-    // Ya no envolvemos en <body> o <html> porque eso está en layout.tsx
-    // Usamos el fondo negro tech-noir
     <div className="bg-black text-neutral-200">
       
-      {/* HEADER ELIMINADO: Ya está en layout.tsx */}
-
       <main>
         <MarqueeBanner />
 
@@ -212,7 +208,8 @@ const HomepageInteractive = () => {
                     key={product.id}
                     {...product}
                     onAddToCart={handleAddToCart}
-                    onViewDetails={handleViewDetails}
+                    // Pasamos el slug a la función de detalles
+                    onViewDetails={() => handleViewDetails(product.slug)}
                   />
                 ))}
               </div>
@@ -226,7 +223,6 @@ const HomepageInteractive = () => {
         <NewsletterSection />
         <SocialMediaSection />
         
-        {/* FOOTER ELIMINADO: Ya está en layout.tsx */}
       </main>
     </div>
   );

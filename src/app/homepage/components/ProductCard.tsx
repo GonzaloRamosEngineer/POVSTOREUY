@@ -7,6 +7,7 @@ import Icon from '@/components/ui/AppIcon';
 
 interface ProductCardProps {
   id: string;
+  slug: string; // Agregado para navegación SEO
   name: string;
   price: number;
   originalPrice?: number;
@@ -21,6 +22,7 @@ interface ProductCardProps {
 
 const ProductCard = ({
   id,
+  slug,
   name,
   price,
   originalPrice,
@@ -41,7 +43,8 @@ const ProductCard = ({
   const discount = originalPrice ? Math.round(((originalPrice - price) / originalPrice) * 100) : 0;
   const isLowStock = stockCount <= 5;
   
-  const productUrl = `/products/${id}`; 
+  // CAMBIADO: Ahora usamos el slug para la URL de navegación
+  const productUrl = `/products/${slug}`; 
 
   if (!isHydrated) {
     return (
@@ -116,7 +119,6 @@ const ProductCard = ({
       {/* Content Section */}
       <div className="relative p-6 space-y-5 bg-neutral-900">
         <Link href={productUrl} className="block">
-           {/* Título más grande en desktop para mejor jerarquía visual */}
            <h3 className="text-2xl md:text-3xl font-heading font-bold text-white group-hover:text-red-500 transition-colors duration-300 cursor-pointer leading-tight">
              {name}
            </h3>
@@ -154,16 +156,15 @@ const ProductCard = ({
         </ul>
 
         {/* Actions */}
-<div className="pt-4">
-  <Link
-    href={productUrl}
-    className="w-full px-6 py-3.5 bg-red-600 hover:bg-red-500 text-white text-center font-bold rounded-xl transition-all shadow-[0_4px_14px_0_rgba(220,38,38,0.39)] hover:shadow-[0_6px_20px_rgba(220,38,38,0.23)] hover:-translate-y-0.5 active:translate-y-0 uppercase tracking-wide flex items-center justify-center gap-2"
-  >
-    <Icon name="ShoppingCartIcon" size={18} variant="solid" />
-    <span>Comprar Ahora</span>
-  </Link>
-</div>
-
+        <div className="pt-4">
+          <Link
+            href={productUrl}
+            className="w-full px-6 py-3.5 bg-red-600 hover:bg-red-500 text-white text-center font-bold rounded-xl transition-all shadow-[0_4px_14px_0_rgba(220,38,38,0.39)] hover:shadow-[0_6px_20px_rgba(220,38,38,0.23)] hover:-translate-y-0.5 active:translate-y-0 uppercase tracking-wide flex items-center justify-center gap-2"
+          >
+            <Icon name="ShoppingCartIcon" size={18} variant="solid" />
+            <span>Comprar Ahora</span>
+          </Link>
+        </div>
       </div>
     </div>
   );

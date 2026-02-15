@@ -24,7 +24,7 @@ const ComparisonTable = () => {
       price: '$5.990',
       badge: 'Bestseller',
       badgeColor: 'bg-blue-900/30 text-blue-400 border border-blue-500/30',
-      link: '/products/1aabfacb-5f35-4bcf-9e6d-0316483d8362'
+      link: '/products/sjcam-c100plus'
     },
     {
       id: 'c200-pro',
@@ -32,7 +32,7 @@ const ComparisonTable = () => {
       price: '$8.490',
       badge: 'Pro',
       badgeColor: 'bg-red-900/30 text-red-400 border border-red-500/30',
-      link: '/products/c98290bd-884f-49ce-9554-71a0210638f8'
+      link: '/products/sjcam-c200'
     }
   ];
 

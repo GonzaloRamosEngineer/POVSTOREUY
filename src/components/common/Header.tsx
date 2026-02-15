@@ -21,16 +21,18 @@ const Header = ({ isAdminMode = false }: HeaderProps) => {
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [isHydrated, setIsHydrated] = useState(false);
 
-  // Datos de productos para el menú (IDs específicos)
+  // --- DATOS DE PRODUCTOS (Actualizados con SLUG) ---
   const products = [
     { 
       id: 'c98290bd-884f-49ce-9554-71a0210638f8', 
+      slug: 'sjcam-c200', // Agregado para navegación SEO
       name: 'SJCAM C200', 
       tagline: 'Pro 4K & Estabilización',
       image: 'https://kdzhyalorvjqxhybtdil.supabase.co/storage/v1/object/public/products/1769698612746-gzjsukp0nyj.png'
     },
     { 
       id: '1aabfacb-5f35-4bcf-9e6d-0316483d8362', 
+      slug: 'sjcam-c100plus', // Agregado para navegación SEO
       name: 'SJCAM C100Plus', 
       tagline: 'Mini POV & Magnética',
       image: 'https://kdzhyalorvjqxhybtdil.supabase.co/storage/v1/object/public/products/1769699384843-528qlvmclfk.png'
@@ -138,7 +140,7 @@ const Header = ({ isAdminMode = false }: HeaderProps) => {
                         {products.map((p) => (
                           <Link 
                             key={p.id} 
-                            href={`/products/${p.id}`}
+                            href={`/products/${p.slug}`} // CAMBIADO: id -> slug
                             className="flex items-center gap-4 p-3 rounded-xl hover:bg-white/5 transition-colors group"
                             onClick={handleNavigate}
                           >
@@ -209,7 +211,7 @@ const Header = ({ isAdminMode = false }: HeaderProps) => {
               {isMobileProductsOpen && (
                 <div className="grid gap-2 pl-4 animate-in slide-in-from-top-2 duration-300">
                   {products.map(p => (
-                    <Link key={p.id} href={`/products/${p.id}`} className="flex items-center gap-4 p-4 rounded-2xl bg-neutral-900/50 text-white" onClick={handleNavigate}>
+                    <Link key={p.id} href={`/products/${p.slug}`} className="flex items-center gap-4 p-4 rounded-2xl bg-neutral-900/50 text-white" onClick={handleNavigate}>
                       <div className="w-12 h-12 rounded-lg bg-black overflow-hidden border border-white/5 flex-shrink-0">
                         <AppImage src={p.image} alt={p.name} />
                       </div>

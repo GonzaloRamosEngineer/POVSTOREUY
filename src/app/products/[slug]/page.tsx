@@ -23,16 +23,16 @@ const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 type Props = {
-  params: Promise<{ id: string }>;
+  params: Promise<{ slug: string }>;
 };
 
 // SEO Metadata
 export async function generateMetadata({ params }: Props) {
-  const { id } = await params;
+  const { slug } = await params;
   const { data: product } = await supabase
     .from('products')
     .select('name, description')
-    .eq('id', id)
+    .eq('slug', slug)
     .single();
 
   if (!product) return { title: 'Producto no encontrado' };
@@ -44,39 +44,43 @@ export async function generateMetadata({ params }: Props) {
 }
 
 export default async function ProductPage({ params }: Props) {
-  const { id } = await params;
+  const { slug } = await params;
 
-  // 1. Fetch de productos para catálogo y comparativas
-  const { data: allProducts, error } = await supabase
+  // 1. Buscamos el producto principal por su SLUG
+  const { data: rawProduct, error: prodError } = await supabase
+    .from('products')
+    .select('*')
+    .eq('slug', slug)
+    .single();
+
+  if (prodError || !rawProduct) notFound();
+
+  // 2. Traemos todos los productos activos para comparativas
+  const { data: allProducts } = await supabase
     .from('products')
     .select('*')
     .eq('is_active', true)
     .order('price', { ascending: true });
 
-  if (error || !allProducts) notFound();
-
-  const rawProduct = allProducts.find((p) => p.id === id);
-  if (!rawProduct) notFound();
-
-  // 2. Fetch de reseñas REALES
+  // 3. Fetch de reseñas REALES usando el ID del producto encontrado
   const { data: reviewsData } = await supabase
     .from('product_reviews')
     .select(`
       *,
       user_profiles(full_name)
     `)
-    .eq('product_id', id)
+    .eq('product_id', rawProduct.id)
     .order('created_at', { ascending: false });
 
+  // 4. Lógica de Puntaje Dinámico
   const reviews = (reviewsData || []).map(normalizeReviewRow);
-
-  // 3. Lógica de Puntaje Dinámico
   const totalReviewsCount = reviews.length;
   const averageRatingValue = totalReviewsCount > 0 
     ? Number((reviews.reduce((acc, rev) => acc + rev.rating, 0) / totalReviewsCount).toFixed(1))
     : 0;
 
-  const otherProducts = allProducts.filter(p => p.id !== id);
+  // 5. Preparación de datos para componentes
+  const otherProducts = (allProducts || []).filter(p => p.id !== rawProduct.id);
   const product = rawProduct as unknown as Product;
   
   const formattedGallery = [
@@ -101,7 +105,7 @@ export default async function ProductPage({ params }: Props) {
         totalReviews={totalReviewsCount}
       />
 
-      {/* 2. OVERVIEW (Sección Inicial) */}
+      {/* 2. OVERVIEW - Inyección directa para asegurar datos frescos */}
       <div id="overview" className="pt-24 pb-12">
         <ProductDetailsInteractive 
           productInitial={{
@@ -140,12 +144,12 @@ export default async function ProductPage({ params }: Props) {
         </div>
       </div>
 
-      {/* 6. RESEÑAS (Fondo Gris - Subió de posición) */}
+      {/* 6. RESEÑAS (Fondo Gris) */}
       <div id="reviews" className="py-24 bg-gray-50 border-t border-gray-100">
           <ProductReviewsSection reviews={reviews} />
       </div>
 
-      {/* 7. PREGUNTAS FRECUENTES (Fondo Blanco - Bajó de posición) */}
+      {/* 7. PREGUNTAS FRECUENTES (Fondo Blanco) */}
       {product.faq_content && product.faq_content.length > 0 && (
         <div id="faq" className="py-24 bg-white border-t border-gray-100">
           <div className="max-w-4xl mx-auto px-4">
@@ -154,7 +158,7 @@ export default async function ProductPage({ params }: Props) {
         </div>
       )}
 
-      {/* 8. COMUNIDAD (Final de página) */}
+      {/* 8. COMUNIDAD */}
       <div className="border-t border-gray-100">
         <CommunitySection />
       </div>
