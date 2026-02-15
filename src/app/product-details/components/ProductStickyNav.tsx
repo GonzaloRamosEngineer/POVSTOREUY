@@ -3,29 +3,29 @@
 import React, { useState, useEffect } from 'react';
 import Icon from '@/components/ui/AppIcon';
 
-// 1. Agregamos averageRating y totalReviews a la interfaz
 interface ProductStickyNavProps {
   productName: string;
   productPrice: number;
   productImage: string;
-  averageRating: number; // Nuevo
-  totalReviews: number;  // Nuevo
+  averageRating: number;
+  totalReviews: number;
 }
 
+// Reordenado para coincidir con la página: Comparar -> Reseñas -> FAQ
 const SECTIONS = [
   { id: 'overview', label: 'Resumen' },
   { id: 'specs', label: 'Especificaciones' },
   { id: 'compare', label: 'Comparar' },
-  { id: 'faq', label: 'Preguntas' },
-  { id: 'reviews', label: 'Reseñas' },
+  { id: 'reviews', label: 'Opiniones' }, // Subió de posición
+  { id: 'faq', label: 'Preguntas' },     // Bajó de posición
 ];
 
 export default function ProductStickyNav({ 
   productName, 
   productPrice, 
   productImage,
-  averageRating, // Recibimos el puntaje
-  totalReviews   // Recibimos el conteo
+  averageRating,
+  totalReviews 
 }: ProductStickyNavProps) {
   const [isVisible, setIsVisible] = useState(false);
   const [activeSection, setActiveSection] = useState('overview');
@@ -33,13 +33,16 @@ export default function ProductStickyNav({
 
   useEffect(() => {
     const handleScroll = () => {
+      // Mostrar barra al bajar un poco la pantalla
       setIsVisible(window.scrollY > 600);
       setIsMobileMenuOpen(false);
 
+      // Detectar sección activa para iluminar el botón correspondiente
       for (const section of SECTIONS) {
         const element = document.getElementById(section.id);
         if (element) {
           const rect = element.getBoundingClientRect();
+          // Ajustamos el umbral para que cambie la pestaña activa un poco antes de llegar
           if (rect.top >= 0 && rect.top < 400) {
             setActiveSection(section.id);
             break;
@@ -54,7 +57,7 @@ export default function ProductStickyNav({
   const scrollTo = (id: string) => {
     const element = document.getElementById(id);
     if (element) {
-      const offset = 140; 
+      const offset = 140; // Espacio para no tapar el título con el header + nav
       const y = element.getBoundingClientRect().top + window.scrollY - offset;
       window.scrollTo({ top: y, behavior: 'smooth' });
       setActiveSection(id);
@@ -76,7 +79,7 @@ export default function ProductStickyNav({
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
           <div className="flex justify-between items-center h-14 relative">
             
-            {/* 1. IZQUIERDA: Miniatura del Producto + Puntaje Dinámico */}
+            {/* 1. IZQUIERDA: Miniatura y Precio */}
             <div className="flex items-center gap-3 w-auto md:w-1/3">
                <div className="relative w-8 h-8 rounded border border-gray-100 overflow-hidden bg-white hidden sm:block">
                  <img src={productImage} alt={productName} className="w-full h-full object-contain" />
@@ -85,7 +88,6 @@ export default function ProductStickyNav({
                   <span className="font-bold text-gray-900 text-[11px] md:text-xs truncate max-w-[120px] md:max-w-[180px]">{productName}</span>
                   <div className="flex items-center gap-2">
                     <span className="font-mono text-[11px] text-red-600 font-bold">${productPrice.toLocaleString('es-UY')}</span>
-                    {/* Puntaje sutil al lado del precio */}
                     <div className="flex items-center gap-0.5 border-l border-gray-200 pl-2">
                       <Icon name="StarIcon" size={10} variant="solid" className="text-yellow-400" />
                       <span className="text-[10px] text-gray-400 font-bold">{averageRating}</span>
@@ -94,14 +96,14 @@ export default function ProductStickyNav({
                </div>
             </div>
 
-            {/* 2. CENTRO (DESKTOP) */}
+            {/* 2. CENTRO (DESKTOP): Pestañas Reordenadas */}
             <div className="hidden md:flex flex-1 justify-center space-x-6 h-full items-center">
               {SECTIONS.map((item) => (
                 <button
                   key={item.id}
                   onClick={() => scrollTo(item.id)}
                   className={`
-                    text-[11px] font-black uppercase tracking-widest px-1 py-4 border-b-2 transition-colors
+                    text-[11px] font-black uppercase tracking-widest px-1 py-4 border-b-2 transition-all duration-200
                     ${activeSection === item.id 
                       ? 'border-red-600 text-red-600' 
                       : 'border-transparent text-gray-400 hover:text-gray-900'}
@@ -112,7 +114,7 @@ export default function ProductStickyNav({
               ))}
             </div>
 
-            {/* 2. CENTRO (MOBILE) */}
+            {/* 2. CENTRO (MOBILE): Dropdown */}
             <div className="md:hidden flex-1 flex justify-center">
               <button 
                 onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
@@ -124,13 +126,13 @@ export default function ProductStickyNav({
               </button>
             </div>
             
-            {/* 3. DERECHA: Botón Comprar / Volver arriba */}
+            {/* 3. DERECHA: Acción de subida */}
             <div className="w-auto md:w-1/3 flex justify-end">
               <button 
                 className="flex items-center justify-center w-8 h-8 md:w-auto md:h-auto md:px-4 md:py-1.5 bg-red-600 text-white rounded-full hover:bg-red-700 transition-colors shadow-md group"
                 onClick={scrollToTop}
               >
-                <span className="hidden md:inline text-[10px] font-black uppercase tracking-widest mr-2">Subir</span>
+                <span className="hidden md:inline text-[10px] font-black uppercase tracking-widest mr-2">Comprar</span>
                 <Icon name="ArrowUpIcon" size={12} className="text-white group-hover:-translate-y-0.5 transition-transform" />
               </button>
             </div>
@@ -139,7 +141,7 @@ export default function ProductStickyNav({
         </div>
       </div>
 
-      {/* MENÚ DESPLEGABLE MÓVIL */}
+      {/* MENÚ MÓVIL */}
       {isMobileMenuOpen && (
         <>
           <div className="fixed inset-0 z-40 bg-black/20 md:hidden" onClick={() => setIsMobileMenuOpen(false)} />

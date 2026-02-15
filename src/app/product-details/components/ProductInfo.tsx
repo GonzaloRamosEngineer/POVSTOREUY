@@ -27,6 +27,23 @@ export default function ProductInfo({
   description,
 }: ProductInfoProps) {
   
+  // --- Función de Scroll suave hasta las reseñas ---
+  const scrollToReviews = () => {
+    const reviewsSection = document.getElementById('reviews');
+    if (reviewsSection) {
+      const offset = 100; // Ajuste para que no quede pegado al borde superior (considerando el header sticky)
+      const bodyRect = document.body.getBoundingClientRect().top;
+      const elementRect = reviewsSection.getBoundingClientRect().top;
+      const elementPosition = elementRect - bodyRect;
+      const offsetPosition = elementPosition - offset;
+
+      window.scrollTo({
+        top: offsetPosition,
+        behavior: 'smooth'
+      });
+    }
+  };
+
   // --- Lógica de Ahorro y Precios ---
   const hasDiscount = originalPrice && originalPrice > price;
   const savingsAmount = hasDiscount ? (originalPrice as number) - price : 0;
@@ -34,7 +51,6 @@ export default function ProductInfo({
     ? Math.round((savingsAmount / (originalPrice as number)) * 100) 
     : 0;
     
-  // Referencia de 30 días: Redondeado sin decimales para máxima limpieza
   const price30Days = Math.round(originalPrice ? originalPrice * 1.02 : price * 1.10);
 
   const stockMessages = {
@@ -67,7 +83,7 @@ export default function ProductInfo({
         {name}
       </h1>
 
-      {/* 3. Rating y Opiniones (Unificado a "opiniones") */}
+      {/* 3. Rating y Opiniones con LINK de SCROLL */}
       <div className="flex items-center gap-3">
         <div className="flex items-center gap-0.5">
           {[...Array(5)].map((_, i) => (
@@ -82,26 +98,28 @@ export default function ProductInfo({
         </div>
         <span className="text-sm font-bold text-gray-500">
           {rating.toFixed(1)} <span className="mx-1">•</span> 
-          <button className="underline hover:text-red-600 transition-colors">{reviewCount} opiniones</button>
+          {/* BOTÓN ACTUALIZADO CON ONCLICK */}
+          <button 
+            onClick={scrollToReviews}
+            className="underline hover:text-red-600 transition-colors cursor-pointer decoration-gray-300 hover:decoration-red-600 underline-offset-4"
+          >
+            {reviewCount} opiniones
+          </button>
         </span>
       </div>
 
-      {/* 4. Bloque de Precios y Ahorro (Alineación Baseline) */}
+      {/* 4. Bloque de Precios y Ahorro */}
       <div className="space-y-1">
         <div className="flex items-baseline gap-3 flex-wrap">
-          {/* Precio Principal */}
           <span className="text-4xl font-black text-red-600 tracking-tighter">
             ${price.toLocaleString('es-UY')}
           </span>
 
           {hasDiscount && (
             <div className="flex items-center gap-2">
-              {/* Precio Original Tachado */}
               <span className="text-xl text-gray-400 line-through decoration-gray-400 decoration-1">
                 ${originalPrice?.toLocaleString('es-UY')}
               </span>
-              
-              {/* Badge de Ahorro con espaciado prolijo */}
               <span className="bg-red-600 text-white text-[11px] font-black px-2 py-1 rounded flex items-center gap-1 shadow-sm">
                 -${savingsAmount.toLocaleString('es-UY')} (-{savingsPercentage}%)
               </span>
@@ -109,7 +127,6 @@ export default function ProductInfo({
           )}
         </div>
 
-        {/* Info 30 días sin decimales */}
         {hasDiscount && (
           <p className="text-[13px] text-gray-500 font-medium tracking-tight">
             Precio más bajo en los últimos 30 días: 

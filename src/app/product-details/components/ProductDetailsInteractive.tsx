@@ -44,7 +44,7 @@ interface ProductData {
   is_active: boolean;
   colors?: { name: string; hex: string; images?: string[]; stock?: number }[];
   addon_ids?: string[];
-  rating: number;      
+  rating: number;
   review_count: number;
 }
 
@@ -532,78 +532,79 @@ export default function ProductDetailsInteractive({
                   )}
                 </div>
 
-                {/* Addons List - VERSIÓN PILL/BADGE */}
-                {addonsData.length > 0 && (
-                  <div className="border rounded-lg overflow-hidden">
-                    <div className="bg-gray-50 px-3 py-2 text-xs font-bold text-gray-700 border-b uppercase">
-                      Agrega Accesorios
-                    </div>
-                    <div className="divide-y max-h-[220px] sm:max-h-[280px] overflow-y-auto">
-                      {addonsData.map((addon) => {
-                        const features = normalizeFeatures(addon.features);
-                        const isSelected = selectedAddonIds.includes(addon.id);
-                        const isOutOfStock = addon.stock_count === 0;
+                {/* Sección de Accesorios con Kit Gratuito Forzado */}
+{addonsData.length > 0 && (
+  <div className="border rounded-lg overflow-hidden mb-4">
+    <div className="bg-gray-50 px-3 py-2 text-xs font-bold text-gray-700 border-b uppercase tracking-wider">
+      Agrega Accesorios
+    </div>
+    <div className="divide-y max-h-[280px] overflow-y-auto">
+      
+      {/* ITEM ESTÁTICO: Kit de Accesorios Originales (GRATIS) */}
+      <div className="flex items-center gap-3 p-3 bg-white border-b border-green-50 group">
+        <div className="w-5 h-5 bg-green-600 rounded flex items-center justify-center shadow-sm shadow-green-200">
+          <Icon name="CheckIcon" size={14} className="text-white" />
+        </div>
+        <div className="flex-1">
+          <p className="text-[11px] sm:text-xs font-black text-gray-900 leading-tight">
+            Kit Accesorios Originales
+          </p>
+          <p className="text-[10px] text-green-600 font-black uppercase tracking-tighter mt-0.5">
+            ¡INCLUIDO GRATIS!
+          </p>
+        </div>
+        {/* <div className="text-[10px] text-gray-400 font-medium italic">
+          Valorado en $1.200
+        </div> */}
+      </div>
 
-                        return (
-                          <div
-                            key={addon.id}
-                            className={`relative ${isOutOfStock ? 'opacity-60' : ''}`}
-                          >
-                            {/* Item principal */}
-                            <label className="flex items-start gap-2 sm:gap-3 p-2 sm:p-3 hover:bg-gray-50 cursor-pointer">
-                              <input
-                                type="checkbox"
-                                checked={isSelected}
-                                onChange={() => toggleAddon(addon.id)}
-                                disabled={isOutOfStock}
-                                className="w-4 h-4 text-blue-600 rounded disabled:cursor-not-allowed flex-shrink-0 mt-1"
-                              />
-                              <div className="w-10 h-10 sm:w-12 sm:h-12 border rounded bg-white p-0.5 sm:p-1 flex-shrink-0">
-                                <AppImage
-                                  src={addon.image_url}
-                                  alt={addon.name}
-                                  className="object-contain w-full h-full"
-                                />
-                              </div>
-                              <div className="flex-1 min-w-0 space-y-1">
-                                <p className="text-[11px] sm:text-xs font-medium text-gray-900 line-clamp-2 pr-1">
-                                  {addon.name}
-                                </p>
-                                <div className="flex items-center gap-1.5 flex-wrap">
-                                  <p className="text-[11px] sm:text-xs text-gray-500 font-mono">
-                                    +${Number(addon.price).toLocaleString('es-UY')}
-                                  </p>
-                                  {addon.badge && (
-                                    <span className="px-1 sm:px-1.5 py-0.5 bg-blue-100 text-blue-700 text-[9px] sm:text-[10px] font-bold rounded whitespace-nowrap">
-                                      {addon.badge}
-                                    </span>
-                                  )}
-                                </div>
-                                {/* Pill "Ver más" debajo del nombre */}
-                                <button
-                                  onClick={(e) => {
-                                    e.preventDefault();
-                                    openAddonModal(addon);
-                                  }}
-                                  className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-50 hover:bg-blue-100 border border-blue-200 hover:border-blue-300 text-blue-700 text-[10px] sm:text-xs font-semibold rounded-full transition-all duration-200 active:scale-95"
-                                  title="Ver información completa"
-                                >
-                                  <Icon name="EyeIcon" size={10} className="sm:w-3 sm:h-3" />
-                                  <span>Ver más</span>
-                                </button>
-                                {isOutOfStock && (
-                                  <p className="text-[9px] sm:text-[10px] text-red-500 font-medium">
-                                    Sin stock
-                                  </p>
-                                )}
-                              </div>
-                            </label>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
+      {/* RENDERIZADO DINÁMICO DE LOS DEMÁS ADDONS */}
+      {addonsData.map(addon => {
+        const isSelected = selectedAddonIds.includes(addon.id);
+        const isOutOfStock = addon.stock_count === 0;
+        
+        return (
+          <div key={addon.id} className={`relative ${isOutOfStock ? 'opacity-60' : ''}`}>
+            <label className="flex items-start gap-3 p-3 hover:bg-gray-50 cursor-pointer transition-colors">
+              <input 
+                type="checkbox" 
+                checked={isSelected} 
+                onChange={() => toggleAddon(addon.id)} 
+                disabled={isOutOfStock}
+                className="w-4 h-4 text-blue-600 rounded disabled:cursor-not-allowed mt-1 focus:ring-blue-500" 
+              />
+              <div className="w-10 h-10 border rounded bg-white p-1 flex-shrink-0">
+                <AppImage src={addon.image_url} alt={addon.name} className="object-contain w-full h-full" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-[11px] sm:text-xs font-bold text-gray-900 line-clamp-2 leading-tight">
+                  {addon.name}
+                </p>
+                <div className="flex items-center gap-1.5 mt-1">
+                   <p className="text-[11px] text-gray-500 font-mono font-bold">
+                     +${Number(addon.price).toLocaleString('es-UY')}
+                   </p>
+                   {addon.badge && (
+                     <span className="px-1 py-0.5 bg-blue-50 text-blue-600 text-[9px] font-black rounded uppercase">
+                       {addon.badge}
+                     </span>
+                   )}
+                </div>
+                <button
+                  onClick={(e) => { e.preventDefault(); openAddonModal(addon); }}
+                  className="mt-2 inline-flex items-center gap-1 px-2 py-0.5 bg-blue-50 text-blue-700 text-[10px] font-bold rounded-full border border-blue-100 hover:bg-blue-100 transition-colors"
+                >
+                  <Icon name="EyeIcon" size={10} />
+                  <span>Ver más</span>
+                </button>
+              </div>
+            </label>
+          </div>
+        );
+      })}
+    </div>
+  </div>
+)}
 
                 {/* Cantidad */}
                 <div className="flex items-center justify-between border rounded-md p-1">

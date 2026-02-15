@@ -46,7 +46,7 @@ export async function generateMetadata({ params }: Props) {
 export default async function ProductPage({ params }: Props) {
   const { id } = await params;
 
-  // 1. Traemos todos los productos activos para el catálogo y comparativas
+  // 1. Fetch de productos para catálogo y comparativas
   const { data: allProducts, error } = await supabase
     .from('products')
     .select('*')
@@ -55,11 +55,10 @@ export default async function ProductPage({ params }: Props) {
 
   if (error || !allProducts) notFound();
 
-  // 2. Identificamos el producto actual
   const rawProduct = allProducts.find((p) => p.id === id);
   if (!rawProduct) notFound();
 
-  // 3. Traemos las reseñas REALES de este producto desde product_reviews
+  // 2. Fetch de reseñas REALES
   const { data: reviewsData } = await supabase
     .from('product_reviews')
     .select(`
@@ -69,42 +68,22 @@ export default async function ProductPage({ params }: Props) {
     .eq('product_id', id)
     .order('created_at', { ascending: false });
 
-  // Normalizamos las reseñas para el frontend
   const reviews = (reviewsData || []).map(normalizeReviewRow);
 
-  // --- LÓGICA DE PUNTAJE DINÁMICO ---
+  // 3. Lógica de Puntaje Dinámico
   const totalReviewsCount = reviews.length;
   const averageRatingValue = totalReviewsCount > 0 
     ? Number((reviews.reduce((acc, rev) => acc + rev.rating, 0) / totalReviewsCount).toFixed(1))
     : 0;
 
-  // 4. Filtramos otros productos para la comparativa
   const otherProducts = allProducts.filter(p => p.id !== id);
-
-  // Tipado para uso general en el renderizado
   const product = rawProduct as unknown as Product;
   
-  // 5. Formateamos la galería de imágenes y video
   const formattedGallery = [
-    {
-      id: 'main-image',
-      url: product.image_url,
-      alt: `${product.name} principal`,
-      type: 'image' as const,
-    },
-    ...(product.video_url
-      ? [{
-          id: 'video-main',
-          url: product.video_url,
-          alt: `Video de ${product.name}`,
-          type: 'video' as const,
-        }]
-      : []),
+    { id: 'main-image', url: product.image_url, alt: `${product.name} principal`, type: 'image' as const },
+    ...(product.video_url ? [{ id: 'video-main', url: product.video_url, alt: `Video de ${product.name}`, type: 'video' as const }] : []),
     ...(product.gallery || []).map((url: string, index: number) => ({
-      id: `gallery-${index}`,
-      url: url,
-      alt: `${product.name} vista ${index + 1}`,
-      type: 'image' as const,
+      id: `gallery-${index}`, url: url, alt: `${product.name} vista ${index + 1}`, type: 'image' as const
     })),
   ];
 
@@ -113,7 +92,7 @@ export default async function ProductPage({ params }: Props) {
       
       <Header />
       
-      {/* 1. STICKY NAV - Inyectamos el promedio y total REALES */}
+      {/* 1. STICKY NAV */}
       <ProductStickyNav 
         productName={product.name}
         productPrice={product.price}
@@ -122,7 +101,7 @@ export default async function ProductPage({ params }: Props) {
         totalReviews={totalReviewsCount}
       />
 
-      {/* 2. OVERVIEW - Inyección directa para asegurar datos frescos */}
+      {/* 2. OVERVIEW (Sección Inicial) */}
       <div id="overview" className="pt-24 pb-12">
         <ProductDetailsInteractive 
           productInitial={{
@@ -141,45 +120,43 @@ export default async function ProductPage({ params }: Props) {
         </div>
       )}
 
-      {/* 4. ESPECIFICACIONES */}
+      {/* 4. ESPECIFICACIONES (Fondo Gris) */}
       <div id="specs" className="py-24 bg-gray-50 border-t border-gray-100">
          <div className="max-w-7xl mx-auto px-4">
             <TechSpecsTable specs={product.tech_specs} />
          </div>
       </div>
 
-      {/* 5. COMPARATIVA */}
+      {/* 5. COMPARATIVA (Fondo Blanco) */}
       <div id="compare" className="py-24 border-t border-gray-100 bg-white">
         <div className="max-w-7xl mx-auto px-4">
             <h2 className="text-3xl md:text-4xl font-bold text-center mb-12 text-gray-900">
               Comparativa de Modelos
             </h2>
             <ProductComparison 
-                currentProduct={{
-                  ...product,
-                  rating: averageRatingValue,
-                  review_count: totalReviewsCount
-                } as any} 
+                currentProduct={{ ...product, rating: averageRatingValue, review_count: totalReviewsCount } as any} 
                 otherProducts={otherProducts as unknown as any[]} 
             />
         </div>
       </div>
 
-      {/* 6. COMUNIDAD */}
-      <CommunitySection />
+      {/* 6. RESEÑAS (Fondo Gris - Subió de posición) */}
+      <div id="reviews" className="py-24 bg-gray-50 border-t border-gray-100">
+          <ProductReviewsSection reviews={reviews} />
+      </div>
 
-      {/* 7. PREGUNTAS FRECUENTES */}
+      {/* 7. PREGUNTAS FRECUENTES (Fondo Blanco - Bajó de posición) */}
       {product.faq_content && product.faq_content.length > 0 && (
-        <div id="faq" className="py-24 bg-gray-50 border-t border-gray-100">
+        <div id="faq" className="py-24 bg-white border-t border-gray-100">
           <div className="max-w-4xl mx-auto px-4">
              <ProductFAQ faqs={product.faq_content} />
           </div>
         </div>
       )}
 
-      {/* 8. RESEÑAS - Lista completa real */}
-      <div id="reviews" className="py-24 bg-white border-t border-gray-100">
-          <ProductReviewsSection reviews={reviews} />
+      {/* 8. COMUNIDAD (Final de página) */}
+      <div className="border-t border-gray-100">
+        <CommunitySection />
       </div>
 
     </div>
