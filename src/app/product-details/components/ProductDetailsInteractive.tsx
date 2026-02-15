@@ -436,6 +436,38 @@ export default function ProductDetailsInteractive({
     return product.description || (f.length ? f.join(' • ') : '');
   }, [product]);
 
+
+
+
+  // ---------------------- LÓGICA PARA HIGHLIGHTS SEGÚN EL MODELO ----------------------
+  const productHighlights = useMemo(() => {
+  // Normalizamos a mayúsculas y quitamos espacios para evitar fallos de match
+  const modelName = String(product.model || '').toUpperCase().trim();
+  const productName = String(product.name || '').toUpperCase().trim();
+  
+  // Lógica para C200
+  if (modelName.includes('C200') || productName.includes('C200')) {
+    return [
+      { text: "ESTABILIZACIÓN GYRO 6-EJES", icon: "VideoCameraIcon" },
+      { text: "VISIÓN NOCTURNA PRO", icon: "MoonIcon" }
+    ];
+  }
+  
+  // Lógica para C100 / C100+
+  if (modelName.includes('C100') || productName.includes('C100')) {
+    return [
+      { text: "Cuerpo Magnético", icon: "MagnetIcon" }, 
+      { text: "Ultra Ligera", icon: "SparklesIcon" }
+    ];
+  }
+
+  // Si es un accesorio (como la memoria) u otro producto
+  return [
+    { text: "Calidad Premium", icon: "StarIcon" },
+    { text: "Garantía Oficial", icon: "ShieldCheckIcon" }
+  ];
+}, [product.model, product.name]);
+
   const totalPrice = useMemo(() => {
     const base = Number(product.price) * quantity;
     const addonsCost = selectedAddonIds.reduce((acc, id) => {
@@ -535,6 +567,7 @@ export default function ProductDetailsInteractive({
               stockStatus={stockStatus}
               stockCount={currentStock}
               description={desc}
+              highlights={productHighlights} // <--- AGREGÁ ESTA LÍNEA
             />
 
             {/* Selector de Colores */}

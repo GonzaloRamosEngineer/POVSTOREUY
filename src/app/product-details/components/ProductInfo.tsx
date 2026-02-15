@@ -13,6 +13,8 @@ interface ProductInfoProps {
   stockStatus: 'in-stock' | 'low-stock' | 'out-of-stock';
   stockCount?: number;
   description: string;
+  // Array opcional de objetos para los atributos destacados
+  highlights?: { text: string; icon: string }[];
 }
 
 export default function ProductInfo({
@@ -25,13 +27,14 @@ export default function ProductInfo({
   stockStatus,
   stockCount,
   description,
+  highlights,
 }: ProductInfoProps) {
   
   // --- Función de Scroll suave hasta las reseñas ---
   const scrollToReviews = () => {
     const reviewsSection = document.getElementById('reviews');
     if (reviewsSection) {
-      const offset = 100; // Ajuste para que no quede pegado al borde superior (considerando el header sticky)
+      const offset = 100;
       const bodyRect = document.body.getBoundingClientRect().top;
       const elementRect = reviewsSection.getBoundingClientRect().top;
       const elementPosition = elementRect - bodyRect;
@@ -52,6 +55,14 @@ export default function ProductInfo({
     : 0;
     
   const price30Days = Math.round(originalPrice ? originalPrice * 1.02 : price * 1.10);
+
+  // --- Lógica de Highlights (Atributos Destacados) ---
+  const defaultHighlights = [
+    { text: "Grabación 4K UHD", icon: "VideoCameraIcon" },
+    { text: "Estabilización EIS", icon: "BoltIcon" }
+  ];
+
+  const displayHighlights = highlights && highlights.length > 0 ? highlights : defaultHighlights;
 
   const stockMessages = {
     'in-stock': 'En stock',
@@ -98,7 +109,6 @@ export default function ProductInfo({
         </div>
         <span className="text-sm font-bold text-gray-500">
           {rating.toFixed(1)} <span className="mx-1">•</span> 
-          {/* BOTÓN ACTUALIZADO CON ONCLICK */}
           <button 
             onClick={scrollToReviews}
             className="underline hover:text-red-600 transition-colors cursor-pointer decoration-gray-300 hover:decoration-red-600 underline-offset-4"
@@ -142,20 +152,21 @@ export default function ProductInfo({
         </div>
       )}
 
-      {/* 6. Atributos Destacados */}
+      {/* 6. Atributos Destacados Dinámicos */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
-        <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl border border-gray-100 group hover:border-red-100 transition-colors">
-          <div className="w-8 h-8 rounded-lg bg-white flex items-center justify-center text-red-600 shadow-sm border border-gray-100">
-            <Icon name="VideoCameraIcon" size={18} variant="solid" />
+        {displayHighlights.map((item, idx) => (
+          <div 
+            key={idx} 
+            className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl border border-gray-100 group hover:border-red-100 transition-colors"
+          >
+            <div className="w-8 h-8 rounded-lg bg-white flex items-center justify-center text-red-600 shadow-sm border border-gray-100">
+              <Icon name={item.icon as any} size={18} variant="solid" />
+            </div>
+            <span className="text-sm font-bold text-gray-700 uppercase tracking-tight">
+              {item.text}
+            </span>
           </div>
-          <span className="text-sm font-bold text-gray-700 uppercase tracking-tight">Grabación 4K UHD</span>
-        </div>
-        <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl border border-gray-100 group hover:border-red-100 transition-colors">
-          <div className="w-8 h-8 rounded-lg bg-white flex items-center justify-center text-red-600 shadow-sm border border-gray-100">
-            <Icon name="BoltIcon" size={18} variant="solid" />
-          </div>
-          <span className="text-sm font-bold text-gray-700 uppercase tracking-tight">Estabilización EIS</span>
-        </div>
+        ))}
       </div>
     </div>
   );
