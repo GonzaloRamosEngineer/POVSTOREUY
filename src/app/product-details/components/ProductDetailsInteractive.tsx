@@ -102,7 +102,7 @@ export function MarkdownText({ text, className = '' }: { text: string; className
   );
 }
 
-// --- Componente Modal de Addon - CON SOPORTE MARKDOWN ---
+// --- Componente Modal de Addon - CON GALERÍA DINÁMICA ---
 function AddonDetailModal({
   addon,
   isOpen,
@@ -113,10 +113,14 @@ function AddonDetailModal({
   onClose: () => void;
 }) {
   const features = normalizeFeatures(addon.features);
+  
+  // Estado para controlar qué imagen se está viendo
+  const [activeImage, setActiveImage] = useState(addon.image_url);
 
-  // Prevenir scroll del body cuando el modal está abierto
+  // Resetear la imagen principal cuando cambia el addon o se abre el modal
   useEffect(() => {
     if (isOpen) {
+      setActiveImage(addon.image_url);
       document.body.style.overflow = 'hidden';
     } else {
       document.body.style.overflow = 'unset';
@@ -124,9 +128,26 @@ function AddonDetailModal({
     return () => {
       document.body.style.overflow = 'unset';
     };
-  }, [isOpen]);
+  }, [isOpen, addon.image_url]);
 
   if (!isOpen) return null;
+
+  // Combinamos la imagen principal con la galería para tener todo el set
+  const allImages = [addon.image_url, ...(addon.gallery || [])].filter(Boolean);
+  
+  // Índice actual de la imagen
+  const currentImageIndex = allImages.indexOf(activeImage);
+
+  // Funciones de navegación
+  const goToPrevImage = () => {
+    const prevIndex = currentImageIndex > 0 ? currentImageIndex - 1 : allImages.length - 1;
+    setActiveImage(allImages[prevIndex]);
+  };
+
+  const goToNextImage = () => {
+    const nextIndex = currentImageIndex < allImages.length - 1 ? currentImageIndex + 1 : 0;
+    setActiveImage(allImages[nextIndex]);
+  };
 
   return (
     <>
@@ -134,7 +155,7 @@ function AddonDetailModal({
         className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[99999] flex items-center justify-center p-3 sm:p-4 overflow-y-auto"
         onClick={onClose}
       >
-        {/* Modal Card - Sin Scroll Visible */}
+        {/* Modal Card */}
         <div
           className="bg-white rounded-xl sm:rounded-2xl w-full max-w-4xl my-auto shadow-2xl transform transition-all duration-300 ease-out"
           onClick={(e) => e.stopPropagation()}
@@ -142,7 +163,7 @@ function AddonDetailModal({
           {/* Botón cerrar absoluto */}
           <button
             onClick={onClose}
-            className="absolute top-2 right-2 sm:top-3 sm:right-3 z-10 p-1.5 sm:p-2 bg-white/95 hover:bg-white rounded-full shadow-lg transition-all hover:scale-110 active:scale-95"
+            className="absolute top-2 right-2 sm:top-3 sm:right-3 z-50 p-1.5 sm:p-2 bg-white/95 hover:bg-white rounded-full shadow-lg transition-all hover:scale-110 active:scale-95"
             aria-label="Cerrar"
           >
             <Icon name="XMarkIcon" size={18} className="sm:w-5 sm:h-5 text-gray-700" />
@@ -150,8 +171,8 @@ function AddonDetailModal({
 
           {/* Layout Grid Responsivo */}
           <div className="grid grid-cols-1 md:grid-cols-5 gap-0">
-            {/* COLUMNA IZQUIERDA - Imagen (2/5 del ancho en desktop) */}
-            <div className="md:col-span-2 relative bg-gradient-to-br from-gray-50 to-gray-100 rounded-t-xl md:rounded-l-xl md:rounded-tr-none p-4 sm:p-6 flex items-center justify-center min-h-[280px] sm:min-h-[350px]">
+            {/* COLUMNA IZQUIERDA - GALERÍA INTERACTIVA */}
+            <div className="md:col-span-2 relative bg-gradient-to-br from-gray-50 to-gray-100 rounded-t-xl md:rounded-l-xl md:rounded-tr-none p-4 sm:p-6 flex flex-col items-center justify-center min-h-[280px] sm:min-h-[350px]">
               {/* Badge */}
               {addon.badge && (
                 <div className="absolute top-3 left-3 z-10">
@@ -161,35 +182,70 @@ function AddonDetailModal({
                 </div>
               )}
 
-              {/* Imagen Principal */}
-              <div className="w-full aspect-square max-w-[200px] sm:max-w-[250px]">
+              {/* Visor de Imagen Principal con Flechas de Navegación */}
+              <div className="w-full aspect-square max-w-[200px] sm:max-w-[250px] mb-4 relative group">
                 <AppImage
-                  src={addon.image_url}
+                  key={activeImage}
+                  src={activeImage}
                   alt={addon.name}
-                  className="w-full h-full object-contain drop-shadow-xl"
+                  className="w-full h-full object-contain drop-shadow-xl transition-all duration-300"
                 />
+                
+                {/* Flechas de Navegación - Solo si hay más de 1 imagen */}
+                {allImages.length > 1 && (
+                  <>
+                    {/* Flecha Izquierda */}
+                    <button
+                      onClick={goToPrevImage}
+                      className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-2 sm:-translate-x-3 p-1.5 sm:p-2 bg-white/90 hover:bg-white rounded-full shadow-lg transition-all opacity-0 group-hover:opacity-100 hover:scale-110 active:scale-95"
+                      aria-label="Imagen anterior"
+                    >
+                      <Icon name="ChevronLeftIcon" size={18} className="sm:w-5 sm:h-5 text-gray-700" />
+                    </button>
+                    
+                    {/* Flecha Derecha */}
+                    <button
+                      onClick={goToNextImage}
+                      className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-2 sm:translate-x-3 p-1.5 sm:p-2 bg-white/90 hover:bg-white rounded-full shadow-lg transition-all opacity-0 group-hover:opacity-100 hover:scale-110 active:scale-95"
+                      aria-label="Imagen siguiente"
+                    >
+                      <Icon name="ChevronRightIcon" size={18} className="sm:w-5 sm:h-5 text-gray-700" />
+                    </button>
+
+                    {/* Contador de imágenes */}
+                    <div className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-2 px-2 py-1 bg-black/60 text-white text-[10px] sm:text-xs font-bold rounded-full">
+                      {currentImageIndex + 1} / {allImages.length}
+                    </div>
+                  </>
+                )}
               </div>
 
-              {/* Mini Gallery Thumbnails */}
-              {addon.gallery && addon.gallery.length > 0 && (
-                <div className="absolute bottom-3 left-3 right-3 flex gap-1.5 sm:gap-2 justify-center">
-                  {addon.gallery.slice(0, 3).map((img, idx) => (
-                    <div
-                      key={idx}
-                      className="w-10 h-10 sm:w-12 sm:h-12 bg-white rounded-md shadow-md overflow-hidden border border-gray-200"
+              {/* Miniaturas (Selector de Galería) */}
+              {allImages.length > 1 && (
+                <div className="flex gap-1.5 sm:gap-2 justify-center flex-wrap mt-auto">
+                  {allImages.map((img, idx) => (
+                    <button
+                      key={`${img}-${idx}`}
+                      onClick={() => setActiveImage(img)}
+                      className={`w-10 h-10 sm:w-12 sm:h-12 bg-white rounded-md overflow-hidden border-2 transition-all ${
+                        activeImage === img
+                          ? 'border-blue-600 scale-110 shadow-md'
+                          : 'border-gray-200 hover:border-gray-300'
+                      }`}
                     >
                       <AppImage
+                        key={img}
                         src={img}
                         alt={`Vista ${idx + 1}`}
                         className="w-full h-full object-contain p-0.5 sm:p-1"
                       />
-                    </div>
+                    </button>
                   ))}
                 </div>
               )}
             </div>
 
-            {/* COLUMNA DERECHA - Info (3/5 del ancho en desktop) */}
+            {/* COLUMNA DERECHA - Info */}
             <div className="md:col-span-3 p-4 sm:p-6 space-y-3 sm:space-y-4">
               {/* Título */}
               <div>
@@ -212,12 +268,17 @@ function AddonDetailModal({
                       <span className="text-base sm:text-lg text-gray-400 line-through">
                         ${Number(addon.original_price).toLocaleString('es-UY')}
                       </span>
-                      <span className="px-2 py-0.5 bg-green-100 text-green-700 text-xs font-bold rounded-full">
-                        {Math.round(
-                          ((addon.original_price - addon.price) / addon.original_price) * 100
-                        )}
-                        % OFF
-                      </span>
+                      <div className="flex flex-col gap-0.5">
+                        <span className="px-2 py-0.5 bg-green-100 text-green-700 text-xs font-bold rounded-full">
+                          {Math.round(
+                            ((addon.original_price - addon.price) / addon.original_price) * 100
+                          )}
+                          % OFF
+                        </span>
+                        <span className="px-2 py-0.5 bg-blue-50 text-blue-700 text-[10px] font-bold rounded-full text-center">
+                          Ahorrás ${Number(addon.original_price - addon.price).toLocaleString('es-UY')}
+                        </span>
+                      </div>
                     </>
                   )}
                 </div>
@@ -469,8 +530,8 @@ export default function ProductDetailsInteractive({
               model={product.model ?? ''}
               price={Number(product.price)}
               originalPrice={product.original_price ?? undefined}
-              rating={product.rating} // <-- CAMBIAR: Usar el de la prop
-              reviewCount={product.review_count} // <-- CAMBIAR: Usar el de la prop
+              rating={product.rating}
+              reviewCount={product.review_count}
               stockStatus={stockStatus}
               stockCount={currentStock}
               description={desc}
@@ -533,78 +594,81 @@ export default function ProductDetailsInteractive({
                 </div>
 
                 {/* Sección de Accesorios con Kit Gratuito Forzado */}
-{addonsData.length > 0 && (
-  <div className="border rounded-lg overflow-hidden mb-4">
-    <div className="bg-gray-50 px-3 py-2 text-xs font-bold text-gray-700 border-b uppercase tracking-wider">
-      Agrega Accesorios
-    </div>
-    <div className="divide-y max-h-[280px] overflow-y-auto">
-      
-      {/* ITEM ESTÁTICO: Kit de Accesorios Originales (GRATIS) */}
-      <div className="flex items-center gap-3 p-3 bg-white border-b border-green-50 group">
-        <div className="w-5 h-5 bg-green-600 rounded flex items-center justify-center shadow-sm shadow-green-200">
-          <Icon name="CheckIcon" size={14} className="text-white" />
-        </div>
-        <div className="flex-1">
-          <p className="text-[11px] sm:text-xs font-black text-gray-900 leading-tight">
-            Kit Accesorios Originales
-          </p>
-          <p className="text-[10px] text-green-600 font-black uppercase tracking-tighter mt-0.5">
-            ¡INCLUIDO GRATIS!
-          </p>
-        </div>
-        {/* <div className="text-[10px] text-gray-400 font-medium italic">
-          Valorado en $1.200
-        </div> */}
-      </div>
+                {addonsData.length > 0 && (
+                  <div className="border rounded-lg overflow-hidden mb-4">
+                    <div className="bg-gray-50 px-3 py-2 text-xs font-bold text-gray-700 border-b uppercase tracking-wider">
+                      Agrega Accesorios
+                    </div>
+                    <div className="divide-y max-h-[280px] overflow-y-auto">
+                      {/* ITEM ESTÁTICO: Kit de Accesorios Originales (GRATIS) */}
+                      <div className="flex items-center gap-3 p-3 bg-white border-b border-green-50 group">
+                        <div className="w-5 h-5 bg-green-600 rounded flex items-center justify-center shadow-sm shadow-green-200">
+                          <Icon name="CheckIcon" size={14} className="text-white" />
+                        </div>
+                        <div className="flex-1">
+                          <p className="text-[11px] sm:text-xs font-black text-gray-900 leading-tight">
+                            Kit Accesorios Originales
+                          </p>
+                          <p className="text-[10px] text-green-600 font-black uppercase tracking-tighter mt-0.5">
+                            ¡INCLUIDO GRATIS!
+                          </p>
+                        </div>
+                      </div>
 
-      {/* RENDERIZADO DINÁMICO DE LOS DEMÁS ADDONS */}
-      {addonsData.map(addon => {
-        const isSelected = selectedAddonIds.includes(addon.id);
-        const isOutOfStock = addon.stock_count === 0;
-        
-        return (
-          <div key={addon.id} className={`relative ${isOutOfStock ? 'opacity-60' : ''}`}>
-            <label className="flex items-start gap-3 p-3 hover:bg-gray-50 cursor-pointer transition-colors">
-              <input 
-                type="checkbox" 
-                checked={isSelected} 
-                onChange={() => toggleAddon(addon.id)} 
-                disabled={isOutOfStock}
-                className="w-4 h-4 text-blue-600 rounded disabled:cursor-not-allowed mt-1 focus:ring-blue-500" 
-              />
-              <div className="w-10 h-10 border rounded bg-white p-1 flex-shrink-0">
-                <AppImage src={addon.image_url} alt={addon.name} className="object-contain w-full h-full" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-[11px] sm:text-xs font-bold text-gray-900 line-clamp-2 leading-tight">
-                  {addon.name}
-                </p>
-                <div className="flex items-center gap-1.5 mt-1">
-                   <p className="text-[11px] text-gray-500 font-mono font-bold">
-                     +${Number(addon.price).toLocaleString('es-UY')}
-                   </p>
-                   {addon.badge && (
-                     <span className="px-1 py-0.5 bg-blue-50 text-blue-600 text-[9px] font-black rounded uppercase">
-                       {addon.badge}
-                     </span>
-                   )}
-                </div>
-                <button
-                  onClick={(e) => { e.preventDefault(); openAddonModal(addon); }}
-                  className="mt-2 inline-flex items-center gap-1 px-2 py-0.5 bg-blue-50 text-blue-700 text-[10px] font-bold rounded-full border border-blue-100 hover:bg-blue-100 transition-colors"
-                >
-                  <Icon name="EyeIcon" size={10} />
-                  <span>Ver más</span>
-                </button>
-              </div>
-            </label>
-          </div>
-        );
-      })}
-    </div>
-  </div>
-)}
+                      {/* RENDERIZADO DINÁMICO DE LOS DEMÁS ADDONS */}
+                      {addonsData.map((addon) => {
+                        const isSelected = selectedAddonIds.includes(addon.id);
+                        const isOutOfStock = addon.stock_count === 0;
+
+                        return (
+                          <div key={addon.id} className={`relative ${isOutOfStock ? 'opacity-60' : ''}`}>
+                            <label className="flex items-start gap-3 p-3 hover:bg-gray-50 cursor-pointer transition-colors">
+                              <input
+                                type="checkbox"
+                                checked={isSelected}
+                                onChange={() => toggleAddon(addon.id)}
+                                disabled={isOutOfStock}
+                                className="w-4 h-4 text-blue-600 rounded disabled:cursor-not-allowed mt-1 focus:ring-blue-500"
+                              />
+                              <div className="w-10 h-10 border rounded bg-white p-1 flex-shrink-0">
+                                <AppImage
+                                  src={addon.image_url}
+                                  alt={addon.name}
+                                  className="object-contain w-full h-full"
+                                />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-[11px] sm:text-xs font-bold text-gray-900 line-clamp-2 leading-tight">
+                                  {addon.name}
+                                </p>
+                                <div className="flex items-center gap-1.5 mt-1">
+                                  <p className="text-[11px] text-gray-500 font-mono font-bold">
+                                    +${Number(addon.price).toLocaleString('es-UY')}
+                                  </p>
+                                  {addon.badge && (
+                                    <span className="px-1 py-0.5 bg-blue-50 text-blue-600 text-[9px] font-black rounded uppercase">
+                                      {addon.badge}
+                                    </span>
+                                  )}
+                                </div>
+                                <button
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    openAddonModal(addon);
+                                  }}
+                                  className="mt-2 inline-flex items-center gap-1 px-2 py-0.5 bg-blue-50 text-blue-700 text-[10px] font-bold rounded-full border border-blue-100 hover:bg-blue-100 transition-colors"
+                                >
+                                  <Icon name="EyeIcon" size={10} />
+                                  <span>Ver más</span>
+                                </button>
+                              </div>
+                            </label>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
 
                 {/* Cantidad */}
                 <div className="flex items-center justify-between border rounded-md p-1">

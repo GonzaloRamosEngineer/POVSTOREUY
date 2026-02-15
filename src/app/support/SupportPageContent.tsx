@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Icon from '@/components/ui/AppIcon';
+import AppImage from '@/components/ui/AppImage';
 
 const FAQItem = ({ question, answer }: { question: string; answer: React.ReactNode }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -39,101 +40,87 @@ export default function SupportPageContent() {
       <div className="max-w-6xl mx-auto px-4 py-12 grid grid-cols-1 lg:grid-cols-12 gap-12">
         {/* COLUMNA IZQUIERDA: Navegación Rápida / App */}
         <div className="lg:col-span-4 space-y-8">
-          {/* Tarjeta APP */}
-          <div className="bg-neutral-900 rounded-2xl p-6 border border-neutral-800">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center">
-                <Icon name="VideoCameraIcon" size={24} className="text-black" />
+          {/* Tarjeta APP - Ajustada con Logo Oficial */}
+          <div className="bg-neutral-900 rounded-2xl p-6 border border-neutral-800 shadow-xl">
+            <div className="flex items-center gap-4 mb-4">
+              {/* Contenedor del Logo con fondo oscuro y sombra sutil */}
+              <div className="w-14 h-14 bg-neutral-800 rounded-2xl flex items-center justify-center overflow-hidden border border-white/5 shadow-inner p-1">
+                <AppImage
+                  src="https://kdzhyalorvjqxhybtdil.supabase.co/storage/v1/object/public/media/sjcam-zone-logo.webp"
+                  alt="SJCAM Zone App"
+                  className="w-full h-full object-contain rounded-xl"
+                />
               </div>
               <div>
-                <h3 className="font-bold text-white">SJCAM Zone</h3>
-                <p className="text-xs text-neutral-500">App Oficial Gratuita</p>
+                <h3 className="font-bold text-white text-lg">SJCAM Zone</h3>
+                <p className="text-xs text-red-500 font-medium tracking-wide uppercase">
+                  App Oficial Gratuita
+                </p>
               </div>
             </div>
-            <p className="text-sm text-neutral-400 mb-6">
-              Controlá tu cámara, descargá tus videos al celular sin cables y compartí en redes al
-              instante.
+
+            <p className="text-sm text-neutral-400 mb-6 leading-relaxed">
+              Controlá tu cámara desde el celular, descargá tus videos sin cables y compartí tus
+              mejores tomas al instante.
             </p>
+
             <div className="grid grid-cols-2 gap-3">
               <a
                 href="https://apps.apple.com/us/app/sjcam-zone/id991679682"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center justify-center gap-2 bg-neutral-800 hover:bg-neutral-700 py-2 rounded-lg text-xs font-bold text-white transition-colors"
+                className="flex items-center justify-center gap-2 bg-neutral-800 hover:bg-neutral-700 py-2.5 rounded-xl text-xs font-bold text-white transition-all border border-white/5 hover:border-white/10"
               >
-                <Icon name="DevicePhoneMobileIcon" size={14} /> iOS Store
+                <Icon name="DevicePhoneMobileIcon" size={14} /> App Store
               </a>
               <a
                 href="https://play.google.com/store/apps/details?id=org.jght.sjcam.zone"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center justify-center gap-2 bg-neutral-800 hover:bg-neutral-700 py-2 rounded-lg text-xs font-bold text-white transition-colors"
+                className="flex items-center justify-center gap-2 bg-neutral-800 hover:bg-neutral-700 py-2.5 rounded-xl text-xs font-bold text-white transition-all border border-white/5 hover:border-white/10"
               >
-                <Icon name="DevicePhoneMobileIcon" size={14} /> Android
+                <Icon name="DevicePhoneMobileIcon" size={14} /> Google Play
               </a>
             </div>
           </div>
 
-          {/* Tarjeta Manuales */}
-          <div className="bg-neutral-900 rounded-2xl p-6 border border-neutral-800">
-            <h3 className="font-bold text-white mb-4 flex items-center gap-2">
-              <Icon name="DocumentTextIcon" size={20} className="text-yellow-500" />
-              Manuales y Guias de Usuario
+          {/* Tarjeta Manuales - Visual mejorado */}
+          <div className="bg-neutral-900 rounded-2xl p-6 border border-neutral-800 shadow-xl">
+            <h3 className="font-bold text-white mb-6 flex items-center gap-3 text-lg">
+              <div className="w-8 h-8 bg-yellow-500/10 rounded-lg flex items-center justify-center">
+                <Icon name="DocumentTextIcon" size={20} className="text-yellow-500" />
+              </div>
+              Manuales y Guías
             </h3>
-            <div className="space-y-3">
-              <a
-                href="/documents/manual-c100plus.pdf"
-                download
-                className="flex items-center justify-between p-3 rounded-lg bg-black/40 hover:bg-black/60 border border-neutral-800 hover:border-neutral-700 transition-all group"
-              >
-                <span className="text-sm text-neutral-300">Descargar Manual C100+</span>
-                <Icon
-                  name="ArrowDownTrayIcon"
-                  size={16}
-                  className="text-neutral-500 group-hover:text-white"
-                />
-              </a>
-              <a
-                href="/documents/manual-c200.pdf"
-                download
-                className="flex items-center justify-between p-3 rounded-lg bg-black/40 hover:bg-black/60 border border-neutral-800 hover:border-neutral-700 transition-all group"
-              >
-                <span className="text-sm text-neutral-300">Descargar Manual C200</span>
-                <Icon
-                  name="ArrowDownTrayIcon"
-                  size={16}
-                  className="text-neutral-500 group-hover:text-white"
-                />
-              </a>
 
-              <a
-                href="/documents/guia-configuracion-c100+.pdf"
-                download
-                className="flex items-center justify-between p-3 rounded-lg bg-black/40 hover:bg-black/60 border border-neutral-800 hover:border-neutral-700 transition-all group"
-              >
-                <span className="text-sm text-neutral-300">
-                  Descargar Guia de Configuración C100+
-                </span>
-                <Icon
-                  name="ArrowDownTrayIcon"
-                  size={16}
-                  className="text-neutral-500 group-hover:text-white"
-                />
-              </a>
-              <a
-                href="/documents/guia-configuracion-c200.pdf"
-                download
-                className="flex items-center justify-between p-3 rounded-lg bg-black/40 hover:bg-black/60 border border-neutral-800 hover:border-neutral-700 transition-all group"
-              >
-                <span className="text-sm text-neutral-300">
-                  Descargar Guia de Configuración C200
-                </span>
-                <Icon
-                  name="ArrowDownTrayIcon"
-                  size={16}
-                  className="text-neutral-500 group-hover:text-white"
-                />
-              </a>
+            <div className="space-y-3">
+              {[
+                { name: 'Manual C100+', file: 'manual-c100plus.pdf' },
+                { name: 'Manual C200', file: 'manual-c200.pdf' },
+                { name: 'Configuración C100+', file: 'guia-configuracion-c100+.pdf' },
+                { name: 'Configuración C200', file: 'guia-configuracion-c200.pdf' },
+              ].map((doc, idx) => (
+                <a
+                  key={idx}
+                  href={`/documents/${doc.file}`}
+                  download
+                  className="flex items-center justify-between p-4 rounded-xl bg-black/40 hover:bg-neutral-800 border border-neutral-800 hover:border-red-500/30 transition-all group"
+                >
+                  <div className="flex items-center gap-3">
+                    <Icon
+                      name="ArrowDownTrayIcon"
+                      size={16}
+                      className="text-neutral-500 group-hover:text-red-500 transition-colors"
+                    />
+                    <span className="text-sm text-neutral-300 font-medium group-hover:text-white transition-colors">
+                      Descargar {doc.name}
+                    </span>
+                  </div>
+                  <span className="text-[10px] font-bold text-neutral-600 group-hover:text-neutral-400 uppercase tracking-widest">
+                    PDF
+                  </span>
+                </a>
+              ))}
             </div>
           </div>
         </div>
