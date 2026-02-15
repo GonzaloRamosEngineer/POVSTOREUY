@@ -14,31 +14,43 @@ interface HeaderProps {
 const Header = ({ isAdminMode = false }: HeaderProps) => {
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isProductsOpen, setIsProductsOpen] = useState(false); // Dropdown desktop
+  const [isMobileProductsOpen, setIsMobileProductsOpen] = useState(false); // Accordion mobile
   const [scrolled, setScrolled] = useState(false);
   
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [isHydrated, setIsHydrated] = useState(false);
 
-  // Función para actualizar el carrito desde localStorage
+  // Datos de productos para el menú (IDs específicos)
+  const products = [
+    { 
+      id: 'c98290bd-884f-49ce-9554-71a0210638f8', 
+      name: 'SJCAM C200', 
+      tagline: 'Pro 4K & Estabilización',
+      image: 'https://kdzhyalorvjqxhybtdil.supabase.co/storage/v1/object/public/products/1769698612746-gzjsukp0nyj.png'
+    },
+    { 
+      id: '1aabfacb-5f35-4bcf-9e6d-0316483d8362', 
+      name: 'SJCAM C100Plus', 
+      tagline: 'Mini POV & Magnética',
+      image: 'https://kdzhyalorvjqxhybtdil.supabase.co/storage/v1/object/public/products/1769699384843-528qlvmclfk.png'
+    },
+  ];
+
+  // Sincronización del carrito
   const updateCartFromStorage = () => {
     const items = readCart();
     setCartItems(items);
   };
 
-  // Cargar carrito y escuchar cambios
   useEffect(() => {
     setIsHydrated(true);
     updateCartFromStorage();
 
-    const handleCartUpdate = () => {
-      updateCartFromStorage();
-    };
+    const handleCartUpdate = () => updateCartFromStorage();
 
-    // Escuchar eventos personalizados y cambios en localStorage
     window.addEventListener('cart-updated', handleCartUpdate);
     window.addEventListener('storage', handleCartUpdate);
-
-    // También actualizar cuando la ventana recupera el foco
     window.addEventListener('focus', handleCartUpdate);
 
     return () => {
@@ -48,54 +60,40 @@ const Header = ({ isAdminMode = false }: HeaderProps) => {
     };
   }, []);
 
-  // Actualizar carrito cuando se abre el drawer
-  useEffect(() => {
-    if (isCartOpen) {
-      updateCartFromStorage();
-    }
-  }, [isCartOpen]);
-
-  const cartItemCount = cartItems.reduce((total, item) => total + item.quantity, 0);
-  const cartTotal = cartItems.reduce((total, item) => total + item.price * item.quantity, 0);
-
-  // Función para vaciar el carrito
-  const handleClearCart = () => {
-    if (confirm('¿Estás seguro de que querés vaciar todo el carrito?')) {
-      clearCart();
-      setCartItems([]);
-      window.dispatchEvent(new Event('cart-updated'));
-      window.dispatchEvent(new Event('storage'));
-    }
-  };
-
-  // Scroll effect
+  // Efecto de scroll
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 10);
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  // Lock body scroll when menu/cart is open
+  // Bloqueo de scroll global
   useEffect(() => {
-    if (isMobileMenuOpen || isCartOpen) document.body.style.overflow = 'hidden';
-    else document.body.style.overflow = 'unset';
+    if (isMobileMenuOpen || isCartOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'unset';
+    }
     return () => { document.body.style.overflow = 'unset'; };
   }, [isMobileMenuOpen, isCartOpen]);
 
-  const handleCartToggle = () => setIsCartOpen(!isCartOpen);
-  const handleMobileMenuToggle = () => setIsMobileMenuOpen(!isMobileMenuOpen);
+  const cartItemCount = cartItems.reduce((total, item) => total + item.quantity, 0);
+  const cartTotal = cartItems.reduce((total, item) => total + item.price * item.quantity, 0);
+
+  const handleClearCart = () => {
+    if (confirm('¿Estás seguro de que querés vaciar todo el carrito?')) {
+      clearCart();
+      setCartItems([]);
+      window.dispatchEvent(new Event('cart-updated'));
+    }
+  };
+
   const handleNavigate = () => {
     setIsMobileMenuOpen(false);
     setIsCartOpen(false);
+    setIsProductsOpen(false);
+    setIsMobileProductsOpen(false);
   };
-
-  // Links de navegación centralizados
-  const navLinks = [
-    { href: '/homepage', label: 'Productos', icon: 'ShoppingBagIcon' },
-    { href: '/support', label: 'Soporte', icon: 'LifebuoyIcon' },
-    { href: '/about', label: 'Nosotros', icon: 'UserGroupIcon' },
-    { href: '/contact', label: 'Contacto', icon: 'ChatBubbleLeftRightIcon' },
-  ];
 
   if (!isHydrated) return <header className="h-16 bg-neutral-950" />;
 
@@ -109,51 +107,67 @@ const Header = ({ isAdminMode = false }: HeaderProps) => {
         <div className="max-w-[1400px] mx-auto">
           <div className="flex items-center justify-between h-16 px-4 lg:px-6">
             
-            {/* Logo Section */}
-            <Link
-              href="/homepage"
-              className="flex items-center gap-3 hover:opacity-80 transition-opacity"
-              onClick={handleNavigate}
-            >
-              <div className="relative w-10 h-10 flex-shrink-0">
-                 <Image 
-                    src="/icon.png"
-                    alt="POV Store Logo"
-                    width={40}
-                    height={40}
-                    className="object-contain"
-                    priority
-                 />
+            {/* Logo */}
+            <Link href="/homepage" className="flex items-center gap-3 hover:opacity-80 transition-opacity" onClick={handleNavigate}>
+              <div className="relative w-10 h-10">
+                 <Image src="/icon.png" alt="POV Store Logo" width={40} height={40} className="object-contain" priority />
               </div>
-              
               <div className="flex flex-col">
-                <span className="text-lg font-bold text-white leading-none tracking-tight">POV Store</span>
-                <span className="text-[10px] text-neutral-400 font-medium leading-none mt-0.5">Uruguay</span>
+                <span className="text-lg font-bold text-white tracking-tight">POV Store</span>
+                <span className="text-[10px] text-neutral-400 font-medium leading-none">Uruguay</span>
               </div>
             </Link>
 
             {/* Desktop Nav */}
             <nav className="hidden md:flex items-center gap-8">
-              {navLinks.map((link) => (
-                <Link
-                  key={link.href}
-                  href={link.href}
-                  className="text-sm font-bold tracking-wide text-neutral-300 hover:text-white hover:scale-105 transition-all uppercase"
-                  onClick={handleNavigate}
-                >
-                  {link.label}
-                </Link>
-              ))}
+              <div 
+                className="relative h-16 flex items-center"
+                onMouseEnter={() => setIsProductsOpen(true)}
+                onMouseLeave={() => setIsProductsOpen(false)}
+              >
+                <button className={`flex items-center gap-1 text-sm font-bold tracking-wide transition-all uppercase ${isProductsOpen ? 'text-white' : 'text-neutral-300'}`}>
+                  Productos
+                  <Icon name="ChevronDownIcon" size={14} className={`transition-transform duration-300 ${isProductsOpen ? 'rotate-180 text-red-500' : ''}`} />
+                </button>
+
+                {/* Dropdown Panel */}
+                {isProductsOpen && (
+                  <div className="absolute top-full -left-4 pt-0 w-72 animate-in fade-in slide-in-from-top-2 duration-200">
+                    <div className="bg-neutral-900 border border-white/10 rounded-2xl shadow-2xl overflow-hidden backdrop-blur-xl mt-2">
+                      <div className="p-2">
+                        {products.map((p) => (
+                          <Link 
+                            key={p.id} 
+                            href={`/products/${p.id}`}
+                            className="flex items-center gap-4 p-3 rounded-xl hover:bg-white/5 transition-colors group"
+                            onClick={handleNavigate}
+                          >
+                            <div className="w-14 h-14 bg-black rounded-lg overflow-hidden border border-white/10 group-hover:border-red-500/50 transition-colors flex-shrink-0">
+                              <AppImage src={p.image} alt={p.name} className="object-cover w-full h-full" />
+                            </div>
+                            <div>
+                              <div className="text-sm font-bold text-white group-hover:text-red-500 transition-colors">{p.name}</div>
+                              <div className="text-[10px] text-neutral-500 uppercase font-medium">{p.tagline}</div>
+                            </div>
+                          </Link>
+                        ))}
+                      </div>
+                      <Link href="/homepage" className="block p-3 bg-neutral-800/50 text-center text-[10px] font-bold uppercase tracking-widest text-neutral-400 hover:text-white transition-colors border-t border-white/5">
+                        Ver todo el catálogo
+                      </Link>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <Link href="/support" className="text-sm font-bold tracking-wide text-neutral-300 hover:text-white uppercase" onClick={handleNavigate}>Soporte</Link>
+              <Link href="/about" className="text-sm font-bold tracking-wide text-neutral-300 hover:text-white uppercase" onClick={handleNavigate}>Nosotros</Link>
+              <Link href="/contact" className="text-sm font-bold tracking-wide text-neutral-300 hover:text-white uppercase" onClick={handleNavigate}>Contacto</Link>
             </nav>
 
             {/* Actions */}
             <div className="flex items-center gap-4">
-              {/* Cart Button */}
-              <button
-                onClick={handleCartToggle}
-                className="relative p-2 text-neutral-300 hover:text-white transition-colors group"
-                aria-label={`Shopping cart with ${cartItemCount} items`}
-              >
+              <button onClick={() => setIsCartOpen(true)} className="relative p-2 text-neutral-300 hover:text-white transition-colors group">
                 <Icon name="ShoppingCartIcon" size={24} />
                 {cartItemCount > 0 && (
                   <span className="absolute -top-1 -right-1 flex items-center justify-center min-w-[18px] h-[18px] px-1 text-[10px] font-bold text-white bg-red-600 rounded-full ring-2 ring-black">
@@ -161,14 +175,8 @@ const Header = ({ isAdminMode = false }: HeaderProps) => {
                   </span>
                 )}
               </button>
-
-              {/* Mobile Menu Button */}
-              <button
-                onClick={handleMobileMenuToggle}
-                className="md:hidden p-2 text-neutral-300 hover:text-white"
-                aria-label="Toggle menu"
-              >
-                <Icon name={isMobileMenuOpen ? 'XMarkIcon' : 'Bars3Icon'} size={24} />
+              <button onClick={() => setIsMobileMenuOpen(true)} className="md:hidden p-2 text-neutral-300 hover:text-white">
+                <Icon name="Bars3Icon" size={24} />
               </button>
             </div>
           </div>
@@ -177,89 +185,75 @@ const Header = ({ isAdminMode = false }: HeaderProps) => {
 
       {/* Mobile Menu Overlay */}
       {isMobileMenuOpen && (
-        <div className="fixed inset-0 z-[90] bg-neutral-950 md:hidden">
-          {/* Backdrop con patrón sutil */}
-          <div className="absolute inset-0 opacity-5 bg-[radial-gradient(#333_1px,transparent_1px)] [background-size:16px_16px]" />
-          
-          <div className="relative h-full pt-20 px-6 flex flex-col">
-            {/* Navigation Links */}
-            <nav className="flex-1 flex flex-col gap-2 py-6">
-              {navLinks.map((link, index) => (
-                <Link
-                  key={link.href}
-                  href={link.href}
-                  className="flex items-center gap-4 px-4 py-4 rounded-xl text-white hover:bg-neutral-900 transition-all group"
-                  onClick={handleNavigate}
-                  style={{ 
-                    animationDelay: `${index * 50}ms`,
-                    animation: 'slideIn 0.3s ease-out forwards'
-                  }}
-                >
-                  <div className="w-10 h-10 rounded-full bg-neutral-900 flex items-center justify-center group-hover:bg-red-600 transition-colors">
-                    <Icon name={link.icon as any} size={20} className="text-neutral-400 group-hover:text-white" />
-                  </div>
-                  <span className="text-lg font-semibold">{link.label}</span>
-                  <Icon name="ChevronRightIcon" size={20} className="ml-auto text-neutral-600 group-hover:text-white transition-colors" />
-                </Link>
-              ))}
-              
-              {/* Admin link si aplica */}
-              {isAdminMode && (
-                <Link 
-                  href="/admin-dashboard" 
-                  className="flex items-center gap-4 px-4 py-4 rounded-xl text-white hover:bg-neutral-900 transition-all group mt-4 border-t border-neutral-800 pt-6"
-                  onClick={handleNavigate}
-                >
-                  <div className="w-10 h-10 rounded-full bg-neutral-900 flex items-center justify-center group-hover:bg-blue-600 transition-colors">
-                    <Icon name="Cog6ToothIcon" size={20} className="text-neutral-400 group-hover:text-white" />
-                  </div>
-                  <span className="text-lg font-semibold">Admin Dashboard</span>
-                </Link>
-              )}
-            </nav>
-
-            {/* Footer con info adicional */}
-            <div className="border-t border-neutral-800 py-6 space-y-4">
-              <div className="flex items-center justify-center gap-6 text-sm text-neutral-500">
-                <a href="https://www.instagram.com/povstore.uy/" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">
-                  <Icon name="CameraIcon" size={20} />
-                </a>
-                <a href="https://www.tiktok.com/@povstore.uy" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">
-                  <Icon name="MusicalNoteIcon" size={20} />
-                </a>
-              </div>
-              <p className="text-center text-xs text-neutral-600">
-                POV Store Uruguay © 2026
-              </p>
-            </div>
+        <div className="fixed inset-0 z-[150] bg-neutral-950 md:hidden flex flex-col">
+          <div className="flex items-center justify-between h-16 px-6 border-b border-white/5">
+            <span className="text-lg font-bold text-white">Menú</span>
+            <button onClick={() => setIsMobileMenuOpen(false)} className="p-2 text-neutral-400">
+              <Icon name="XMarkIcon" size={28} />
+            </button>
           </div>
+          
+          <nav className="flex-1 overflow-y-auto p-6 space-y-2">
+            <div className="space-y-2">
+              <button 
+                onClick={() => setIsMobileProductsOpen(!isMobileProductsOpen)}
+                className={`w-full flex items-center justify-between p-4 rounded-2xl transition-colors ${isMobileProductsOpen ? 'bg-neutral-800' : 'bg-neutral-900'} text-white font-bold`}
+              >
+                <div className="flex items-center gap-4">
+                  <Icon name="ShoppingBagIcon" size={20} className="text-red-500" />
+                  Productos
+                </div>
+                <Icon name="ChevronDownIcon" size={20} className={`transition-transform duration-300 ${isMobileProductsOpen ? 'rotate-180' : ''}`} />
+              </button>
+              
+              {isMobileProductsOpen && (
+                <div className="grid gap-2 pl-4 animate-in slide-in-from-top-2 duration-300">
+                  {products.map(p => (
+                    <Link key={p.id} href={`/products/${p.id}`} className="flex items-center gap-4 p-4 rounded-2xl bg-neutral-900/50 text-white" onClick={handleNavigate}>
+                      <div className="w-12 h-12 rounded-lg bg-black overflow-hidden border border-white/5 flex-shrink-0">
+                        <AppImage src={p.image} alt={p.name} />
+                      </div>
+                      <span className="font-semibold">{p.name}</span>
+                    </Link>
+                  ))}
+                  <Link href="/homepage" className="p-4 text-center text-xs font-bold uppercase text-neutral-500" onClick={handleNavigate}>
+                    Ver todo el catálogo
+                  </Link>
+                </div>
+              )}
+            </div>
+
+            <Link href="/support" className="flex items-center gap-4 p-4 rounded-2xl bg-neutral-900 text-white font-bold" onClick={handleNavigate}>
+              <Icon name="LifebuoyIcon" size={20} className="text-neutral-400" /> Soporte
+            </Link>
+            <Link href="/about" className="flex items-center gap-4 p-4 rounded-2xl bg-neutral-900 text-white font-bold" onClick={handleNavigate}>
+              <Icon name="UserGroupIcon" size={20} className="text-neutral-400" /> Nosotros
+            </Link>
+            <Link href="/contact" className="flex items-center gap-4 p-4 rounded-2xl bg-neutral-900 text-white font-bold" onClick={handleNavigate}>
+              <Icon name="ChatBubbleLeftRightIcon" size={20} className="text-neutral-400" /> Contacto
+            </Link>
+
+            {isAdminMode && (
+              <Link href="/admin-dashboard" className="flex items-center gap-4 p-4 rounded-2xl bg-neutral-900 text-white font-bold border-t border-white/5 mt-4" onClick={handleNavigate}>
+                <Icon name="Cog6ToothIcon" size={20} className="text-blue-500" /> Admin Panel
+              </Link>
+            )}
+          </nav>
         </div>
       )}
 
-      {/* Cart Drawer (Slide-over) */}
+      {/* Cart Drawer */}
       {isCartOpen && (
         <div className="fixed inset-0 z-[110]">
-          {/* Backdrop */}
-          <div 
-            className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity" 
-            onClick={() => setIsCartOpen(false)} 
-          />
-          
-          {/* Drawer Panel */}
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity" onClick={() => setIsCartOpen(false)} />
           <div className="absolute top-0 right-0 w-full sm:w-[400px] h-full bg-neutral-900 border-l border-neutral-800 shadow-2xl flex flex-col transform transition-transform duration-300">
-            
-            {/* Drawer Header */}
             <div className="flex items-center justify-between p-5 border-b border-neutral-800">
               <h3 className="text-lg font-bold text-white">Tu Carrito</h3>
-              <button
-                onClick={() => setIsCartOpen(false)}
-                className="p-2 text-neutral-400 hover:text-white transition-colors"
-              >
+              <button onClick={() => setIsCartOpen(false)} className="p-2 text-neutral-400 hover:text-white transition-colors">
                 <Icon name="XMarkIcon" size={20} />
               </button>
             </div>
 
-            {/* Drawer Items */}
             <div className="flex-1 overflow-y-auto p-5">
               {cartItems.length === 0 ? (
                 <div className="h-full flex flex-col items-center justify-center text-center space-y-4">
@@ -267,12 +261,7 @@ const Header = ({ isAdminMode = false }: HeaderProps) => {
                     <Icon name="ShoppingCartIcon" size={32} className="text-neutral-500" />
                   </div>
                   <p className="text-neutral-400">El carrito está vacío</p>
-                  <button 
-                    onClick={() => setIsCartOpen(false)}
-                    className="text-red-500 font-medium hover:underline"
-                  >
-                    Ver productos
-                  </button>
+                  <button onClick={() => setIsCartOpen(false)} className="text-red-500 font-medium hover:underline">Ver productos</button>
                 </div>
               ) : (
                 <div className="space-y-4">
@@ -294,7 +283,6 @@ const Header = ({ isAdminMode = false }: HeaderProps) => {
               )}
             </div>
 
-            {/* Drawer Footer */}
             {cartItems.length > 0 && (
               <div className="p-5 border-t border-neutral-800 bg-neutral-900 space-y-4">
                 <div className="flex items-center justify-between">
@@ -302,28 +290,15 @@ const Header = ({ isAdminMode = false }: HeaderProps) => {
                   <span className="text-xl font-bold text-white">${cartTotal.toLocaleString('es-UY')}</span>
                 </div>
                 
-                {/* Botón para vaciar carrito */}
-                <button
-                  onClick={handleClearCart}
-                  className="w-full py-2 bg-neutral-800 text-neutral-400 font-medium text-center rounded-lg hover:bg-neutral-700 hover:text-white transition-colors flex items-center justify-center gap-2 text-sm"
-                >
-                  <Icon name="TrashIcon" size={16} />
-                  Vaciar Carrito
+                <button onClick={handleClearCart} className="w-full py-2 bg-neutral-800 text-neutral-400 font-medium text-center rounded-lg hover:bg-neutral-700 hover:text-white transition-colors flex items-center justify-center gap-2 text-sm">
+                  <Icon name="TrashIcon" size={16} /> Vaciar Carrito
                 </button>
 
                 <div className="grid gap-3">
-                    <Link
-                        href="/shopping-cart"
-                        onClick={handleNavigate}
-                        className="w-full py-3 bg-white text-black font-bold text-center rounded-lg hover:bg-neutral-200 transition-colors"
-                    >
+                    <Link href="/shopping-cart" onClick={handleNavigate} className="w-full py-3 bg-white text-black font-bold text-center rounded-lg hover:bg-neutral-200 transition-colors">
                         Ver Carrito Completo
                     </Link>
-                    <Link
-                        href="/checkout-payment"
-                        onClick={handleNavigate}
-                        className="w-full py-3 bg-red-600 text-white font-bold text-center rounded-lg hover:bg-red-700 transition-colors shadow-lg shadow-red-900/20"
-                    >
+                    <Link href="/checkout-payment" onClick={handleNavigate} className="w-full py-3 bg-red-600 text-white font-bold text-center rounded-lg hover:bg-red-700 transition-colors shadow-lg shadow-red-900/20">
                         Finalizar Compra
                     </Link>
                 </div>
@@ -332,20 +307,6 @@ const Header = ({ isAdminMode = false }: HeaderProps) => {
           </div>
         </div>
       )}
-
-      {/* Animación para el mobile menu */}
-      <style jsx>{`
-        @keyframes slideIn {
-          from {
-            opacity: 0;
-            transform: translateX(-20px);
-          }
-          to {
-            opacity: 1;
-            transform: translateX(0);
-          }
-        }
-      `}</style>
     </>
   );
 };

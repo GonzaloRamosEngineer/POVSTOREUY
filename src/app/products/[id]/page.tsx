@@ -46,7 +46,7 @@ export async function generateMetadata({ params }: Props) {
 export default async function ProductPage({ params }: Props) {
   const { id } = await params;
 
-  // 1. Traemos todos los productos activos para comparativas y selección
+  // 1. Traemos todos los productos activos para el catálogo y comparativas
   const { data: allProducts, error } = await supabase
     .from('products')
     .select('*')
@@ -59,8 +59,7 @@ export default async function ProductPage({ params }: Props) {
   const rawProduct = allProducts.find((p) => p.id === id);
   if (!rawProduct) notFound();
 
-  // 3. Traemos las reseñas relacionadas con este producto
-  // Incluimos el full_name del perfil del usuario
+  // 3. Traemos las reseñas REALES de este producto desde product_reviews
   const { data: reviewsData } = await supabase
     .from('product_reviews')
     .select(`
@@ -70,13 +69,19 @@ export default async function ProductPage({ params }: Props) {
     .eq('product_id', id)
     .order('created_at', { ascending: false });
 
-  // Normalizamos las reseñas para que el componente las entienda correctamente
+  // Normalizamos las reseñas para el frontend
   const reviews = (reviewsData || []).map(normalizeReviewRow);
+
+  // --- LÓGICA DE PUNTAJE DINÁMICO ---
+  const totalReviewsCount = reviews.length;
+  const averageRatingValue = totalReviewsCount > 0 
+    ? Number((reviews.reduce((acc, rev) => acc + rev.rating, 0) / totalReviewsCount).toFixed(1))
+    : 0;
 
   // 4. Filtramos otros productos para la comparativa
   const otherProducts = allProducts.filter(p => p.id !== id);
 
-  // Casting de tipo para el producto principal
+  // Tipado para uso general en el renderizado
   const product = rawProduct as unknown as Product;
   
   // 5. Formateamos la galería de imágenes y video
@@ -108,17 +113,23 @@ export default async function ProductPage({ params }: Props) {
       
       <Header />
       
-      {/* 1. STICKY NAV */}
+      {/* 1. STICKY NAV - Inyectamos el promedio y total REALES */}
       <ProductStickyNav 
         productName={product.name}
         productPrice={product.price}
         productImage={product.image_url}
+        averageRating={averageRatingValue}
+        totalReviews={totalReviewsCount}
       />
 
-      {/* 2. OVERVIEW */}
+      {/* 2. OVERVIEW - Inyección directa para asegurar datos frescos */}
       <div id="overview" className="pt-24 pb-12">
         <ProductDetailsInteractive 
-          productInitial={rawProduct} 
+          productInitial={{
+            ...rawProduct,
+            rating: averageRatingValue,
+            review_count: totalReviewsCount 
+          } as any} 
           galleryInitial={formattedGallery} 
         />
       </div>
@@ -144,7 +155,11 @@ export default async function ProductPage({ params }: Props) {
               Comparativa de Modelos
             </h2>
             <ProductComparison 
-                currentProduct={product} 
+                currentProduct={{
+                  ...product,
+                  rating: averageRatingValue,
+                  review_count: totalReviewsCount
+                } as any} 
                 otherProducts={otherProducts as unknown as any[]} 
             />
         </div>
@@ -162,7 +177,7 @@ export default async function ProductPage({ params }: Props) {
         </div>
       )}
 
-      {/* 8. RESEÑAS (Sustituido el marcador de posición por el componente real) */}
+      {/* 8. RESEÑAS - Lista completa real */}
       <div id="reviews" className="py-24 bg-white border-t border-gray-100">
           <ProductReviewsSection reviews={reviews} />
       </div>

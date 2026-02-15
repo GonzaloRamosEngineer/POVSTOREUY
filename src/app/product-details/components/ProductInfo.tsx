@@ -26,6 +26,17 @@ export default function ProductInfo({
   stockCount,
   description,
 }: ProductInfoProps) {
+  
+  // --- Lógica de Ahorro y Precios ---
+  const hasDiscount = originalPrice && originalPrice > price;
+  const savingsAmount = hasDiscount ? (originalPrice as number) - price : 0;
+  const savingsPercentage = hasDiscount 
+    ? Math.round((savingsAmount / (originalPrice as number)) * 100) 
+    : 0;
+    
+  // Referencia de 30 días: Redondeado sin decimales para máxima limpieza
+  const price30Days = Math.round(originalPrice ? originalPrice * 1.02 : price * 1.10);
+
   const stockMessages = {
     'in-stock': 'En stock',
     'low-stock': `¡Solo quedan ${stockCount} unidades!`,
@@ -33,79 +44,100 @@ export default function ProductInfo({
   };
 
   const stockColors = {
-    'in-stock': 'text-success',
-    'low-stock': 'text-warning',
-    'out-of-stock': 'text-error',
+    'in-stock': 'text-green-600',
+    'low-stock': 'text-orange-600',
+    'out-of-stock': 'text-red-600',
   };
 
   return (
     <div className="space-y-6">
-      {/* Product Title */}
-      <div>
-        <div className="flex items-center gap-2 mb-2">
-          <span className="px-3 py-1 bg-primary/10 text-primary text-xs font-medium rounded-full">
-            {model}
-          </span>
-          <div className={`flex items-center gap-1 ${stockColors[stockStatus]}`}>
-            <Icon name="CheckCircleIcon" size={16} variant="solid" />
-            <span className="text-xs font-medium">{stockMessages[stockStatus]}</span>
-          </div>
+      {/* 1. Badge de Stock y Modelo */}
+      <div className="flex items-center gap-2 mb-2">
+        <span className="px-3 py-1 bg-gray-100 text-gray-700 text-[10px] font-bold uppercase tracking-wider rounded-full border border-gray-200">
+          {model || 'Original'}
+        </span>
+        <div className={`flex items-center gap-1.5 px-2 py-1 rounded-md ${stockStatus === 'low-stock' ? 'bg-orange-50' : ''} ${stockColors[stockStatus]}`}>
+          <Icon name={stockStatus === 'out-of-stock' ? 'XCircleIcon' : 'CheckCircleIcon'} size={14} variant="solid" />
+          <span className="text-xs font-bold tracking-tight">{stockMessages[stockStatus]}</span>
         </div>
-        <h1 className="text-3xl lg:text-4xl font-heading font-bold text-foreground">
-          {name}
-        </h1>
       </div>
 
-      {/* Rating */}
+      {/* 2. Título del Producto */}
+      <h1 className="text-3xl lg:text-4xl font-black text-gray-900 leading-tight tracking-tight">
+        {name}
+      </h1>
+
+      {/* 3. Rating y Opiniones (Unificado a "opiniones") */}
       <div className="flex items-center gap-3">
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-0.5">
           {[...Array(5)].map((_, i) => (
             <Icon
               key={i}
               name="StarIcon"
-              size={20}
+              size={18}
               variant={i < Math.floor(rating) ? 'solid' : 'outline'}
-              className={i < Math.floor(rating) ? 'text-accent' : 'text-muted-foreground'}
+              className={i < Math.floor(rating) ? 'text-yellow-400' : 'text-gray-300'}
             />
           ))}
         </div>
-        <span className="text-sm text-muted-foreground">
-          {rating.toFixed(1)} ({reviewCount} reseñas)
+        <span className="text-sm font-bold text-gray-500">
+          {rating.toFixed(1)} <span className="mx-1">•</span> 
+          <button className="underline hover:text-red-600 transition-colors">{reviewCount} opiniones</button>
         </span>
       </div>
 
-      {/* Price */}
-      <div className="flex items-baseline gap-3">
-        <span className="text-4xl font-mono font-bold text-primary">
-          ${price.toLocaleString('es-UY')}
-        </span>
-        {originalPrice && (
-          <span className="text-xl font-mono text-muted-foreground line-through">
-            ${originalPrice.toLocaleString('es-UY')}
+      {/* 4. Bloque de Precios y Ahorro (Alineación Baseline) */}
+      <div className="space-y-1">
+        <div className="flex items-baseline gap-3 flex-wrap">
+          {/* Precio Principal */}
+          <span className="text-4xl font-black text-red-600 tracking-tighter">
+            ${price.toLocaleString('es-UY')}
           </span>
+
+          {hasDiscount && (
+            <div className="flex items-center gap-2">
+              {/* Precio Original Tachado */}
+              <span className="text-xl text-gray-400 line-through decoration-gray-400 decoration-1">
+                ${originalPrice?.toLocaleString('es-UY')}
+              </span>
+              
+              {/* Badge de Ahorro con espaciado prolijo */}
+              <span className="bg-red-600 text-white text-[11px] font-black px-2 py-1 rounded flex items-center gap-1 shadow-sm">
+                -${savingsAmount.toLocaleString('es-UY')} (-{savingsPercentage}%)
+              </span>
+            </div>
+          )}
+        </div>
+
+        {/* Info 30 días sin decimales */}
+        {hasDiscount && (
+          <p className="text-[13px] text-gray-500 font-medium tracking-tight">
+            Precio más bajo en los últimos 30 días: 
+            <span className="line-through ml-1.5 opacity-70">${price30Days.toLocaleString('es-UY')}</span>
+          </p>
         )}
       </div>
 
-      {/* Description */}
+      {/* 5. Descripción */}
       {description && (
-        <div className="prose prose-invert max-w-none">
-          <MarkdownText text={description} className="text-base text-muted-foreground leading-relaxed" />
+        <div className="pt-2 border-t border-gray-100">
+          <MarkdownText text={description} className="text-base text-gray-600 leading-relaxed" />
         </div>
       )}
 
-      {/* Key Features */}
-      <div className="grid grid-cols-2 gap-3">
-        <div className="flex items-center gap-2 p-3 bg-muted rounded-md">
-          <Icon name="VideoCameraIcon" size={20} className="text-primary" variant="solid" />
-          <span className="text-sm text-foreground">Grabación 4K</span>
+      {/* 6. Atributos Destacados */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+        <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl border border-gray-100 group hover:border-red-100 transition-colors">
+          <div className="w-8 h-8 rounded-lg bg-white flex items-center justify-center text-red-600 shadow-sm border border-gray-100">
+            <Icon name="VideoCameraIcon" size={18} variant="solid" />
+          </div>
+          <span className="text-sm font-bold text-gray-700 uppercase tracking-tight">Grabación 4K UHD</span>
         </div>
-        <div className="flex items-center gap-2 p-3 bg-muted rounded-md">
-          <Icon name="BoltIcon" size={20} className="text-primary" variant="solid" />
-          <span className="text-sm text-foreground">Carga rápida</span>
-        </div>
-        <div className="flex items-center gap-2 p-3 bg-muted rounded-md">
-          <Icon name="WifiIcon" size={20} className="text-primary" variant="solid" />
-          <span className="text-sm text-foreground">WiFi integrado</span>
+        <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl border border-gray-100 group hover:border-red-100 transition-colors">
+          <div className="w-8 h-8 rounded-lg bg-white flex items-center justify-center text-red-600 shadow-sm border border-gray-100">
+            <Icon name="BoltIcon" size={18} variant="solid" />
+          </div>
+          <span className="text-sm font-bold text-gray-700 uppercase tracking-tight">Estabilización EIS</span>
         </div>
       </div>
     </div>
