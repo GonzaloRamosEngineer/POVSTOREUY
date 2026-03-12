@@ -1,15 +1,14 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect, useMemo } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import ProductGallery from './ProductGallery';
 import ProductInfo from './ProductInfo';
-import Icon from '@/components/ui/AppIcon';
-import AppImage from '@/components/ui/AppImage';
 import { getSupabaseBrowserClient } from '@/lib/supabaseClient';
-import { upsertCartItem, incrementItem, readCart } from '@/lib/cart';
+import { upsertCartItem } from '@/lib/cart';
+import Icon from '@/components/ui/AppIcon';
+import AccessoriesCarousel from '@/components/common/AccessoriesCarousel';
 
-// --- Interfaces ---
 interface GalleryImage {
   id: string;
   url: string;
@@ -17,18 +16,23 @@ interface GalleryImage {
   type: 'image' | 'video';
 }
 
-interface AddonProduct {
+type PackBadge = {
+  text: string;
+  variant: 'red' | 'green' | 'orange' | 'blue';
+};
+
+interface ProductPack {
   id: string;
   name: string;
-  model: string;
-  description: string;
+  tagline: string;
   price: number;
   original_price: number | null;
-  image_url: string;
-  stock_count: number;
-  features: string[] | string;
-  badge: string | null;
-  gallery: string[];
+  cash_price?: number | null; // NUEVO
+  card_price?: number | null; // NUEVO
+  includes: string[];
+  images?: string[];
+  stock?: number;
+  badge?: PackBadge;
 }
 
 interface ProductData {
@@ -36,723 +40,591 @@ interface ProductData {
   name: string;
   model: string;
   description: string;
+  resumen?: string;
   price: number;
   original_price: number | null;
+  cash_price?: number | null; // NUEVO
+  card_price?: number | null; // NUEVO
   image_url: string;
   stock_count: number;
   features: string[] | string;
   is_active: boolean;
-  colors?: { name: string; hex: string; images?: string[]; stock?: number }[];
-  addon_ids?: string[];
-  rating: number;
-  review_count: number;
+  packs?: ProductPack[];
+  rating?: number;
+  review_count?: number;
+  shipping_info?: string;
+  warranty_info?: string;
+  payment_info?: string;
 }
 
 interface ProductInteractiveProps {
   productInitial: ProductData;
   galleryInitial: GalleryImage[];
+  addonsDictionary?: any[]; // Recibe el diccionario de accesorios para armar las recetas
 }
 
-// --- Helpers ---
-function normalizeFeatures(v: unknown): string[] {
-  if (Array.isArray(v)) return v.filter(Boolean).map(String);
-  try {
-    const parsed = JSON.parse(v as string);
-    if (Array.isArray(parsed)) return parsed.filter(Boolean).map(String);
-  } catch {}
-  return [];
-}
+function TrustAccordion({
+  shippingInfo,
+  warrantyInfo,
+  paymentInfo,
+}: {
+  shippingInfo?: string;
+  warrantyInfo?: string;
+  paymentInfo?: string;
+}) {
+  const [open, setOpen] = useState<string | null>(null);
 
-// --- Componente de Markdown Simple (EXPORTADO para usar en ProductInfo también) ---
-export function MarkdownText({ text, className = '' }: { text: string; className?: string }) {
-  const renderMarkdown = (content: string) => {
-    // Reemplazar **bold** con <strong>
-    let processed = content.replace(
-      /\*\*(.*?)\*\*/g,
-      '<strong class="font-bold text-gray-900">$1</strong>'
-    );
-
-    // Reemplazar *italic* con <em>
-    processed = processed.replace(/\*(.*?)\*/g, '<em class="italic">$1</em>');
-
-    // Reemplazar __underline__ con <u>
-    processed = processed.replace(/__(.*?)__/g, '<u class="underline decoration-2">$1</u>');
-
-    // Split por saltos de línea y crear párrafos
-    const paragraphs = processed.split('\n\n').filter((p) => p.trim());
-
-    return paragraphs.map((paragraph, idx) => {
-      // Reemplazar saltos de línea simples con <br>
-      const withBreaks = paragraph.replace(/\n/g, '<br />');
-
-      return (
-        <p
-          key={idx}
-          className={idx > 0 ? 'mt-3' : ''}
-          dangerouslySetInnerHTML={{ __html: withBreaks }}
-        />
-      );
-    });
+  const toggle = (id: string) => {
+    setOpen((prev) => (prev === id ? null : id));
   };
 
+  const items = [
+    {
+      id: 'returns',
+      title: 'Garantía y Devoluciones',
+      icon: 'ArrowUturnLeftIcon',
+      content:
+        warrantyInfo || 'Tenés 30 días para devolver el producto si no cumple con tus expectativas.',
+    },
+    {
+      id: 'shipping',
+      title: 'Política de Envíos',
+      icon: 'TruckIcon',
+      content:
+        shippingInfo || 'Enviamos a todo Uruguay con seguimiento para que sepas siempre dónde está tu pedido.',
+    },
+    {
+      id: 'payments',
+      title: 'Medios de Pago',
+      icon: 'CreditCardIcon',
+      content:
+        paymentInfo || 'Tus pagos están protegidos mediante sistemas de seguridad y cifrado.',
+    },
+  ];
+
   return (
-    <div className={`text-sm text-gray-600 leading-relaxed ${className}`}>
-      {renderMarkdown(text)}
+    <div className="mt-6 border-t border-gray-200">
+      {items.map((item) => {
+        const isOpen = open === item.id;
+
+        return (
+          <div key={item.id} className="border-b border-gray-200">
+            <button
+              type="button"
+              onClick={() => toggle(item.id)}
+              className="w-full py-5 flex items-center justify-between group"
+            >
+              <div className="flex items-center gap-3">
+                <Icon name={item.icon as any} size={18} className="text-blue-600" />
+                <span className="font-bold text-gray-900 group-hover:text-blue-600 transition-colors">
+                  {item.title}
+                </span>
+              </div>
+
+              <Icon
+                name="ChevronDownIcon"
+                size={18}
+                className={`transition-transform text-gray-400 ${isOpen ? 'rotate-180' : ''}`}
+              />
+            </button>
+
+            {isOpen && (
+              <div
+                className="pb-4 pl-8 text-sm text-gray-600 leading-relaxed"
+                dangerouslySetInnerHTML={{ __html: item.content }}
+              />
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }
 
-// --- Componente Modal de Addon - CON GALERÍA DINÁMICA ---
-function AddonDetailModal({
-  addon,
-  isOpen,
-  onClose,
-}: {
-  addon: AddonProduct;
-  isOpen: boolean;
-  onClose: () => void;
-}) {
-  const features = normalizeFeatures(addon.features);
-  
-  // Estado para controlar qué imagen se está viendo
-  const [activeImage, setActiveImage] = useState(addon.image_url);
-
-  // Resetear la imagen principal cuando cambia el addon o se abre el modal
-  useEffect(() => {
-    if (isOpen) {
-      setActiveImage(addon.image_url);
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = 'unset';
-    }
-    return () => {
-      document.body.style.overflow = 'unset';
-    };
-  }, [isOpen, addon.image_url]);
-
-  if (!isOpen) return null;
-
-  // Combinamos la imagen principal con la galería para tener todo el set
-  const allImages = [addon.image_url, ...(addon.gallery || [])].filter(Boolean);
-  
-  // Índice actual de la imagen
-  const currentImageIndex = allImages.indexOf(activeImage);
-
-  // Funciones de navegación
-  const goToPrevImage = () => {
-    const prevIndex = currentImageIndex > 0 ? currentImageIndex - 1 : allImages.length - 1;
-    setActiveImage(allImages[prevIndex]);
-  };
-
-  const goToNextImage = () => {
-    const nextIndex = currentImageIndex < allImages.length - 1 ? currentImageIndex + 1 : 0;
-    setActiveImage(allImages[nextIndex]);
-  };
-
-  return (
-    <>
-      <div
-        className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[99999] flex items-center justify-center p-3 sm:p-4 overflow-y-auto"
-        onClick={onClose}
-      >
-        {/* Modal Card */}
-        <div
-          className="bg-white rounded-xl sm:rounded-2xl w-full max-w-4xl my-auto shadow-2xl transform transition-all duration-300 ease-out"
-          onClick={(e) => e.stopPropagation()}
-        >
-          {/* Botón cerrar absoluto */}
-          <button
-            onClick={onClose}
-            className="absolute top-2 right-2 sm:top-3 sm:right-3 z-50 p-1.5 sm:p-2 bg-white/95 hover:bg-white rounded-full shadow-lg transition-all hover:scale-110 active:scale-95"
-            aria-label="Cerrar"
-          >
-            <Icon name="XMarkIcon" size={18} className="sm:w-5 sm:h-5 text-gray-700" />
-          </button>
-
-          {/* Layout Grid Responsivo */}
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-0">
-            {/* COLUMNA IZQUIERDA - GALERÍA INTERACTIVA */}
-            <div className="md:col-span-2 relative bg-gradient-to-br from-gray-50 to-gray-100 rounded-t-xl md:rounded-l-xl md:rounded-tr-none p-4 sm:p-6 flex flex-col items-center justify-center min-h-[280px] sm:min-h-[350px]">
-              {/* Badge */}
-              {addon.badge && (
-                <div className="absolute top-3 left-3 z-10">
-                  <span className="px-2 py-1 sm:px-3 sm:py-1.5 bg-blue-600 text-white text-[10px] sm:text-xs font-bold rounded-full shadow-lg">
-                    {addon.badge}
-                  </span>
-                </div>
-              )}
-
-              {/* Visor de Imagen Principal con Flechas de Navegación */}
-              <div className="w-full aspect-square max-w-[200px] sm:max-w-[250px] mb-4 relative group">
-                <AppImage
-                  key={activeImage}
-                  src={activeImage}
-                  alt={addon.name}
-                  className="w-full h-full object-contain drop-shadow-xl transition-all duration-300"
-                />
-                
-                {/* Flechas de Navegación - Solo si hay más de 1 imagen */}
-                {allImages.length > 1 && (
-                  <>
-                    {/* Flecha Izquierda */}
-                    <button
-                      onClick={goToPrevImage}
-                      className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-2 sm:-translate-x-3 p-1.5 sm:p-2 bg-white/90 hover:bg-white rounded-full shadow-lg transition-all opacity-0 group-hover:opacity-100 hover:scale-110 active:scale-95"
-                      aria-label="Imagen anterior"
-                    >
-                      <Icon name="ChevronLeftIcon" size={18} className="sm:w-5 sm:h-5 text-gray-700" />
-                    </button>
-                    
-                    {/* Flecha Derecha */}
-                    <button
-                      onClick={goToNextImage}
-                      className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-2 sm:translate-x-3 p-1.5 sm:p-2 bg-white/90 hover:bg-white rounded-full shadow-lg transition-all opacity-0 group-hover:opacity-100 hover:scale-110 active:scale-95"
-                      aria-label="Imagen siguiente"
-                    >
-                      <Icon name="ChevronRightIcon" size={18} className="sm:w-5 sm:h-5 text-gray-700" />
-                    </button>
-
-                    {/* Contador de imágenes */}
-                    <div className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-2 px-2 py-1 bg-black/60 text-white text-[10px] sm:text-xs font-bold rounded-full">
-                      {currentImageIndex + 1} / {allImages.length}
-                    </div>
-                  </>
-                )}
-              </div>
-
-              {/* Miniaturas (Selector de Galería) */}
-              {allImages.length > 1 && (
-                <div className="flex gap-1.5 sm:gap-2 justify-center flex-wrap mt-auto">
-                  {allImages.map((img, idx) => (
-                    <button
-                      key={`${img}-${idx}`}
-                      onClick={() => setActiveImage(img)}
-                      className={`w-10 h-10 sm:w-12 sm:h-12 bg-white rounded-md overflow-hidden border-2 transition-all ${
-                        activeImage === img
-                          ? 'border-blue-600 scale-110 shadow-md'
-                          : 'border-gray-200 hover:border-gray-300'
-                      }`}
-                    >
-                      <AppImage
-                        key={img}
-                        src={img}
-                        alt={`Vista ${idx + 1}`}
-                        className="w-full h-full object-contain p-0.5 sm:p-1"
-                      />
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* COLUMNA DERECHA - Info */}
-            <div className="md:col-span-3 p-4 sm:p-6 space-y-3 sm:space-y-4">
-              {/* Título */}
-              <div>
-                <h2 className="text-xl sm:text-2xl font-bold text-gray-900 leading-tight pr-8">
-                  {addon.name}
-                </h2>
-                {addon.model && (
-                  <p className="text-xs sm:text-sm text-gray-500 font-medium mt-1">{addon.model}</p>
-                )}
-              </div>
-
-              {/* Precio y Stock */}
-              <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b">
-                <div className="flex flex-wrap items-baseline gap-2">
-                  <span className="text-2xl sm:text-3xl font-bold text-gray-900">
-                    ${Number(addon.price).toLocaleString('es-UY')}
-                  </span>
-                  {addon.original_price && addon.original_price > addon.price && (
-                    <>
-                      <span className="text-base sm:text-lg text-gray-400 line-through">
-                        ${Number(addon.original_price).toLocaleString('es-UY')}
-                      </span>
-                      <div className="flex flex-col gap-0.5">
-                        <span className="px-2 py-0.5 bg-green-100 text-green-700 text-xs font-bold rounded-full">
-                          {Math.round(
-                            ((addon.original_price - addon.price) / addon.original_price) * 100
-                          )}
-                          % OFF
-                        </span>
-                        <span className="px-2 py-0.5 bg-blue-50 text-blue-700 text-[10px] font-bold rounded-full text-center">
-                          Ahorrás ${Number(addon.original_price - addon.price).toLocaleString('es-UY')}
-                        </span>
-                      </div>
-                    </>
-                  )}
-                </div>
-
-                {/* Stock Badge */}
-                <div className="flex items-center gap-1.5">
-                  <div
-                    className={`w-2 h-2 rounded-full ${
-                      addon.stock_count > 5
-                        ? 'bg-green-500'
-                        : addon.stock_count > 0
-                          ? 'bg-yellow-500'
-                          : 'bg-red-500'
-                    }`}
-                  />
-                  <span
-                    className={`text-xs sm:text-sm font-semibold ${
-                      addon.stock_count > 5
-                        ? 'text-green-700'
-                        : addon.stock_count > 0
-                          ? 'text-yellow-700'
-                          : 'text-red-700'
-                    }`}
-                  >
-                    {addon.stock_count > 5
-                      ? 'En Stock'
-                      : addon.stock_count > 0
-                        ? `${addon.stock_count} unidades`
-                        : 'Sin Stock'}
-                  </span>
-                </div>
-              </div>
-
-              {/* Descripción con Soporte Markdown */}
-              {addon.description && (
-                <div className="pb-3 border-b">
-                  <h4 className="text-xs sm:text-sm font-bold text-gray-900 mb-1.5 uppercase tracking-wide">
-                    Descripción
-                  </h4>
-                  <MarkdownText text={addon.description} className="text-xs sm:text-sm" />
-                </div>
-              )}
-
-              {/* Features - TODAS VISIBLES */}
-              {features.length > 0 && (
-                <div className="pb-2">
-                  <h4 className="text-xs sm:text-sm font-bold text-gray-900 mb-2 uppercase tracking-wide">
-                    Características
-                  </h4>
-                  <div className="space-y-1.5">
-                    {features.map((feature, idx) => (
-                      <div key={idx} className="flex items-start gap-2">
-                        <div className="w-4 h-4 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0 mt-0.5">
-                          <Icon name="CheckIcon" size={10} className="text-green-600" />
-                        </div>
-                        <span className="text-xs sm:text-sm text-gray-700 flex-1 leading-snug">
-                          {feature}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* CSS para scroll invisible en el overlay */}
-      <style jsx global>{`
-        body:has(.modal-open) {
-          overflow: hidden;
-        }
-      `}</style>
-    </>
-  );
+function getBadgeClasses(variant?: PackBadge['variant']) {
+  switch (variant) {
+    case 'green':
+      return 'bg-green-500 text-black';
+    case 'orange':
+      return 'bg-orange-500 text-white';
+    case 'blue':
+      return 'bg-blue-500 text-white';
+    case 'red':
+    default:
+      return 'bg-red-500 text-white';
+  }
 }
 
 export default function ProductDetailsInteractive({
   productInitial,
   galleryInitial,
+  addonsDictionary = [],
 }: ProductInteractiveProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const supabase = getSupabaseBrowserClient();
   const product = productInitial;
 
-  // --- ESTADOS ---
-  const [selectedColor, setSelectedColor] = useState<{
-    name: string;
-    hex: string;
-    images?: string[];
-    stock?: number;
-  } | null>(product.colors && product.colors.length > 0 ? product.colors[0] : null);
-
-  const [addonsData, setAddonsData] = useState<AddonProduct[]>([]);
-  const [selectedAddonIds, setSelectedAddonIds] = useState<string[]>([]);
+  const [dbPacks, setDbPacks] = useState<ProductPack[]>([]);
+  const [selectedPack, setSelectedPack] = useState<ProductPack | null>(null);
+  const [isAdding, setIsAdding] = useState(false);
   const [quantity, setQuantity] = useState(1);
-  const [addonModalOpen, setAddonModalOpen] = useState(false);
-  const [selectedAddonForModal, setSelectedAddonForModal] = useState<AddonProduct | null>(null);
 
-  // --- LÓGICA DE GALERÍA DINÁMICA ---
-  const currentGallery = useMemo(() => {
-    if (selectedColor && selectedColor.images && selectedColor.images.length > 0) {
-      const videoItem = galleryInitial.find((i) => i.type === 'video');
-      const variantImages: GalleryImage[] = selectedColor.images.map((url, index) => ({
-        id: `color-${selectedColor.name}-${index}`,
-        url: url,
-        alt: `${product.name} - ${selectedColor.name}`,
+  const [mounted, setMounted] = useState(false);
+  const [timeLeft, setTimeLeft] = useState({ hours: 0, minutes: 0, seconds: 0 });
+
+  useEffect(() => {
+    setMounted(true);
+
+    const calculateTimeLeft = () => {
+      const now = new Date();
+      const tomorrow = new Date(now);
+      tomorrow.setHours(24, 0, 0, 0);
+
+      const diff = tomorrow.getTime() - now.getTime();
+
+      return {
+        hours: Math.floor((diff / (1000 * 60 * 60)) % 24),
+        minutes: Math.floor((diff / 1000 / 60) % 60),
+        seconds: Math.floor((diff / 1000) % 60),
+      };
+    };
+
+    setTimeLeft(calculateTimeLeft());
+
+    const timer = setInterval(() => {
+      setTimeLeft(calculateTimeLeft());
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    async function fetchPacks() {
+      const { data } = await supabase.from('products').select('packs').eq('id', product.id).single();
+
+      let loadedPacks: any = data?.packs || [];
+
+      if (typeof loadedPacks === 'string') {
+        try {
+          loadedPacks = JSON.parse(loadedPacks);
+        } catch (e) {}
+      }
+
+      if (Array.isArray(loadedPacks) && loadedPacks.length > 0) {
+        const normalizedPacks = loadedPacks.map((pack: any) => ({
+          ...pack,
+          cash_price: pack.cash_price ? Number(pack.cash_price) : null,
+          card_price: pack.card_price ? Number(pack.card_price) : null,
+          images: Array.isArray(pack.images) ? pack.images : [],
+          badge: pack.badge || { text: '', variant: 'red' },
+        }));
+
+        setDbPacks(normalizedPacks);
+
+        const urlPackId = searchParams?.get('pack');
+        const initialPack = urlPackId
+          ? normalizedPacks.find((p: any) => p.id === urlPackId)
+          : null;
+
+        setSelectedPack(initialPack || normalizedPacks[0]);
+      }
+    }
+
+    fetchPacks();
+  }, [product.id, supabase, searchParams]);
+
+  useEffect(() => {
+    const urlPackId = searchParams?.get('pack');
+
+    if (dbPacks.length > 0) {
+      if (urlPackId) {
+        const foundPack = dbPacks.find((p) => p.id === urlPackId);
+        if (foundPack) {
+          setSelectedPack(foundPack);
+        }
+      } else {
+        setSelectedPack(dbPacks[0]);
+      }
+    }
+  }, [searchParams, dbPacks]);
+
+  useEffect(() => {
+    setQuantity(1);
+  }, [selectedPack?.id]);
+
+  const currentStock = useMemo(() => {
+    if (!selectedPack) return Number(product.stock_count);
+    
+    let minStock = Number(product.stock_count);
+
+    if (selectedPack.includes && selectedPack.includes.length > 0 && addonsDictionary.length > 0) {
+        selectedPack.includes.forEach(itemId => {
+            const addonReal = addonsDictionary.find(a => a.id === itemId);
+            if (addonReal && addonReal.stock_count < minStock) {
+                minStock = addonReal.stock_count;
+            }
+        });
+    }
+    
+    if (selectedPack.stock !== undefined && selectedPack.stock < minStock) {
+        minStock = selectedPack.stock;
+    }
+    
+    return minStock;
+  }, [selectedPack, product.stock_count, addonsDictionary]);
+
+  const dynamicGallery = useMemo(() => {
+    if (selectedPack && selectedPack.images && selectedPack.images.length > 0) {
+      const packImages: GalleryImage[] = selectedPack.images.map((url, i) => ({
+        id: `pack-${selectedPack.id}-${i}`,
+        url,
+        alt: `${product.name} - ${selectedPack.name}`,
         type: 'image' as const,
       }));
-      return videoItem ? [videoItem, ...variantImages] : variantImages;
+
+      return [...packImages, ...galleryInitial];
     }
+
     return galleryInitial;
-  }, [selectedColor, galleryInitial, product.name]);
+  }, [selectedPack, galleryInitial, product.name]);
 
-  // --- LÓGICA DE STOCK DINÁMICO ---
-  const currentStock = useMemo(() => {
-    if (selectedColor && typeof selectedColor.stock === 'number') {
-      return selectedColor.stock;
-    }
-    return product.stock_count;
-  }, [selectedColor, product.stock_count]);
-
-  const stockStatus: 'in-stock' | 'low-stock' | 'out-of-stock' =
-    currentStock <= 0 ? 'out-of-stock' : currentStock <= 5 ? 'low-stock' : 'in-stock';
-
-  useEffect(() => {
-    if (quantity > currentStock && currentStock > 0) setQuantity(currentStock);
-    if (currentStock === 0) setQuantity(1);
-  }, [currentStock, quantity]);
-
-  // --- FETCH ADDONS CON TODOS LOS CAMPOS ---
-  useEffect(() => {
-    const fetchAddons = async () => {
-      if (!product.addon_ids?.length) return;
-      const { data } = await supabase
-        .from('products')
-        .select(
-          'id, name, model, description, price, original_price, image_url, stock_count, features, badge, gallery'
-        )
-        .in('id', product.addon_ids)
-        .eq('is_active', true);
-      if (data) setAddonsData(data);
-    };
-    fetchAddons();
-  }, [product.addon_ids, supabase]);
-
-  // --- CÁLCULOS ---
-  const title = useMemo(
-    () => product.name + (product.model ? ` - ${product.model}` : ''),
-    [product]
-  );
-  const desc = useMemo(() => {
-    const f = normalizeFeatures(product.features);
-    return product.description || (f.length ? f.join(' • ') : '');
-  }, [product]);
-
-
-
-
-  // ---------------------- LÓGICA PARA HIGHLIGHTS SEGÚN EL MODELO ----------------------
-  const productHighlights = useMemo(() => {
-  // Normalizamos a mayúsculas y quitamos espacios para evitar fallos de match
-  const modelName = String(product.model || '').toUpperCase().trim();
-  const productName = String(product.name || '').toUpperCase().trim();
-  
-  // Lógica para C200
-  if (modelName.includes('C200') || productName.includes('C200')) {
-    return [
-      { text: "ESTABILIZACIÓN GYRO 6-EJES", icon: "VideoCameraIcon" },
-      { text: "VISIÓN NOCTURNA PRO", icon: "MoonIcon" }
-    ];
-  }
-  
-  // Lógica para C100 / C100+
-  if (modelName.includes('C100') || productName.includes('C100')) {
-    return [
-      { text: "Cuerpo Magnético", icon: "MagnetIcon" }, 
-      { text: "Ultra Ligera", icon: "SparklesIcon" }
-    ];
-  }
-
-  // Si es un accesorio (como la memoria) u otro producto
-  return [
-    { text: "Calidad Premium", icon: "StarIcon" },
-    { text: "Garantía Oficial", icon: "ShieldCheckIcon" }
-  ];
-}, [product.model, product.name]);
-
-  const totalPrice = useMemo(() => {
-    const base = Number(product.price) * quantity;
-    const addonsCost = selectedAddonIds.reduce((acc, id) => {
-      const item = addonsData.find((a) => a.id === id);
-      return acc + (item ? Number(item.price) : 0);
-    }, 0);
-    return base + addonsCost;
-  }, [product.price, quantity, selectedAddonIds, addonsData]);
-
-  // --- HANDLERS ---
-  const toggleAddon = (id: string) => {
-    setSelectedAddonIds((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
-    );
-  };
-
-  const openAddonModal = (addon: AddonProduct) => {
-    setSelectedAddonForModal(addon);
-    setAddonModalOpen(true);
-  };
+  const currentDisplayPrice = selectedPack ? selectedPack.price : Number(product.price);
+  const currentOriginalPrice = selectedPack ? selectedPack.original_price : product.original_price;
+  const hasDiscount = currentOriginalPrice ? currentOriginalPrice > currentDisplayPrice : false;
 
   const handleAddToCart = () => {
-    if (stockStatus === 'out-of-stock') return;
+    if (currentStock <= 0) return;
 
-    const mainProductName = selectedColor
-      ? `${product.name} (${selectedColor.name})`
-      : product.name;
+    setIsAdding(true);
 
+    let cartProductName = product.name;
+
+    if (selectedPack) {
+      cartProductName = `${product.name} - ${selectedPack.name}`;
+    }
+
+    const cartItemId = selectedPack ? `${product.id}-${selectedPack.id}` : product.id;
+
+    // Para el carrito usamos el "price" como base
     upsertCartItem({
-      id: product.id,
-      name: mainProductName,
+      id: cartItemId,
+      name: cartProductName,
       model: product.model,
-      price: Number(product.price),
-      quantity: quantity,
-      image: currentGallery[0]?.url || product.image_url,
-      alt: title,
+      price: currentDisplayPrice,
+      quantity,
+      image: dynamicGallery[0]?.url || product.image_url,
+      alt: cartProductName,
       stock: currentStock,
     });
 
-    selectedAddonIds.forEach((addonId) => {
-      const item = addonsData.find((a) => a.id === addonId);
-      if (item) {
-        const existing = readCart().find((c) => c.id === item.id);
-        if (existing) incrementItem(item.id, 1);
-        else
-          upsertCartItem({
-            id: item.id,
-            name: item.name,
-            model: 'Accesorio',
-            price: Number(item.price),
-            quantity: 1,
-            image: item.image_url,
-            stock: item.stock_count,
-            alt: item.name,
-          });
-      }
-    });
-
     window.dispatchEvent(new Event('cart-updated'));
-    router.push('/shopping-cart');
+
+    setTimeout(() => {
+      router.push('/shopping-cart');
+    }, 200);
   };
 
-  if (product.is_active === false)
+  if (product.is_active === false) {
     return (
-      <div className="min-h-screen flex items-center justify-center text-gray-500">
-        Producto no disponible.
+      <div className="min-h-screen flex items-center justify-center text-gray-500 font-medium">
+        Este producto no está disponible actualmente.
       </div>
     );
+  }
 
   return (
     <>
-      {/* Modal */}
-      {selectedAddonForModal && (
-        <AddonDetailModal
-          addon={selectedAddonForModal}
-          isOpen={addonModalOpen}
-          onClose={() => setAddonModalOpen(false)}
-        />
+      {mounted && hasDiscount && (
+        <div className="relative left-1/2 right-1/2 ml-[-50vw] mr-[-50vw] w-screen mb-6">
+          <div className="w-full bg-neutral-950 border-b border-white/5 py-3 px-4 flex justify-center items-center relative overflow-hidden">
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(220,38,38,0.20),transparent_55%)] pointer-events-none" />
+
+            <div className="flex flex-row items-center gap-3 sm:gap-4 relative z-10">
+              <Icon name="ClockIcon" size={16} className="text-red-500 animate-pulse hidden sm:block" />
+
+              <span className="font-bold text-gray-200 uppercase tracking-widest text-[10px] sm:text-xs drop-shadow-sm">
+                La oferta termina hoy:
+              </span>
+
+              <div className="flex items-center gap-1.5">
+                <span className="font-black bg-red-600 text-white px-2 py-0.5 rounded shadow-sm text-[11px] sm:text-xs min-w-[24px] text-center leading-tight">
+                  {String(timeLeft.hours).padStart(2, '0')}
+                </span>
+                <span className="text-red-500 font-bold text-xs">:</span>
+                <span className="font-black bg-red-600 text-white px-2 py-0.5 rounded shadow-sm text-[11px] sm:text-xs min-w-[24px] text-center leading-tight">
+                  {String(timeLeft.minutes).padStart(2, '0')}
+                </span>
+                <span className="text-red-500 font-bold text-xs">:</span>
+                <span className="font-black bg-red-600 text-white px-2 py-0.5 rounded shadow-sm text-[11px] sm:text-xs min-w-[24px] text-center leading-tight">
+                  {String(timeLeft.seconds).padStart(2, '0')}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
 
-      <div className="max-w-[1400px] mx-auto px-3 sm:px-4 lg:px-6 py-4 sm:py-6 lg:py-8 space-y-8 sm:space-y-12">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6 lg:gap-8">
-          {/* COLUMNA 1: Galería */}
-          <div className="lg:col-span-5">
-            <ProductGallery images={currentGallery} productName={title} />
+      <div className="max-w-[1200px] mx-auto px-4 lg:px-8 pt-0 pb-12 md:pb-16">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 md:gap-12 lg:gap-16 items-start">
+          <div className="w-full lg:sticky lg:top-24 z-10 bg-white">
+            <ProductGallery
+              key={selectedPack?.id || 'main'}
+              images={dynamicGallery}
+              productName={product.name}
+            />
           </div>
 
-          {/* COLUMNA 2: Info */}
-          <div className="lg:col-span-4 space-y-6">
+          <div className="space-y-6 md:space-y-8 relative z-20 bg-white">
             <ProductInfo
-              name={title}
+              name={selectedPack ? `${product.name} - ${selectedPack.name}` : product.name}
               model={product.model ?? ''}
-              price={Number(product.price)}
-              originalPrice={product.original_price ?? undefined}
-              rating={product.rating}
-              reviewCount={product.review_count}
-              stockStatus={stockStatus}
-              stockCount={currentStock}
-              description={desc}
-              highlights={productHighlights} // <--- AGREGÁ ESTA LÍNEA
+              price={currentDisplayPrice}
+              originalPrice={currentOriginalPrice ?? undefined}
+              cashPrice={selectedPack ? selectedPack.cash_price : product.cash_price}
+              cardPrice={selectedPack ? selectedPack.card_price : product.card_price}
+              rating={product.rating || 5}
+              reviewCount={product.review_count || 0}
+              description={product.description}
+              resumen={selectedPack?.tagline || product.resumen}
             />
 
-            {/* Selector de Colores */}
-            {product.colors && product.colors.length > 0 && (
-              <div className="pt-3 sm:pt-4 border-t">
-                <div className="flex justify-between items-center mb-2 sm:mb-3">
-                  <h3 className="text-xs sm:text-sm font-medium text-gray-900">
-                    Color: <span className="text-gray-500 font-normal">{selectedColor?.name}</span>
-                  </h3>
-                  {selectedColor && (
-                    <span
-                      className={`text-[10px] sm:text-xs font-bold ${selectedColor.stock && selectedColor.stock > 0 ? 'text-green-600' : 'text-red-500'}`}
-                    >
-                      {selectedColor.stock && selectedColor.stock > 0 ? 'Disponible' : 'Agotado'}
-                    </span>
-                  )}
-                </div>
-                <div className="flex gap-2 sm:gap-3 flex-wrap">
-                  {product.colors.map((c) => {
-                    const isOutOfStock = c.stock !== undefined && c.stock <= 0;
+            {dbPacks.length > 0 && (
+              <div className="pt-4 md:pt-6 border-t border-gray-100">
+                <h3 className="font-black text-blue-800 text-[11px] mb-4 uppercase tracking-widest flex items-center gap-2">
+                  <span className="w-1 h-4 bg-blue-600 rounded-full" />
+                  SELECCIONA TU KIT
+                </h3>
+
+                <div className="space-y-4">
+                  {dbPacks.map((pack) => {
+                    const isSelected = selectedPack?.id === pack.id;
+                    const packHasDiscount = pack.original_price && pack.original_price > pack.price;
+                    
+                    const packCashPrice = pack.cash_price || pack.price;
+                    const packCardPrice = pack.card_price || pack.price;
+                    const packHasDualPricing = !!(pack.cash_price && pack.card_price && pack.cash_price < pack.card_price);
+
                     return (
-                      <button
-                        key={c.name}
-                        onClick={() => setSelectedColor(c)}
-                        className={`relative w-9 h-9 sm:w-10 sm:h-10 rounded-full border shadow-sm transition-all focus:outline-none ${selectedColor?.name === c.name ? 'ring-2 ring-offset-2 ring-blue-600 border-white scale-110' : 'border-gray-200 hover:scale-105'} ${isOutOfStock ? 'opacity-50 grayscale' : ''}`}
-                        style={{ backgroundColor: c.hex }}
-                        title={`${c.name} ${isOutOfStock ? '(Sin Stock)' : ''}`}
-                        aria-label={`Seleccionar color ${c.name}`}
+                      <div
+                        key={pack.id}
+                        className={`rounded-2xl border-2 transition-all duration-300 relative ${
+                          isSelected
+                            ? 'border-blue-600 bg-white shadow-lg'
+                            : 'border-gray-200 bg-gray-50/50 hover:border-blue-200'
+                        }`}
                       >
-                        {isOutOfStock && (
-                          <div className="absolute inset-0 flex items-center justify-center">
-                            <div className="w-full h-0.5 bg-red-500 rotate-45 transform" />
+                        {pack.badge?.text && (
+                          <div className="absolute -top-3 right-4 z-10">
+                            <span
+                              className={`inline-flex items-center gap-1 px-3 py-1 rounded-md text-[10px] font-black uppercase tracking-wider shadow-sm ${getBadgeClasses(
+                                pack.badge.variant
+                              )}`}
+                            >
+                              <Icon name="GiftIcon" size={10} />
+                              {pack.badge.text}
+                            </span>
                           </div>
                         )}
-                      </button>
+
+                        <button
+                          type="button"
+                          onClick={() => setSelectedPack(pack)}
+                          className="w-full p-4 md:p-5 text-left"
+                        >
+                          <div className="flex items-start justify-between gap-4">
+                            
+                            {/* Radio Button y Textos */}
+                            <div className="flex-1 flex gap-3">
+                                <div
+                                  className={`mt-1 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all flex-shrink-0 ${
+                                    isSelected ? 'border-red-500' : 'border-gray-300'
+                                  }`}
+                                >
+                                  {isSelected && (
+                                    <div className="w-2.5 h-2.5 rounded-full bg-red-500" />
+                                  )}
+                                </div>
+                                <div>
+                                    <span className="font-bold text-lg leading-tight text-gray-900 block mb-0.5">
+                                      {pack.name}
+                                    </span>
+                                    {pack.tagline && (
+                                      <p className="text-xs text-gray-500">
+                                        {pack.tagline}
+                                      </p>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Sección de Precios */}
+                            <div className="text-right flex-shrink-0 flex flex-col items-end pt-1">
+                                {packHasDualPricing ? (
+                                    <>
+                                        <div className="flex flex-col items-end gap-1 mb-2">
+                                            <span className="text-[9px] font-black text-[#10b981] bg-[#10b981]/15 px-2 py-0.5 rounded uppercase tracking-wider inline-block">
+                                                Ahorrás $U {(packCardPrice - packCashPrice).toLocaleString('es-UY')}
+                                            </span>
+                                            <div className="font-black text-[#10b981] text-xl md:text-2xl leading-none">
+                                                $U {packCashPrice.toLocaleString('es-UY')}
+                                            </div>
+                                            <div className="text-[10px] font-bold text-[#10b981]">
+                                                Transferencia bancaria
+                                            </div>
+                                        </div>
+                                        
+                                        <div className="flex flex-col items-end">
+                                            <div className="font-black text-gray-900 text-sm sm:text-base leading-none">
+                                                $U {packCardPrice.toLocaleString('es-UY')}
+                                            </div>
+                                            <div className="text-[10px] font-medium text-gray-500">
+                                                Tarjeta / MercadoPago
+                                            </div>
+                                        </div>
+                                    </>
+                                ) : (
+                                    <div className="font-black text-gray-900 text-xl md:text-2xl leading-none">
+                                        $U {pack.price.toLocaleString('es-UY')}
+                                    </div>
+                                )}
+
+                                {packHasDiscount && (
+                                  <div className="mt-1.5 text-xs text-gray-400 line-through">
+                                    $U {pack.original_price?.toLocaleString('es-UY')}
+                                  </div>
+                                )}
+                            </div>
+                          </div>
+                        </button>
+
+                        <div
+                          className={`grid transition-all duration-300 ease-in-out ${
+                            isSelected ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'
+                          }`}
+                        >
+                          <div className="overflow-hidden">
+                            {pack.includes && pack.includes.length > 0 && (
+                              <div className="border-t border-gray-100 bg-white px-5 pb-5 pt-4 rounded-b-2xl mx-1 mb-1">
+                                <h4 className="font-black text-[10px] text-gray-400 uppercase tracking-[0.2em] mb-4">
+                                  ¿Qué incluye este kit?
+                                </h4>
+
+                                <div className="space-y-3">
+                                  {pack.includes.map((itemId, idx) => {
+                                      const itemData = addonsDictionary.find(a => a.id === itemId);
+                                      
+                                      if (itemData) {
+                                          return (
+                                              <div key={itemId} className="flex items-center gap-3 p-2.5 rounded-xl border border-blue-100 bg-blue-50/20">
+                                                  <div className="w-5 h-5 rounded-full flex items-center justify-center bg-blue-100 text-blue-600 flex-shrink-0">
+                                                      <Icon name="CheckIcon" size={12} />
+                                                  </div>
+                                                  <div className="w-10 h-10 bg-white rounded-lg border border-gray-200 p-1 flex-shrink-0 shadow-sm">
+                                                      <img src={itemData.image_url} className="w-full h-full object-contain" alt="" />
+                                                  </div>
+                                                  <div className="flex-1">
+                                                      <div className="text-xs sm:text-sm font-bold text-gray-900 leading-tight">{itemData.name}</div>
+                                                  </div>
+                                                  <div className="text-[9px] font-black text-blue-600 uppercase tracking-widest bg-blue-100/50 px-2 py-1 rounded">
+                                                      Incluido
+                                                  </div>
+                                              </div>
+                                          );
+                                      }
+                                      
+                                      return (
+                                          <div key={`${itemId}-${idx}`} className="flex items-center gap-3 p-2.5 rounded-xl border border-gray-100 bg-gray-50">
+                                              <div className="w-5 h-5 rounded-full flex items-center justify-center bg-gray-200 text-gray-500 flex-shrink-0">
+                                                  <Icon name="CheckIcon" size={12} />
+                                              </div>
+                                              <span className="text-xs sm:text-sm font-bold text-gray-700">{itemId}</span>
+                                          </div>
+                                      );
+                                  })}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
                     );
                   })}
                 </div>
               </div>
             )}
-          </div>
 
-          {/* COLUMNA 3: Compra */}
-          <div className="lg:col-span-3">
-            <div className="lg:sticky lg:top-24 space-y-4 sm:space-y-6">
-              <div className="bg-white p-4 sm:p-6 rounded-xl border shadow-sm space-y-4 sm:space-y-6">
-                <div>
-                  <p className="text-xs sm:text-sm text-gray-500 mb-1">Precio Total</p>
-                  <div className="text-2xl sm:text-3xl font-bold text-gray-900">
-                    ${totalPrice.toLocaleString('es-UY')}
-                  </div>
-                  {selectedAddonIds.length > 0 && (
-                    <p className="text-[10px] sm:text-xs text-green-600 mt-1 font-medium">
-                      Incluye {selectedAddonIds.length} accesorio(s)
-                    </p>
-                  )}
-                </div>
-
-                {/* Sección de Accesorios con Kit Gratuito Forzado */}
-                {addonsData.length > 0 && (
-                  <div className="border rounded-lg overflow-hidden mb-4">
-                    <div className="bg-gray-50 px-3 py-2 text-xs font-bold text-gray-700 border-b uppercase tracking-wider">
-                      Agrega Accesorios
-                    </div>
-                    <div className="divide-y max-h-[280px] overflow-y-auto">
-                      {/* ITEM ESTÁTICO: Kit de Accesorios Originales (GRATIS) */}
-                      <div className="flex items-center gap-3 p-3 bg-white border-b border-green-50 group">
-                        <div className="w-5 h-5 bg-green-600 rounded flex items-center justify-center shadow-sm shadow-green-200">
-                          <Icon name="CheckIcon" size={14} className="text-white" />
-                        </div>
-                        <div className="flex-1">
-                          <p className="text-[11px] sm:text-xs font-black text-gray-900 leading-tight">
-                            Kit Accesorios Originales
-                          </p>
-                          <p className="text-[10px] text-green-600 font-black uppercase tracking-tighter mt-0.5">
-                            ¡INCLUIDO GRATIS!
-                          </p>
-                        </div>
-                      </div>
-
-                      {/* RENDERIZADO DINÁMICO DE LOS DEMÁS ADDONS */}
-                      {addonsData.map((addon) => {
-                        const isSelected = selectedAddonIds.includes(addon.id);
-                        const isOutOfStock = addon.stock_count === 0;
-
-                        return (
-                          <div key={addon.id} className={`relative ${isOutOfStock ? 'opacity-60' : ''}`}>
-                            <label className="flex items-start gap-3 p-3 hover:bg-gray-50 cursor-pointer transition-colors">
-                              <input
-                                type="checkbox"
-                                checked={isSelected}
-                                onChange={() => toggleAddon(addon.id)}
-                                disabled={isOutOfStock}
-                                className="w-4 h-4 text-blue-600 rounded disabled:cursor-not-allowed mt-1 focus:ring-blue-500"
-                              />
-                              <div className="w-10 h-10 border rounded bg-white p-1 flex-shrink-0">
-                                <AppImage
-                                  src={addon.image_url}
-                                  alt={addon.name}
-                                  className="object-contain w-full h-full"
-                                />
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <p className="text-[11px] sm:text-xs font-bold text-gray-900 line-clamp-2 leading-tight">
-                                  {addon.name}
-                                </p>
-                                <div className="flex items-center gap-1.5 mt-1">
-                                  <p className="text-[11px] text-gray-500 font-mono font-bold">
-                                    +${Number(addon.price).toLocaleString('es-UY')}
-                                  </p>
-                                  {addon.badge && (
-                                    <span className="px-1 py-0.5 bg-blue-50 text-blue-600 text-[9px] font-black rounded uppercase">
-                                      {addon.badge}
-                                    </span>
-                                  )}
-                                </div>
-                                <button
-                                  onClick={(e) => {
-                                    e.preventDefault();
-                                    openAddonModal(addon);
-                                  }}
-                                  className="mt-2 inline-flex items-center gap-1 px-2 py-0.5 bg-blue-50 text-blue-700 text-[10px] font-bold rounded-full border border-blue-100 hover:bg-blue-100 transition-colors"
-                                >
-                                  <Icon name="EyeIcon" size={10} />
-                                  <span>Ver más</span>
-                                </button>
-                              </div>
-                            </label>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-
-                {/* Cantidad */}
-                <div className="flex items-center justify-between border rounded-md p-1">
-                  <button
-                    onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                    className="p-2 sm:p-2.5 text-gray-500 hover:text-blue-600 active:bg-gray-100 rounded transition-colors"
-                    disabled={stockStatus === 'out-of-stock'}
-                    aria-label="Disminuir cantidad"
-                  >
-                    <Icon name="MinusIcon" size={16} className="sm:w-5 sm:h-5" />
-                  </button>
-                  <span className="font-bold text-gray-900 text-sm sm:text-base min-w-[3ch] text-center">
-                    {quantity}
+            <div className="pt-4 md:pt-6 border-t border-gray-100">
+              {currentStock > 0 && (
+                <div className="flex items-center gap-2 mb-5 px-4 py-2.5 bg-red-50 border border-red-200 rounded-xl w-fit animate-pulse shadow-sm">
+                  <span className="text-base leading-none">🔥</span>
+                  <span className="text-[11px] sm:text-xs font-black text-red-600 uppercase tracking-widest">
+                    ¡Últimas unidades en stock!
                   </span>
-                  <button
-                    onClick={() => setQuantity(Math.min(currentStock, quantity + 1))}
-                    className="p-2 sm:p-2.5 text-gray-500 hover:text-blue-600 active:bg-gray-100 rounded transition-colors"
-                    disabled={quantity >= currentStock || stockStatus === 'out-of-stock'}
-                    aria-label="Aumentar cantidad"
-                  >
-                    <Icon name="PlusIcon" size={16} className="sm:w-5 sm:h-5" />
-                  </button>
                 </div>
+              )}
 
-                {/* Botón Acción */}
-                <button
-                  onClick={handleAddToCart}
-                  disabled={stockStatus === 'out-of-stock'}
-                  className={`w-full py-3 sm:py-4 rounded-lg font-bold text-base sm:text-lg shadow-md transition-all flex items-center justify-center gap-2 ${stockStatus === 'out-of-stock' ? 'bg-gray-200 text-gray-400 cursor-not-allowed shadow-none' : 'bg-blue-600 hover:bg-blue-700 text-white hover:shadow-lg active:scale-95'}`}
-                >
-                  <Icon name="ShoppingCartIcon" size={20} className="sm:w-6 sm:h-6" />
-                  <span className="truncate">
-                    {stockStatus === 'out-of-stock' ? 'Sin Stock' : 'Agregar al Carrito'}
+              {currentStock > 0 && (
+                <div className="flex items-center gap-4 mb-6">
+                  <span className="text-sm font-bold text-gray-800">Cantidad:</span>
+
+                  <div className="flex items-center bg-gray-50 border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+                    <button
+                      onClick={() => setQuantity((q) => Math.max(1, q - 1))}
+                      disabled={quantity <= 1}
+                      className="w-10 h-10 flex items-center justify-center text-gray-600 hover:bg-gray-200 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+                      type="button"
+                    >
+                      <Icon name="MinusIcon" size={16} />
+                    </button>
+
+                    <div className="w-12 h-10 flex items-center justify-center font-black text-gray-900 bg-white border-x border-gray-200 text-sm">
+                      {quantity}
+                    </div>
+
+                    <button
+                      onClick={() => setQuantity((q) => Math.min(currentStock, q + 1))}
+                      disabled={quantity >= currentStock}
+                      className="w-10 h-10 flex items-center justify-center text-gray-600 hover:bg-gray-200 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+                      type="button"
+                    >
+                      <Icon name="PlusIcon" size={16} />
+                    </button>
+                  </div>
+
+                  <span className="text-xs text-gray-500 font-medium">
+                    ({currentStock} {currentStock === 1 ? 'disponible' : 'disponibles'})
                   </span>
-                </button>
+                </div>
+              )}
 
-                {stockStatus === 'out-of-stock' && (
-                  <p className="text-center text-[10px] sm:text-xs text-red-500 font-medium">
-                    Variante agotada temporalmente.
-                  </p>
-                )}
-              </div>
+              <button
+                onClick={handleAddToCart}
+                disabled={currentStock <= 0 || isAdding}
+                className={`w-full py-4 md:py-5 rounded-2xl font-black uppercase tracking-widest text-sm transition-all duration-300 shadow-xl ${
+                  currentStock <= 0
+                    ? 'bg-gray-200 text-gray-400 shadow-none'
+                    : 'bg-[#0066FF] hover:bg-blue-700 text-white shadow-blue-500/20 active:scale-[0.98]'
+                }`}
+                type="button"
+              >
+                {currentStock <= 0
+                  ? 'Sin Stock'
+                  : isAdding
+                  ? 'Procesando...'
+                  : 'Agregar al Carrito'}
+              </button>
 
-              <div className="flex items-center gap-2 sm:gap-3 text-xs sm:text-sm text-gray-600 px-2 justify-center lg:justify-start">
-                <Icon
-                  name="TruckIcon"
-                  size={18}
-                  className="text-green-600 sm:w-5 sm:h-5 flex-shrink-0"
-                />
-                <span>Despacho en 24 / 48 hs</span>
-              </div>
+              <TrustAccordion
+                shippingInfo={product.shipping_info}
+                warrantyInfo={product.warranty_info}
+                paymentInfo={product.payment_info}
+              />
+
+              <AccessoriesCarousel
+                title="Completa tu equipo"
+                showTopBorder={true}
+                currentProductId={product.id}
+              />
             </div>
           </div>
         </div>

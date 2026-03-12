@@ -101,7 +101,7 @@ export async function POST(request: Request) {
     });
 
     const subtotal = normalizedItems.reduce((sum: number, it: any) => sum + it.unit_price * it.quantity, 0);
-    const shipping_cost = dm === 'pickup' ? 0 : (subtotal >= 2000 ? 0 : 250);
+    const shipping_cost = dm === 'pickup' ? 0 : (subtotal >= 2000 ? 0 : 300);
     const total = subtotal + shipping_cost;
     
     // Generar Número de orden

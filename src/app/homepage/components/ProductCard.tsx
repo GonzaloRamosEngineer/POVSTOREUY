@@ -7,7 +7,7 @@ import Icon from '@/components/ui/AppIcon';
 
 interface ProductCardProps {
   id: string;
-  slug: string; // Agregado para navegación SEO
+  slug: string;
   name: string;
   price: number;
   originalPrice?: number;
@@ -15,7 +15,7 @@ interface ProductCardProps {
   alt: string;
   features: string[];
   stockCount: number;
-  badge?: string;
+  badge?: string | { text: string; variant?: string };
   onAddToCart: (productId: string) => void;
   onViewDetails?: (productId: string) => void;
 }
@@ -40,11 +40,35 @@ const ProductCard = ({
     setIsHydrated(true);
   }, []);
 
-  const discount = originalPrice ? Math.round(((originalPrice - price) / originalPrice) * 100) : 0;
+  const discount = originalPrice
+    ? Math.round(((originalPrice - price) / originalPrice) * 100)
+    : 0;
+
   const isLowStock = stockCount <= 5;
-  
-  // CAMBIADO: Ahora usamos el slug para la URL de navegación
-  const productUrl = `/products/${slug}`; 
+
+  const productUrl = `/products/${slug}`;
+
+  // 🔧 FIX DEL ERROR badge.toUpperCase
+  const badgeText =
+    typeof badge === 'string'
+      ? badge
+      : badge?.text || '';
+
+  const badgeVariant =
+    typeof badge === 'object'
+      ? badge?.variant
+      : undefined;
+
+  const badgeClasses =
+    badgeVariant === 'green'
+      ? 'bg-green-500 text-black'
+      : badgeVariant === 'orange'
+      ? 'bg-orange-500 text-white'
+      : badgeVariant === 'blue'
+      ? 'bg-blue-500 text-white'
+      : badgeText.toUpperCase() === 'ENVÍO GRATIS'
+      ? 'bg-[#1ED760] text-black'
+      : 'bg-white text-black';
 
   if (!isHydrated) {
     return (
@@ -56,10 +80,16 @@ const ProductCard = ({
             className="w-full h-full object-cover"
           />
         </div>
+
         <div className="p-6 space-y-4">
-          <h3 className="text-2xl md:text-3xl font-heading font-bold text-white">{name}</h3>
+          <h3 className="text-2xl md:text-3xl font-heading font-bold text-white">
+            {name}
+          </h3>
+
           <div className="flex items-baseline gap-3">
-            <span className="text-3xl font-mono font-bold text-red-500">${price.toLocaleString('es-UY')}</span>
+            <span className="text-3xl font-mono font-bold text-red-500">
+              ${price.toLocaleString('es-UY')}
+            </span>
           </div>
         </div>
       </div>
@@ -67,32 +97,38 @@ const ProductCard = ({
   }
 
   return (
-    <div 
+    <div
       className="group relative bg-neutral-900 rounded-2xl overflow-hidden border border-neutral-800 hover:border-red-600/50 shadow-xl hover:shadow-[0_0_30px_rgba(220,38,38,0.15)] transition-all duration-300 transform hover:-translate-y-1"
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
-      {/* Glow Effect Trasero */}
+      {/* Glow Effect */}
       <div className="absolute inset-0 bg-gradient-to-br from-red-600/0 via-transparent to-red-900/0 group-hover:from-red-600/5 group-hover:to-red-900/5 transition-all duration-500 pointer-events-none" />
-      
-      {/* Image Section */}
-      <Link href={productUrl} className="block relative h-80 bg-neutral-800 overflow-hidden cursor-pointer">
+
+      {/* IMAGE */}
+      <Link
+        href={productUrl}
+        className="block relative h-80 bg-neutral-800 overflow-hidden cursor-pointer"
+      >
         <AppImage
           src={image}
           alt={alt}
           className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-out"
         />
-        
-        {/* Overlay on hover */}
+
+        {/* Hover Overlay */}
         <div className="absolute inset-0 bg-black/20 group-hover:bg-black/40 transition-colors duration-300" />
-        
-        {/* Badges simplificados */}
+
+        {/* BADGES */}
         <div className="absolute top-4 left-4 flex flex-col gap-2 z-10">
-          {badge && (
-            <span className="px-3 py-1 bg-white text-black text-xs font-bold rounded-lg shadow-lg uppercase tracking-wider">
-              {badge}
+          {badgeText && (
+            <span
+              className={`px-3 py-1 text-xs font-bold rounded-lg shadow-lg uppercase tracking-wider ${badgeClasses}`}
+            >
+              {badgeText}
             </span>
           )}
+
           {discount > 0 && (
             <span className="px-3 py-1 bg-red-600 text-white text-xs font-bold rounded-lg shadow-lg uppercase tracking-wider">
               -{discount}% OFF
@@ -100,7 +136,7 @@ const ProductCard = ({
           )}
         </div>
 
-        {/* Stock Indicator */}
+        {/* STOCK */}
         {isLowStock && (
           <div className="absolute bottom-4 right-4 px-3 py-1.5 bg-red-600/90 backdrop-blur-sm text-white text-[10px] font-bold rounded-full flex items-center gap-1.5 shadow-lg animate-pulse z-10">
             <Icon name="ExclamationTriangleIcon" size={14} variant="solid" />
@@ -108,7 +144,7 @@ const ProductCard = ({
           </div>
         )}
 
-        {/* Action Overlay Icon */}
+        {/* HOVER ICON */}
         <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-10">
           <div className="bg-red-600 rounded-full p-4 transform scale-50 group-hover:scale-100 transition-all duration-300 shadow-[0_0_20px_rgba(220,38,38,0.6)]">
             <Icon name="EyeIcon" size={24} className="text-white" variant="solid" />
@@ -116,19 +152,20 @@ const ProductCard = ({
         </div>
       </Link>
 
-      {/* Content Section */}
+      {/* CONTENT */}
       <div className="relative p-6 space-y-5 bg-neutral-900">
         <Link href={productUrl} className="block">
-           <h3 className="text-2xl md:text-3xl font-heading font-bold text-white group-hover:text-red-500 transition-colors duration-300 cursor-pointer leading-tight">
-             {name}
-           </h3>
+          <h3 className="text-2xl md:text-3xl font-heading font-bold text-white group-hover:text-red-500 transition-colors duration-300 cursor-pointer leading-tight">
+            {name}
+          </h3>
         </Link>
 
-        {/* Pricing */}
+        {/* PRICE */}
         <div className="flex items-baseline gap-3">
           <span className="text-3xl font-mono font-bold text-red-500 drop-shadow-[0_0_8px_rgba(220,38,38,0.3)]">
             ${price.toLocaleString('es-UY')}
           </span>
+
           {originalPrice && (
             <span className="text-sm font-mono text-neutral-500 line-through decoration-neutral-600">
               ${originalPrice.toLocaleString('es-UY')}
@@ -136,13 +173,13 @@ const ProductCard = ({
           )}
         </div>
 
-        {/* Features */}
+        {/* FEATURES */}
         <ul className="space-y-2.5 pt-2">
           {features.map((feature, index) => (
-            <li 
-              key={index} 
+            <li
+              key={index}
               className="flex items-start gap-2.5 text-sm text-neutral-300 transform transition-all duration-300"
-              style={{ 
+              style={{
                 transitionDelay: isHovered ? `${index * 50}ms` : '0ms',
                 transform: isHovered ? 'translateX(4px)' : 'translateX(0)'
               }}
@@ -150,12 +187,13 @@ const ProductCard = ({
               <div className="w-5 h-5 rounded-full bg-neutral-800 flex items-center justify-center flex-shrink-0 mt-0.5 border border-neutral-700 text-red-500">
                 <Icon name="CheckIcon" size={12} variant="solid" />
               </div>
+
               <span className="leading-snug">{feature}</span>
             </li>
           ))}
         </ul>
 
-        {/* Actions */}
+        {/* BUTTON */}
         <div className="pt-4">
           <Link
             href={productUrl}

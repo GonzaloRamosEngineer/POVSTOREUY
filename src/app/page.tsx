@@ -29,7 +29,7 @@ export const metadata: Metadata = {
   twitter: {
     card: 'summary_large_image',
     title: 'POV Store Uruguay',
-    description: 'Cámaras POV profesionales a precios accesibles.',
+    description: 'Cámaras POV a precios accesibles.',
     images: ['https://povstore.uy/images/og-home.png'], // Corregido
   },
 };

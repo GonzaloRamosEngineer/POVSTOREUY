@@ -1,19 +1,17 @@
 import { createClient } from '@supabase/supabase-js';
 import { notFound } from 'next/navigation';
-import Header from '@/components/common/Header'; 
 
 // --- COMPONENTES DEL PRODUCTO ---
 import ProductDetailsInteractive from '@/app/product-details/components/ProductDetailsInteractive';
 import ProductStickyNav from '@/app/product-details/components/ProductStickyNav';
 import DynamicStoryRenderer, { StoryBlock } from '@/app/product-details/components/DynamicStoryRenderer';
-import TechSpecsTable from '@/app/product-details/components/TechSpecsTable'; 
-import ProductComparison from '@/app/product-details/components/ProductComparison';
+import TechSpecsTable from '@/app/product-details/components/TechSpecsTable';
+// import ProductComparison from '@/app/product-details/components/ProductComparison';
 import ProductFAQ from '@/app/product-details/components/ProductFAQ';
-import CommunitySection from '@/app/product-details/components/CommunitySection'; 
+// import CommunitySection from '@/app/product-details/components/CommunitySection';
 import ProductReviewsSection from '@/app/product-details/components/ProductReviewsSection';
 
 // --- UTILIDADES Y TIPOS ---
-import { Product } from '@/types/product'; 
 import { normalizeReviewRow } from '@/lib/reviews';
 
 export const dynamic = 'force-dynamic';
@@ -26,117 +24,98 @@ type Props = {
   params: Promise<{ slug: string }>;
 };
 
-// --- FUNCIÓN DE LIMPIEZA DE METADATA ---
-// Elimina sintaxis Markdown para que WhatsApp y buscadores muestren texto limpio
-function cleanMetadataText(text: string) {
+function cleanMarkdown(text: string | null) {
   if (!text) return '';
   return text
-    .replace(/\*\*(.*?)\*\*/g, '$1') // Quita negritas
-    .replace(/\*(.*?)\*/g, '$1')     // Quita itálicas
-    .replace(/__(.*?)__/g, '$1')     // Quita subrayados
-    .replace(/\r?\n|\r/g, ' ')       // Quita saltos de línea y los cambia por espacios
-    .trim();
+    .replace(/\*\*(.*?)\*\*/g, '$1')
+    .replace(/\*(.*?)\*/g, '$1')
+    .replace(/__(.*?)__/g, '$1')
+    .replace(/#+/g, '')
+    .substring(0, 160);
 }
 
-// --- SEO y Open Graph Metadata Dinámica ---
+// --- DETECTOR DE UUID (ID) ---
+// Función para saber si el texto de la URL es un ID largo o un nombre amigable
+const isUUID = (str: string) => {
+  const regexExp = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  return regexExp.test(str);
+};
+
 export async function generateMetadata({ params }: Props) {
   const { slug } = await params;
-  const { data: product } = await supabase
-    .from('products')
-    .select('name, description, image_url')
-    .eq('slug', slug)
-    .single();
+
+  // Lógica de búsqueda inteligente para Metadata
+  let query = supabase.from('products').select('name, description');
+  if (isUUID(slug)) {
+    query = query.eq('id', slug);
+  } else {
+    query = query.eq('slug', slug);
+  }
+
+  const { data: product } = await query.single();
 
   if (!product) return { title: 'Producto no encontrado' };
 
-  const fullTitle = `${product.name} - POV Store Uruguay`;
-  // Aplicamos la limpieza profunda antes de recortar a 160 caracteres
-  const cleanDesc = cleanMetadataText(product.description || '').substring(0, 160);
-  const imageUrl = product.image_url;
-
   return {
-    title: fullTitle,
-    description: cleanDesc,
-    openGraph: {
-      title: fullTitle,
-      description: cleanDesc,
-      url: `https://povstore.uy/products/${slug}`, // Dominio oficial corregido
-      siteName: 'POV Store Uruguay',
-      images: [
-        {
-          url: imageUrl,
-          width: 1200,
-          height: 630,
-          alt: product.name,
-        },
-      ],
-      locale: 'es_UY',
-      type: 'website',
-    },
-    twitter: {
-      card: 'summary_large_image',
-      title: fullTitle,
-      description: cleanDesc,
-      images: [imageUrl],
-    },
+    title: `${product.name} - POV Store Uruguay`,
+    description: cleanMarkdown(product.description),
   };
 }
 
 export default async function ProductPage({ params }: Props) {
   const { slug } = await params;
 
-  // 1. Buscamos el producto principal por su SLUG
-  const { data: rawProduct, error: prodError } = await supabase
-    .from('products')
-    .select('*')
-    .eq('slug', slug)
-    .single();
+  // Lógica de búsqueda inteligente para la Página
+  let productQuery = supabase.from('products').select('*');
+  if (isUUID(slug)) {
+    productQuery = productQuery.eq('id', slug);
+  } else {
+    productQuery = productQuery.eq('slug', slug);
+  }
 
-  if (prodError || !rawProduct) notFound();
+  const [{ data: product }] = await Promise.all([
+    productQuery.single(),
+  ]);
 
-  // 2. Traemos todos los productos activos para comparativas
-  const { data: allProducts } = await supabase
-    .from('products')
-    .select('*')
-    .eq('is_active', true)
-    .order('price', { ascending: true });
+  if (!product) notFound();
 
-  // 3. Fetch de reseñas REALES usando el ID del producto encontrado
-  const { data: reviewsData } = await supabase
+  const { data: reviewsData, error: reviewsError } = await supabase
     .from('product_reviews')
-    .select(`
-      *,
-      user_profiles(full_name)
-    `)
-    .eq('product_id', rawProduct.id)
+    .select('*')
+    .eq('product_id', product.id)
     .order('created_at', { ascending: false });
 
-  // 4. Lógica de Puntaje Dinámico
+  if (reviewsError) {
+    console.error('Error fetching product reviews:', reviewsError);
+  }
+
   const reviews = (reviewsData || []).map(normalizeReviewRow);
   const totalReviewsCount = reviews.length;
-  const averageRatingValue = totalReviewsCount > 0 
-    ? Number((reviews.reduce((acc, rev) => acc + rev.rating, 0) / totalReviewsCount).toFixed(1))
-    : 0;
+  const averageRatingValue =
+    totalReviewsCount > 0
+      ? reviews.reduce((acc, r) => acc + r.rating, 0) / totalReviewsCount
+      : 5.0;
 
-  // 5. Preparación de datos para componentes
-  const otherProducts = (allProducts || []).filter(p => p.id !== rawProduct.id);
-  const product = rawProduct as unknown as Product;
-  
   const formattedGallery = [
-    { id: 'main-image', url: product.image_url, alt: `${product.name} principal`, type: 'image' as const },
-    ...(product.video_url ? [{ id: 'video-main', url: product.video_url, alt: `Video de ${product.name}`, type: 'video' as const }] : []),
-    ...(product.gallery || []).map((url: string, index: number) => ({
-      id: `gallery-${index}`, url: url, alt: `${product.name} vista ${index + 1}`, type: 'image' as const
+    {
+      id: 'main',
+      url: product.image_url,
+      alt: product.name,
+      type: 'image' as const,
+    },
+    ...(product.gallery || []).map((url: string, i: number) => ({
+      id: `gal-${i}`,
+      url,
+      alt: `${product.name} ${i}`,
+      type: 'image' as const,
     })),
   ];
 
   return (
-    <div className="min-h-screen bg-white text-neutral-900 selection:bg-red-100 selection:text-red-900">
-      
-      <Header />
-      
-      {/* 1. STICKY NAV */}
-      <ProductStickyNav 
+    <div className="min-h-screen bg-white">
+      {/* ✅ NO renderizamos Header acá porque ya viene desde layout.tsx */}
+
+      <ProductStickyNav
         productName={product.name}
         productPrice={product.price}
         productImage={product.image_url}
@@ -144,64 +123,62 @@ export default async function ProductPage({ params }: Props) {
         totalReviews={totalReviewsCount}
       />
 
-      {/* 2. OVERVIEW - Inyección directa para asegurar datos frescos */}
-      <div id="overview" className="pt-24 pb-12">
-        <ProductDetailsInteractive 
-          productInitial={{
-            ...rawProduct,
-            rating: averageRatingValue,
-            review_count: totalReviewsCount 
-          } as any} 
-          galleryInitial={formattedGallery} 
-        />
-      </div>
+      {/* ✅ Sin pt-20 porque layout.tsx ya aplica el espacio del header */}
+      <main className="pt-0">
+        <section id="overview" className="max-w-7xl mx-auto px-4 py-0 md:py-0">
+          <ProductDetailsInteractive
+            productInitial={
+              {
+                ...product,
+                resumen: product.tagline || '',
+                rating: averageRatingValue,
+                review_count: totalReviewsCount,
+              } as any
+            }
+            galleryInitial={formattedGallery}
+          />
+        </section>
 
-      {/* 3. HISTORIA VISUAL */}
-      {product.story_content && product.story_content.length > 0 && (
-        <div className="border-t border-gray-100">
-           <DynamicStoryRenderer content={product.story_content as unknown as StoryBlock[]} />
-        </div>
-      )}
+        {product.story_content && (
+          <section className="w-full">
+            <DynamicStoryRenderer
+              content={product.story_content as unknown as StoryBlock[]}
+            />
+          </section>
+        )}
 
-      {/* 4. ESPECIFICACIONES (Fondo Gris) */}
-      <div id="specs" className="py-24 bg-gray-50 border-t border-gray-100">
-         <div className="max-w-7xl mx-auto px-4">
+        {/* <CommunitySection /> */}
+
+        <div id="specs" className="py-24 bg-gray-50 border-t border-gray-100">
+          <div className="max-w-7xl mx-auto px-4">
             <TechSpecsTable specs={product.tech_specs} />
-         </div>
-      </div>
+          </div>
+        </div>
 
-      {/* 5. COMPARATIVA (Fondo Blanco) */}
-      <div id="compare" className="py-24 border-t border-gray-100 bg-white">
-        <div className="max-w-7xl mx-auto px-4">
+        {/*
+        <div id="compare" className="py-24 border-t border-gray-100 bg-white">
+          <div className="max-w-7xl mx-auto px-4">
             <h2 className="text-3xl md:text-4xl font-bold text-center mb-12 text-gray-900">
               Comparativa de Modelos
             </h2>
-            <ProductComparison 
-                currentProduct={{ ...product, rating: averageRatingValue, review_count: totalReviewsCount } as any} 
-                otherProducts={otherProducts as unknown as any[]} 
+            <ProductComparison
+              currentProduct={{ ...product, rating: averageRatingValue, review_count: totalReviewsCount } as any}
+              otherProducts={otherProducts as unknown as any[]}
             />
-        </div>
-      </div>
-
-      {/* 6. RESEÑAS (Fondo Gris) */}
-      <div id="reviews" className="py-24 bg-gray-50 border-t border-gray-100">
-          <ProductReviewsSection reviews={reviews} />
-      </div>
-
-      {/* 7. PREGUNTAS FRECUENTES (Fondo Blanco) */}
-      {product.faq_content && product.faq_content.length > 0 && (
-        <div id="faq" className="py-24 bg-white border-t border-gray-100">
-          <div className="max-w-4xl mx-auto px-4">
-             <ProductFAQ faqs={product.faq_content} />
           </div>
         </div>
-      )}
+        */}
 
-      {/* 8. COMUNIDAD */}
-      <div className="border-t border-gray-100">
-        <CommunitySection />
-      </div>
+        <div id="reviews" className="py-24 bg-gray-50 border-t border-gray-100">
+          <ProductReviewsSection reviews={reviews} />
+        </div>
 
+        {product.faq_content && product.faq_content.length > 0 && (
+          <div id="faq" className="py-24 bg-white border-t border-gray-100">
+            <ProductFAQ faqs={product.faq_content} />
+          </div>
+        )}
+      </main>
     </div>
   );
 }

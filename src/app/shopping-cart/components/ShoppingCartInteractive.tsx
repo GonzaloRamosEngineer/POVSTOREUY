@@ -43,7 +43,7 @@ export default function ShoppingCartInteractive() {
     () => cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0),
     [cartItems]
   );
-  const shipping = useMemo(() => (subtotal >= 2000 ? 0 : 250), [subtotal]);
+  const shipping = useMemo(() => (subtotal >= 2000 ? 0 : 300), [subtotal]);
   const total = useMemo(() => subtotal + shipping, [subtotal, shipping]);
   const itemCount = useMemo(
     () => cartItems.reduce((sum, item) => sum + item.quantity, 0),

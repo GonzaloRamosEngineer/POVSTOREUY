@@ -97,7 +97,7 @@ export default function CheckoutPaymentInteractive() {
 
   const shipping = useMemo(() => {
     if (deliveryMethod === 'pickup') return 0;
-    return subtotal >= 2000 ? 0 : 250;
+    return subtotal >= 2000 ? 0 : 300;
   }, [deliveryMethod, subtotal]);
 
   const total = subtotal + shipping;
