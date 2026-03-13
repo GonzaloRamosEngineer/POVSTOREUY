@@ -177,15 +177,30 @@ const HomepageInteractive = () => {
     if (!isHydrated) return;
     const product = products.find((p) => p.id === productId);
     if (!product || product.stockCount <= 0) return;
+
+    const m = String(product.id).match(/^([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})-(.+)$/i);
+    const isPack = Boolean(m);
+
     upsertCartItem({
-      id: product.id,
+      id: isPack ? `pack::${m![1]}::${m![2]}` : product.id,
       name: product.name,
       price: product.price,
       quantity: 1,
       image: product.image,
       alt: product.alt,
       stock: product.stockCount,
-    });
+      ...(isPack
+        ? {
+            type: 'pack',
+            parent_product_id: m![1],
+            pack_id: m![2],
+            price_preview: product.price,
+          }
+        : {
+            type: 'product',
+            product_id: product.id,
+          }),
+    } as any);
     window.dispatchEvent(new Event('cart-updated'));
   };
 
