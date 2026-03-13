@@ -9,6 +9,13 @@ export type CartItem = {
   alt: string;
   stock?: number;    // si está, limita cantidad
   model?: string;
+
+  // Contrato Etapa 1 (opcional para compatibilidad legacy)
+  type?: 'product' | 'pack';
+  product_id?: string;
+  parent_product_id?: string;
+  pack_id?: string;
+  price_preview?: number;
 };
 
 const CART_KEY = 'povstore_cart'; // <-- importante: unificado
@@ -22,10 +29,53 @@ function safeParse(raw: string | null): unknown {
   }
 }
 
+
+function normalizeCartItem(raw: any): CartItem | null {
+  if (!raw || typeof raw !== 'object') return null;
+
+  const id = String(raw.id || '').trim();
+  const name = String(raw.name || '').trim();
+  const image = String(raw.image || '').trim();
+  const alt = String(raw.alt || '').trim();
+
+  const price = Number(raw.price ?? 0);
+  const quantity = Number(raw.quantity ?? 0);
+
+  if (!id || !name || !image || !alt) return null;
+  if (!Number.isFinite(price) || !Number.isFinite(quantity) || quantity <= 0) return null;
+
+  const normalized: CartItem = {
+    ...raw,
+    id,
+    name,
+    image,
+    alt,
+    price,
+    quantity,
+    stock: raw.stock != null && Number.isFinite(Number(raw.stock)) ? Number(raw.stock) : undefined,
+    model: raw.model != null ? String(raw.model) : undefined,
+  };
+
+  if (normalized.type === 'pack') {
+    normalized.parent_product_id = raw.parent_product_id ? String(raw.parent_product_id) : undefined;
+    normalized.pack_id = raw.pack_id ? String(raw.pack_id) : undefined;
+    normalized.price_preview = raw.price_preview != null && Number.isFinite(Number(raw.price_preview))
+      ? Number(raw.price_preview)
+      : normalized.price;
+  } else if (normalized.type === 'product') {
+    normalized.product_id = raw.product_id ? String(raw.product_id) : undefined;
+  }
+
+  return normalized;
+}
+
 export function readCart(): CartItem[] {
   if (typeof window === 'undefined') return [];
   const parsed = safeParse(window.localStorage.getItem(CART_KEY));
-  return Array.isArray(parsed) ? (parsed as CartItem[]) : [];
+  if (!Array.isArray(parsed)) return [];
+  return parsed
+    .map((it: any) => normalizeCartItem(it))
+    .filter(Boolean) as CartItem[];
 }
 
 export function writeCart(items: CartItem[]) {

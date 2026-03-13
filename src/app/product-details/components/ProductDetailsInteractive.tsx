@@ -304,9 +304,10 @@ export default function ProductDetailsInteractive({
       cartProductName = `${product.name} - ${selectedPack.name}`;
     }
 
-    const cartItemId = selectedPack ? `${product.id}-${selectedPack.id}` : product.id;
+    const isPack = Boolean(selectedPack);
+    const cartItemId = isPack ? `pack::${product.id}::${selectedPack!.id}` : product.id;
 
-    // Para el carrito usamos el "price" como base
+    // Para el carrito usamos price como preview UI; backend recalcula precio final.
     upsertCartItem({
       id: cartItemId,
       name: cartProductName,
@@ -316,7 +317,18 @@ export default function ProductDetailsInteractive({
       image: dynamicGallery[0]?.url || product.image_url,
       alt: cartProductName,
       stock: currentStock,
-    });
+      ...(isPack
+        ? {
+            type: 'pack',
+            parent_product_id: product.id,
+            pack_id: selectedPack!.id,
+            price_preview: currentDisplayPrice,
+          }
+        : {
+            type: 'product',
+            product_id: product.id,
+          }),
+    } as any);
 
     window.dispatchEvent(new Event('cart-updated'));
 
