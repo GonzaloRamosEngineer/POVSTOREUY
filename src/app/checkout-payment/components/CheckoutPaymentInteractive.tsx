@@ -31,6 +31,50 @@ interface PaymentMethod {
   badge?: string;
 }
 
+
+interface CheckoutPayloadItemProduct {
+  type: 'product';
+  product_id: string;
+  quantity: number;
+}
+
+interface CheckoutPayloadItemPack {
+  type: 'pack';
+  parent_product_id: string;
+  pack_id: string;
+  quantity: number;
+}
+
+type CheckoutPayloadItem = CheckoutPayloadItemProduct | CheckoutPayloadItemPack;
+
+function mapCartItemsToCheckoutPayload(items: CartItemType[]): CheckoutPayloadItem[] {
+  const mapped: CheckoutPayloadItem[] = [];
+
+  for (const i of (items || [])) {
+    const quantity = Number(i?.quantity ?? 0);
+    if (!Number.isFinite(quantity) || quantity <= 0) continue;
+
+    const rawId = String(i?.id || '');
+
+    if (rawId.startsWith('pack::')) {
+      const [, parentProductId, packId] = rawId.split('::');
+      if (!parentProductId || !packId) continue;
+      mapped.push({ type: 'pack', parent_product_id: parentProductId, pack_id: packId, quantity });
+      continue;
+    }
+
+    const legacyPack = rawId.match(/^([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})-(.+)$/i);
+    if (legacyPack) {
+      mapped.push({ type: 'pack', parent_product_id: legacyPack[1], pack_id: legacyPack[2], quantity });
+      continue;
+    }
+
+    mapped.push({ type: 'product', product_id: rawId, quantity });
+  }
+
+  return mapped;
+}
+
 interface CustomerInfo {
   email: string;
   fullName: string;
@@ -132,7 +176,7 @@ export default function CheckoutPaymentInteractive() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         customerInfo,
-        items: cart.map((i) => ({ id: i.id, quantity: i.quantity })),
+        items: mapCartItemsToCheckoutPayload(cart),
         paymentMethod: selectedPaymentMethod,
         deliveryMethod,
       }),
@@ -205,7 +249,7 @@ export default function CheckoutPaymentInteractive() {
 
       // 3. Generamos Link de WhatsApp
       const whatsappNumber = '59897801202';
-      const message = `¡Hola POV Store! Quiero finalizar mi compra #${created.orderNumber} por Transferencia Bancaria para acceder al descuento del 5%.`;
+      const message = `¡Hola POV Store! Quiero finalizar mi compra #${created.orderNumber} por Transferencia Bancaria. Total del pedido: $U ${Number(created.total || 0).toLocaleString('es-UY')}.`;
       const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(message)}`;
 
       // 4. Redirigimos a WhatsApp
