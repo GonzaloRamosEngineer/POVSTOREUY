@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { randomUUID } from 'crypto';
 import { getSupabaseAdmin } from '@/lib/supabaseAdmin';
 
 const URUGUAY_DEPARTMENTS = new Set([
@@ -91,6 +92,75 @@ function normalizeReqItems(items: any[]): { data: NormalizedReqItem[] | null; er
   return { data: normalized };
 }
 
+type PackComponent = {
+  product_id: string;
+  quantity: number;
+  role: 'primary' | 'component';
+};
+
+type ValidatedPack = {
+  id: string;
+  name: string;
+  price: number;
+  cash_price: number | null;
+  card_price: number | null;
+  version: number;
+  image_url: string;
+  components: PackComponent[];
+};
+
+function validatePackOrNull(packRaw: any): { ok: true; pack: ValidatedPack } | { ok: false; error: string } {
+  if (!packRaw || typeof packRaw !== 'object') return { ok: false, error: 'Pack data is invalid' };
+
+  const componentsRaw = Array.isArray(packRaw.components) ? packRaw.components : null;
+  if (!componentsRaw || componentsRaw.length === 0) {
+    return { ok: false, error: 'Pack does not define valid components' };
+  }
+
+  const components: PackComponent[] = [];
+  let primaryCount = 0;
+
+  for (const c of componentsRaw) {
+    const product_id = String(c?.product_id || '').trim();
+    const role = c?.role === 'primary' ? 'primary' : c?.role === 'component' ? 'component' : null;
+    const quantity = Number(c?.quantity ?? 0);
+
+    if (!product_id || !UUID_RE.test(product_id)) {
+      return { ok: false, error: 'Pack has component with invalid product_id' };
+    }
+    if (!role) {
+      return { ok: false, error: 'Pack has component with invalid role' };
+    }
+    if (!Number.isFinite(quantity) || quantity <= 0) {
+      return { ok: false, error: 'Pack has component with invalid quantity' };
+    }
+
+    if (role === 'primary') primaryCount += 1;
+    components.push({ product_id, role, quantity: Math.trunc(quantity) });
+  }
+
+  if (primaryCount !== 1) {
+    return { ok: false, error: 'Pack must define exactly one primary component' };
+  }
+
+  const versionRaw = Number(packRaw.version ?? 1);
+  const version = Number.isFinite(versionRaw) && versionRaw >= 1 ? Math.trunc(versionRaw) : 1;
+
+  return {
+    ok: true,
+    pack: {
+      id: String(packRaw.id || ''),
+      name: String(packRaw.name || '').trim(),
+      price: Number(packRaw.price ?? 0),
+      cash_price: packRaw.cash_price != null ? Number(packRaw.cash_price) : null,
+      card_price: packRaw.card_price != null ? Number(packRaw.card_price) : null,
+      version,
+      image_url: Array.isArray(packRaw.images) && packRaw.images.length > 0 ? String(packRaw.images[0]) : '',
+      components,
+    },
+  };
+}
+
 export async function POST(request: Request) {
   try {
     const supabase = getSupabaseAdmin();
@@ -130,28 +200,60 @@ export async function POST(request: Request) {
     }
     const normalizedReqItems = normalizedReqResult.data;
 
-    const allProductIds = Array.from(new Set(normalizedReqItems.map((it) =>
+    const baseProductIds = Array.from(new Set(normalizedReqItems.map((it) =>
       it.kind === 'product' ? it.productId : it.parentProductId
     )));
 
     const { data: products, error: prodErr } = await supabase
       .from('products')
       .select('id,name,model,price,cash_price,card_price,image_url,stock_count,is_active,packs')
-      .in('id', allProductIds);
+      .in('id', baseProductIds);
 
     if (prodErr) return NextResponse.json({ error: 'Failed to load products', details: prodErr.message }, { status: 500 });
 
     const byId = new Map<string, any>((products || []).map((p: any) => [p.id, p]));
-    const aggregatedByProductId = new Map<string, number>();
-    const resolvedLines: Array<{
-      product_id: string;
-      product_name: string;
-      product_model: string;
-      product_image_url: string;
-      unit_price: number;
-      quantity: number;
-      total_price: number;
-    }> = [];
+    const neededComponentIds = new Set<string>();
+
+    for (const reqItem of normalizedReqItems) {
+      if (reqItem.kind !== 'pack') continue;
+
+      const parent = byId.get(reqItem.parentProductId);
+      if (!parent) return NextResponse.json({ error: `Product not found: ${reqItem.parentProductId}` }, { status: 400 });
+      if (!parent.is_active) return NextResponse.json({ error: `Product inactive: ${parent.name}` }, { status: 400 });
+
+      const packs = parseMaybeJson(parent.packs);
+      const packRaw = packs.find((x: any) => String(x?.id || '') === reqItem.packId);
+      if (!packRaw) {
+        return NextResponse.json({ error: `Pack not found: ${reqItem.packId} in product ${parent.id}` }, { status: 400 });
+      }
+
+      const validatedPack = validatePackOrNull(packRaw);
+      if (validatedPack.ok === false) {
+        return NextResponse.json({ error: `Invalid pack ${reqItem.packId}: ${validatedPack.error}` }, { status: 400 });
+      }
+
+      for (const c of validatedPack.pack.components) {
+        neededComponentIds.add(c.product_id);
+      }
+    }
+
+    const missingComponentIds = Array.from(neededComponentIds).filter((id) => !byId.has(id));
+    if (missingComponentIds.length > 0) {
+      const { data: componentProducts, error: compErr } = await supabase
+        .from('products')
+        .select('id,name,model,price,cash_price,card_price,image_url,stock_count,is_active')
+        .in('id', missingComponentIds);
+
+      if (compErr) {
+        return NextResponse.json({ error: 'Failed to load pack components', details: compErr.message }, { status: 500 });
+      }
+
+      for (const p of (componentProducts || [])) byId.set(p.id, p);
+    }
+
+    const stockNeededByProductId = new Map<string, number>();
+    const simpleLines: any[] = [];
+    const packLines: any[] = [];
 
     for (const reqItem of normalizedReqItems) {
       if (reqItem.kind === 'product') {
@@ -162,8 +264,14 @@ export async function POST(request: Request) {
         const unitPrice = getMethodPrice(paymentMethod, p.cash_price, p.card_price, p.price);
         const qty = reqItem.quantity;
 
-        aggregatedByProductId.set(p.id, (aggregatedByProductId.get(p.id) || 0) + qty);
-        resolvedLines.push({
+        stockNeededByProductId.set(p.id, (stockNeededByProductId.get(p.id) || 0) + qty);
+
+        simpleLines.push({
+          line_type: 'simple',
+          pack_group_id: null,
+          pack_id: null,
+          pack_parent_product_id: null,
+          pack_version: null,
           product_id: p.id,
           product_name: p.name,
           product_model: p.model || '',
@@ -175,32 +283,84 @@ export async function POST(request: Request) {
         continue;
       }
 
-      const p = byId.get(reqItem.parentProductId);
-      if (!p) return NextResponse.json({ error: `Product not found: ${reqItem.parentProductId}` }, { status: 400 });
-      if (!p.is_active) return NextResponse.json({ error: `Product inactive: ${p.name}` }, { status: 400 });
+      const parent = byId.get(reqItem.parentProductId);
+      if (!parent) return NextResponse.json({ error: `Product not found: ${reqItem.parentProductId}` }, { status: 400 });
+      if (!parent.is_active) return NextResponse.json({ error: `Product inactive: ${parent.name}` }, { status: 400 });
 
-      const packs = parseMaybeJson(p.packs);
-      const pack = packs.find((x: any) => String(x?.id || '') === reqItem.packId);
-      if (!pack) {
-        return NextResponse.json({ error: `Pack not found: ${reqItem.packId} in product ${p.id}` }, { status: 400 });
+      const packs = parseMaybeJson(parent.packs);
+      const packRaw = packs.find((x: any) => String(x?.id || '') === reqItem.packId);
+      if (!packRaw) {
+        return NextResponse.json({ error: `Pack not found: ${reqItem.packId} in product ${parent.id}` }, { status: 400 });
       }
 
-      const packPrice = getMethodPrice(paymentMethod, pack.cash_price, pack.card_price, pack.price ?? p.price);
-      const qty = reqItem.quantity;
+      const validatedPack = validatePackOrNull(packRaw);
+      if (validatedPack.ok === false) {
+        return NextResponse.json({ error: `Invalid pack ${reqItem.packId}: ${validatedPack.error}` }, { status: 400 });
+      }
 
-      aggregatedByProductId.set(p.id, (aggregatedByProductId.get(p.id) || 0) + qty);
-      resolvedLines.push({
-        product_id: p.id,
-        product_name: `${p.name} - ${pack.name || reqItem.packId}`,
-        product_model: p.model || '',
-        product_image_url: Array.isArray(pack.images) && pack.images.length > 0 ? String(pack.images[0]) : (p.image_url || ''),
-        unit_price: packPrice,
-        quantity: qty,
-        total_price: packPrice * qty,
+      const pack = validatedPack.pack;
+      const packUnitPrice = getMethodPrice(paymentMethod, pack.cash_price, pack.card_price, pack.price ?? parent.price);
+      const packRequestedQty = reqItem.quantity;
+      const packGroupId = randomUUID();
+      const primaryComponent = pack.components.find((c) => c.role === 'primary');
+
+      if (!primaryComponent) {
+        return NextResponse.json({ error: `Invalid pack ${reqItem.packId}: missing primary component` }, { status: 400 });
+      }
+
+      const primaryProduct = byId.get(primaryComponent.product_id);
+      if (!primaryProduct) {
+        return NextResponse.json({ error: `Pack primary component not found: ${primaryComponent.product_id}` }, { status: 400 });
+      }
+      if (!primaryProduct.is_active) {
+        return NextResponse.json({ error: `Pack primary component inactive: ${primaryProduct.name}` }, { status: 400 });
+      }
+
+      packLines.push({
+        line_type: 'pack_primary',
+        pack_group_id: packGroupId,
+        pack_id: pack.id,
+        pack_parent_product_id: parent.id,
+        pack_version: pack.version,
+        product_id: primaryComponent.product_id,
+        product_name: `${parent.name} - ${pack.name || reqItem.packId}`,
+        product_model: primaryProduct.model || parent.model || '',
+        product_image_url: pack.image_url || primaryProduct.image_url || parent.image_url || '',
+        unit_price: packUnitPrice,
+        quantity: packRequestedQty,
+        total_price: packUnitPrice * packRequestedQty,
       });
+
+      for (const c of pack.components) {
+        const componentProduct = byId.get(c.product_id);
+        if (!componentProduct) {
+          return NextResponse.json({ error: `Pack component not found: ${c.product_id}` }, { status: 400 });
+        }
+        if (!componentProduct.is_active) {
+          return NextResponse.json({ error: `Pack component inactive: ${componentProduct.name}` }, { status: 400 });
+        }
+
+        const componentQty = packRequestedQty * c.quantity;
+        stockNeededByProductId.set(c.product_id, (stockNeededByProductId.get(c.product_id) || 0) + componentQty);
+
+        packLines.push({
+          line_type: 'pack_component',
+          pack_group_id: packGroupId,
+          pack_id: pack.id,
+          pack_parent_product_id: parent.id,
+          pack_version: pack.version,
+          product_id: c.product_id,
+          product_name: componentProduct.name,
+          product_model: componentProduct.model || '',
+          product_image_url: componentProduct.image_url || '',
+          unit_price: 0,
+          quantity: componentQty,
+          total_price: 0,
+        });
+      }
     }
 
-    for (const [productId, qty] of aggregatedByProductId.entries()) {
+    for (const [productId, qty] of stockNeededByProductId.entries()) {
       const p = byId.get(productId);
       if (!p) continue;
       const stock = Number(p.stock_count ?? 0);
@@ -209,20 +369,23 @@ export async function POST(request: Request) {
       }
     }
 
-    const merged = new Map<string, any>();
-    for (const line of resolvedLines) {
-      const key = `${line.product_id}::${line.product_name}::${line.unit_price}`;
-      const existing = merged.get(key);
+    const mergedSimple = new Map<string, any>();
+    for (const line of simpleLines) {
+      const key = `${line.product_id}::${line.unit_price}`;
+      const existing = mergedSimple.get(key);
       if (!existing) {
-        merged.set(key, { ...line });
+        mergedSimple.set(key, { ...line });
       } else {
         existing.quantity += line.quantity;
         existing.total_price = existing.unit_price * existing.quantity;
       }
     }
-    const normalizedItems = Array.from(merged.values());
 
-    const subtotal = normalizedItems.reduce((sum: number, it: any) => sum + it.unit_price * it.quantity, 0);
+    const normalizedItems = [...Array.from(mergedSimple.values()), ...packLines];
+
+    const subtotal = normalizedItems
+      .filter((it: any) => it.line_type === 'simple' || it.line_type === 'pack_primary')
+      .reduce((sum: number, it: any) => sum + it.unit_price * it.quantity, 0);
     const shipping_cost = dm === 'pickup' ? 0 : (subtotal >= 2000 ? 0 : 300);
     const total = subtotal + shipping_cost;
 
@@ -257,7 +420,7 @@ export async function POST(request: Request) {
 
     const itemsToInsert = normalizedItems.map((it: any) => ({
       order_id: orderId,
-      ...it
+      ...it,
     }));
 
     const { error: itemsErr } = await supabase.from('order_items').insert(itemsToInsert);
