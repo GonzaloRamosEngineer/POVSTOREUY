@@ -8,6 +8,7 @@ import MercadoPagoForm from './MercadoPagoForm';
 import BankTransferForm from './BankTransferForm';
 import CustomerInfoForm from './CustomerInfoForm';
 import { readCart, clearCart, type CartItem as CartItemType } from '@/lib/cart';
+import { getSupabaseBrowserClient } from '@/lib/supabaseClient';
 
 // ... (Interfaces OrderItem, PaymentMethod, CustomerInfo se mantienen igual)
 // ... (PICKUP_ADDRESS y isCustomerInfoValid se mantienen igual)
@@ -46,6 +47,51 @@ interface CheckoutPayloadItemPack {
 }
 
 type CheckoutPayloadItem = CheckoutPayloadItemProduct | CheckoutPayloadItemPack;
+
+
+function resolveItemIdentity(item: CartItemType):
+  | { kind: 'product'; productId: string }
+  | { kind: 'pack'; parentProductId: string; packId: string }
+  | null {
+  const anyItem = item as any;
+
+  if (anyItem?.type === 'pack' && anyItem?.parent_product_id && anyItem?.pack_id) {
+    return {
+      kind: 'pack',
+      parentProductId: String(anyItem.parent_product_id),
+      packId: String(anyItem.pack_id),
+    };
+  }
+
+  if (anyItem?.type === 'product' && anyItem?.product_id) {
+    return { kind: 'product', productId: String(anyItem.product_id) };
+  }
+
+  const rawId = String(item?.id || '');
+  if (rawId.startsWith('pack::')) {
+    const [, parentProductId, packId] = rawId.split('::');
+    if (parentProductId && packId) return { kind: 'pack', parentProductId, packId };
+  }
+
+  const legacyPack = rawId.match(/^([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})-(.+)$/i);
+  if (legacyPack) return { kind: 'pack', parentProductId: legacyPack[1], packId: legacyPack[2] };
+
+  if (rawId) return { kind: 'product', productId: rawId };
+  return null;
+}
+
+function getMethodPrice(
+  paymentMethod: 'mercadopago' | 'bank_transfer',
+  cash: any,
+  card: any,
+  fallback: any,
+) {
+  const fallbackPrice = Number(fallback || 0);
+  const cashPrice = cash != null && Number(cash) > 0 ? Number(cash) : null;
+  const cardPrice = card != null && Number(card) > 0 ? Number(card) : null;
+  if (paymentMethod === 'bank_transfer') return cashPrice ?? fallbackPrice;
+  return cardPrice ?? fallbackPrice;
+}
 
 function mapCartItemsToCheckoutPayload(items: CartItemType[]): CheckoutPayloadItem[] {
   const mapped: CheckoutPayloadItem[] = [];
@@ -99,6 +145,7 @@ function isCustomerInfoValid(ci: CustomerInfo, method: DeliveryMethod) {
 
 export default function CheckoutPaymentInteractive() {
   const router = useRouter();
+  const supabase = useMemo(() => getSupabaseBrowserClient(), []);
 
   const [isHydrated, setIsHydrated] = useState(false);
   const [isSummaryExpanded, setIsSummaryExpanded] = useState(false);
@@ -107,6 +154,7 @@ export default function CheckoutPaymentInteractive() {
   const [isProcessing, setIsProcessing] = useState(false);
 
   const [cart, setCart] = useState<CartItemType[]>([]);
+  const [uiPriceByCartId, setUiPriceByCartId] = useState<Record<string, number>>({});
   const [customerInfo, setCustomerInfo] = useState<CustomerInfo>({
     email: '',
     fullName: '',
@@ -122,17 +170,84 @@ export default function CheckoutPaymentInteractive() {
     setCart(readCart());
   }, []);
 
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function refreshUiPrices() {
+      const ids = new Set<string>();
+      for (const it of cart) {
+        const identity = resolveItemIdentity(it);
+        if (!identity) continue;
+        ids.add(identity.kind === 'product' ? identity.productId : identity.parentProductId);
+      }
+
+      if (ids.size === 0) {
+        if (mounted) setUiPriceByCartId({});
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from('products')
+        .select('id, price, cash_price, card_price, packs')
+        .in('id', Array.from(ids));
+
+      if (!mounted) return;
+      if (error) {
+        setUiPriceByCartId({});
+        return;
+      }
+
+      const byId = new Map<string, any>((data || []).map((p: any) => [p.id, p]));
+      const next: Record<string, number> = {};
+
+      for (const it of cart) {
+        const identity = resolveItemIdentity(it);
+        if (!identity) continue;
+
+        if (identity.kind === 'product') {
+          const p = byId.get(identity.productId);
+          if (!p) continue;
+          next[it.id] = getMethodPrice(selectedPaymentMethod, p.cash_price, p.card_price, p.price);
+          continue;
+        }
+
+        const parent = byId.get(identity.parentProductId);
+        if (!parent) continue;
+
+        let packs: any[] = [];
+        if (Array.isArray(parent.packs)) packs = parent.packs;
+        else if (typeof parent.packs === 'string') {
+          try { packs = JSON.parse(parent.packs); } catch {}
+        }
+
+        const pack = (packs || []).find((x: any) => String(x?.id || '') === identity.packId);
+        if (!pack) {
+          next[it.id] = getMethodPrice(selectedPaymentMethod, parent.cash_price, parent.card_price, parent.price);
+          continue;
+        }
+
+        next[it.id] = getMethodPrice(selectedPaymentMethod, pack.cash_price, pack.card_price, pack.price ?? parent.price);
+      }
+
+      setUiPriceByCartId(next);
+    }
+
+    refreshUiPrices();
+    return () => { mounted = false; };
+  }, [cart, selectedPaymentMethod, supabase]);
+
   const orderItems: OrderItem[] = useMemo(() => {
     return (cart || []).map((it) => ({
       id: it.id,
       name: it.name,
       model: it.model || '',
-      price: it.price,
+      price: uiPriceByCartId[it.id] ?? it.price,
       quantity: it.quantity,
       image: it.image,
       alt: it.alt,
     }));
-  }, [cart]);
+  }, [cart, uiPriceByCartId]);
 
   const subtotal = useMemo(
     () => orderItems.reduce((sum, item) => sum + item.price * item.quantity, 0),
