@@ -12,6 +12,11 @@ interface OrderItem {
   quantity: number;
   unit_price: number;
   total_price: number;
+  line_type?: 'simple' | 'pack_primary' | 'pack_component';
+  pack_group_id?: string | null;
+  pack_id?: string | null;
+  pack_parent_product_id?: string | null;
+  pack_version?: number | null;
 }
 
 interface OrderDetails {
@@ -49,6 +54,34 @@ interface OrderDetailsModalProps {
   onClose: () => void;
 }
 
+function getLineTypeBadge(lineType?: OrderItem['line_type']) {
+  if (lineType === 'pack_primary') {
+    return {
+      label: 'PACK PRIMARY',
+      className: 'bg-blue-500/10 text-blue-600 border-blue-500/20',
+    };
+  }
+
+  if (lineType === 'pack_component') {
+    return {
+      label: 'PACK COMPONENT',
+      className: 'bg-purple-500/10 text-purple-600 border-purple-500/20',
+    };
+  }
+
+  return {
+    label: 'SIMPLE',
+    className: 'bg-muted text-muted-foreground border-border',
+  };
+}
+
+function shortId(id?: string | null) {
+  const value = String(id || '').trim();
+  if (!value) return '—';
+  if (value.length <= 10) return value;
+  return `${value.slice(0, 6)}...${value.slice(-4)}`;
+}
+
 export default function OrderDetailsModal({ orderId, isOpen, onClose }: OrderDetailsModalProps) {
   const [orderDetails, setOrderDetails] = useState<OrderDetails | null>(null);
   const [loading, setLoading] = useState(false);
@@ -56,6 +89,7 @@ export default function OrderDetailsModal({ orderId, isOpen, onClose }: OrderDet
   const [trackingInput, setTrackingInput] = useState('');
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const [showCancelMPConfirm, setShowCancelMPConfirm] = useState(false);
+
 
   useEffect(() => {
     if (isOpen && orderId) fetchOrderDetails();
@@ -254,6 +288,86 @@ export default function OrderDetailsModal({ orderId, isOpen, onClose }: OrderDet
   const isCancelled = orderDetails?.order_status === 'cancelled';
   const canCancelBankTransfer = isBankTransfer && !isCancelled && orderDetails?.order_status !== 'completed';
   const canCancelMercadoPago = isMercadoPago && !isCancelled && orderDetails?.payment_status === 'pending';
+
+  const orderItems = orderDetails?.items || [];
+  const simpleItems = orderItems.filter((item) => item.line_type === 'simple' || !item.line_type);
+
+  const packGroupsMap = new Map<string, OrderItem[]>();
+  const packGroupOrder: string[] = [];
+
+  for (const item of orderItems) {
+    if (item.line_type === 'simple' || !item.pack_group_id) continue;
+
+    const groupId = item.pack_group_id;
+    if (!packGroupsMap.has(groupId)) {
+      packGroupsMap.set(groupId, []);
+      packGroupOrder.push(groupId);
+    }
+
+    packGroupsMap.get(groupId)?.push(item);
+  }
+
+  const orderedPackGroups = packGroupOrder.map((groupId) => {
+    const items = [...(packGroupsMap.get(groupId) || [])].sort((a, b) => {
+      const getRank = (lineType?: OrderItem['line_type']) => {
+        if (lineType === 'pack_primary') return 0;
+        if (lineType === 'pack_component') return 1;
+        return 2;
+      };
+
+      return getRank(a.line_type) - getRank(b.line_type);
+    });
+
+    return { groupId, items };
+  });
+
+  const renderOrderItem = (item: OrderItem) => {
+    const badge = getLineTypeBadge(item.line_type);
+    const isPackLine = item.line_type && item.line_type !== 'simple';
+    const isPackPrimary = item.line_type === 'pack_primary';
+    const isPackComponent = item.line_type === 'pack_component';
+
+    return (
+      <div key={item.id} className="flex items-start gap-4 p-4">
+        <img src={item.product_image_url} className="w-12 h-12 object-cover rounded-lg border border-border" alt="" />
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <p className="text-xs font-black truncate text-foreground">{item.product_name}</p>
+            <span className={`px-2 py-0.5 rounded-full border text-[9px] font-black uppercase ${badge.className}`}>
+              {badge.label}
+            </span>
+          </div>
+
+          {(isPackPrimary || isPackComponent) && (
+            <p className="text-[9px] mt-1 font-black uppercase text-muted-foreground">
+              {isPackPrimary ? 'Línea comercial del pack' : 'Línea interna de composición'}
+            </p>
+          )}
+
+          <p className="text-[10px] text-muted-foreground mt-1 uppercase">CANTIDAD: {item.quantity} • UNIT: ${Number(item.unit_price).toLocaleString('es-UY')}</p>
+
+          {isPackLine && (
+            <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-x-3 gap-y-1 text-[9px] uppercase">
+              <p className="text-muted-foreground">
+                <span className="font-black">Pack ID:</span> <span className="font-mono">{shortId(item.pack_id)}</span>
+              </p>
+              <p className="text-muted-foreground">
+                <span className="font-black">Pack Group:</span> <span className="font-mono">{shortId(item.pack_group_id)}</span>
+              </p>
+              <p className="text-muted-foreground">
+                <span className="font-black">Pack Parent Product:</span> <span className="font-mono">{shortId(item.pack_parent_product_id)}</span>
+              </p>
+              <p className="text-muted-foreground">
+                <span className="font-black">Pack Version:</span>{' '}
+                <span className="font-mono">{item.pack_version != null ? item.pack_version : '—'}</span>
+              </p>
+            </div>
+          )}
+        </div>
+        <p className="text-sm font-black text-primary">${Number(item.total_price).toLocaleString('es-UY')}</p>
+      </div>
+    );
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-2 md:p-4 bg-black/60 backdrop-blur-sm">
@@ -632,14 +746,16 @@ export default function OrderDetailsModal({ orderId, isOpen, onClose }: OrderDet
                 <div className="bg-card rounded-2xl border border-border overflow-hidden">
                   <div className="px-4 py-2 bg-muted/20 border-b border-border text-[10px] font-black uppercase text-foreground">Artículos del Pedido</div>
                   <div className="divide-y divide-border">
-                    {orderDetails.items?.map((item) => (
-                      <div key={item.id} className="flex items-center gap-4 p-4">
-                        <img src={item.product_image_url} className="w-12 h-12 object-cover rounded-lg border border-border" alt="" />
-                        <div className="flex-1 min-w-0">
-                          <p className="text-xs font-black truncate text-foreground">{item.product_name}</p>
-                          <p className="text-[10px] text-muted-foreground mt-1 uppercase">CANTIDAD: {item.quantity} • UNIT: ${Number(item.unit_price).toLocaleString('es-UY')}</p>
+                    {simpleItems.map((item) => renderOrderItem(item))}
+
+                    {orderedPackGroups.map(({ groupId, items }) => (
+                      <div key={groupId} className="border-t border-border/70">
+                        <div className="px-4 py-2 bg-muted/10 text-[9px] font-black uppercase tracking-wide text-muted-foreground">
+                          PACK GROUP {shortId(groupId)}
                         </div>
-                        <p className="text-sm font-black text-primary">${Number(item.total_price).toLocaleString('es-UY')}</p>
+                        <div className="divide-y divide-border">
+                          {items.map((item) => renderOrderItem(item))}
+                        </div>
                       </div>
                     ))}
                   </div>
