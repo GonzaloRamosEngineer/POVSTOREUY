@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { randomUUID } from 'crypto';
+import { createHash, randomUUID } from 'crypto';
 import { getSupabaseAdmin } from '@/lib/supabaseAdmin';
 
 const URUGUAY_DEPARTMENTS = new Set([
@@ -109,6 +109,22 @@ type ValidatedPack = {
   components: PackComponent[];
 };
 
+function normalizeCustomerForIdempotency(customerInfo: any, deliveryMethod: 'pickup' | 'delivery') {
+  return {
+    email: String(customerInfo?.email || '').trim().toLowerCase(),
+    fullName: String(customerInfo?.fullName || '').trim(),
+    phone: String(customerInfo?.phone || '').trim(),
+    address: deliveryMethod === 'pickup' ? '' : String(customerInfo?.address || '').trim(),
+    city: deliveryMethod === 'pickup' ? '' : String(customerInfo?.city || '').trim(),
+    department: deliveryMethod === 'pickup' ? '' : String(customerInfo?.department || '').trim(),
+    postalCode: deliveryMethod === 'pickup' ? '' : String(customerInfo?.postalCode || '').trim(),
+  };
+}
+
+function getIdempotencyPayloadHash(payload: any): string {
+  return createHash('sha256').update(JSON.stringify(payload)).digest('hex');
+}
+
 function validatePackOrNull(packRaw: any): { ok: true; pack: ValidatedPack } | { ok: false; error: string } {
   if (!packRaw || typeof packRaw !== 'object') return { ok: false, error: 'Pack data is invalid' };
 
@@ -165,7 +181,12 @@ export async function POST(request: Request) {
   try {
     const supabase = getSupabaseAdmin();
     const body = await request.json();
-    const { customerInfo, items, paymentMethod, deliveryMethod } = body;
+    const { customerInfo, items, paymentMethod, deliveryMethod, idempotency_key } = body;
+
+    const idempotencyKey = String(idempotency_key || '').trim();
+    if (!idempotencyKey || idempotencyKey.length > 128) {
+      return NextResponse.json({ error: 'Missing or invalid idempotency_key' }, { status: 400 });
+    }
 
     const dm = deliveryMethod === 'pickup' ? 'pickup' : 'delivery';
 
@@ -199,6 +220,42 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: normalizedReqResult.error || 'Invalid items' }, { status: 400 });
     }
     const normalizedReqItems = normalizedReqResult.data;
+
+    const idempotencyPayload = {
+      items: [...normalizedReqItems]
+        .map((x) => x)
+        .sort((a, b) => {
+          const ka = a.kind === 'product' ? `product:${a.productId}:${a.quantity}` : `pack:${a.parentProductId}:${a.packId}:${a.quantity}`;
+          const kb = b.kind === 'product' ? `product:${b.productId}:${b.quantity}` : `pack:${b.parentProductId}:${b.packId}:${b.quantity}`;
+          return ka.localeCompare(kb);
+        }),
+      paymentMethod,
+      deliveryMethod: dm,
+      customerInfo: normalizeCustomerForIdempotency(customerInfo, dm),
+    };
+    const idempotencyPayloadHash = getIdempotencyPayloadHash(idempotencyPayload);
+
+    const { data: existingByIdempotency, error: existingByIdempotencyErr } = await supabase
+      .from('orders')
+      .select('id, order_number, total, idempotency_payload_hash')
+      .eq('idempotency_key', idempotencyKey)
+      .maybeSingle();
+
+    if (existingByIdempotencyErr) {
+      return NextResponse.json({ error: 'Failed to check idempotency', details: existingByIdempotencyErr.message }, { status: 500 });
+    }
+
+    if (existingByIdempotency) {
+      if (String(existingByIdempotency.idempotency_payload_hash || '') !== idempotencyPayloadHash) {
+        return NextResponse.json({ error: 'Idempotency key already used with a different payload' }, { status: 409 });
+      }
+      return NextResponse.json({
+        ok: true,
+        orderId: existingByIdempotency.id,
+        orderNumber: existingByIdempotency.order_number,
+        total: existingByIdempotency.total,
+      });
+    }
 
     const baseProductIds = Array.from(new Set(normalizedReqItems.map((it) =>
       it.kind === 'product' ? it.productId : it.parentProductId
@@ -410,11 +467,39 @@ export async function POST(request: Request) {
         payment_method: paymentMethod,
         payment_status: 'pending',
         notes: dm === 'pickup' ? `Retiro en local físico: ${PICKUP_ADDRESS}` : null,
+        idempotency_key: idempotencyKey,
+        idempotency_payload_hash: idempotencyPayloadHash,
       }])
       .select('id, order_number, total, payment_status, order_status')
       .single();
 
-    if (orderErr) return NextResponse.json({ error: 'Failed to create order', details: orderErr.message }, { status: 500 });
+    if (orderErr) {
+      const code = String((orderErr as any)?.code || '');
+      if (code === '23505') {
+        const { data: existingAfterConflict, error: existingAfterConflictErr } = await supabase
+          .from('orders')
+          .select('id, order_number, total, idempotency_payload_hash')
+          .eq('idempotency_key', idempotencyKey)
+          .maybeSingle();
+
+        if (existingAfterConflictErr || !existingAfterConflict) {
+          return NextResponse.json({ error: 'Failed to resolve idempotent create-order conflict' }, { status: 500 });
+        }
+
+        if (String(existingAfterConflict.idempotency_payload_hash || '') !== idempotencyPayloadHash) {
+          return NextResponse.json({ error: 'Idempotency key already used with a different payload' }, { status: 409 });
+        }
+
+        return NextResponse.json({
+          ok: true,
+          orderId: existingAfterConflict.id,
+          orderNumber: existingAfterConflict.order_number,
+          total: existingAfterConflict.total,
+        });
+      }
+
+      return NextResponse.json({ error: 'Failed to create order', details: orderErr.message }, { status: 500 });
+    }
 
     const orderId = orderInserted.id;
 

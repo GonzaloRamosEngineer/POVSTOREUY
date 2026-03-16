@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import OrderSummary from './OrderSummary';
 import PaymentMethodSelector from './PaymentMethodSelector';
@@ -8,7 +8,6 @@ import MercadoPagoForm from './MercadoPagoForm';
 import BankTransferForm from './BankTransferForm';
 import CustomerInfoForm from './CustomerInfoForm';
 import { readCart, clearCart, type CartItem as CartItemType } from '@/lib/cart';
-import { getSupabaseBrowserClient } from '@/lib/supabaseClient';
 
 // ... (Interfaces OrderItem, PaymentMethod, CustomerInfo se mantienen igual)
 // ... (PICKUP_ADDRESS y isCustomerInfoValid se mantienen igual)
@@ -48,50 +47,6 @@ interface CheckoutPayloadItemPack {
 
 type CheckoutPayloadItem = CheckoutPayloadItemProduct | CheckoutPayloadItemPack;
 
-
-function resolveItemIdentity(item: CartItemType):
-  | { kind: 'product'; productId: string }
-  | { kind: 'pack'; parentProductId: string; packId: string }
-  | null {
-  const anyItem = item as any;
-
-  if (anyItem?.type === 'pack' && anyItem?.parent_product_id && anyItem?.pack_id) {
-    return {
-      kind: 'pack',
-      parentProductId: String(anyItem.parent_product_id),
-      packId: String(anyItem.pack_id),
-    };
-  }
-
-  if (anyItem?.type === 'product' && anyItem?.product_id) {
-    return { kind: 'product', productId: String(anyItem.product_id) };
-  }
-
-  const rawId = String(item?.id || '');
-  if (rawId.startsWith('pack::')) {
-    const [, parentProductId, packId] = rawId.split('::');
-    if (parentProductId && packId) return { kind: 'pack', parentProductId, packId };
-  }
-
-  const legacyPack = rawId.match(/^([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})-(.+)$/i);
-  if (legacyPack) return { kind: 'pack', parentProductId: legacyPack[1], packId: legacyPack[2] };
-
-  if (rawId) return { kind: 'product', productId: rawId };
-  return null;
-}
-
-function getMethodPrice(
-  paymentMethod: 'mercadopago' | 'bank_transfer',
-  cash: any,
-  card: any,
-  fallback: any,
-) {
-  const fallbackPrice = Number(fallback || 0);
-  const cashPrice = cash != null && Number(cash) > 0 ? Number(cash) : null;
-  const cardPrice = card != null && Number(card) > 0 ? Number(card) : null;
-  if (paymentMethod === 'bank_transfer') return cashPrice ?? fallbackPrice;
-  return cardPrice ?? fallbackPrice;
-}
 
 function mapCartItemsToCheckoutPayload(items: CartItemType[]): CheckoutPayloadItem[] {
   const mapped: CheckoutPayloadItem[] = [];
@@ -143,9 +98,37 @@ function isCustomerInfoValid(ci: CustomerInfo, method: DeliveryMethod) {
   return Boolean(ci.address && ci.city && ci.department);
 }
 
+
+function normalizeCustomerInfoForIdempotency(ci: CustomerInfo, deliveryMethod: DeliveryMethod) {
+  return {
+    email: String(ci?.email || '').trim().toLowerCase(),
+    fullName: String(ci?.fullName || '').trim(),
+    phone: String(ci?.phone || '').trim(),
+    address: deliveryMethod === 'pickup' ? '' : String(ci?.address || '').trim(),
+    city: deliveryMethod === 'pickup' ? '' : String(ci?.city || '').trim(),
+    department: deliveryMethod === 'pickup' ? '' : String(ci?.department || '').trim(),
+    postalCode: deliveryMethod === 'pickup' ? '' : String(ci?.postalCode || '').trim(),
+  };
+}
+
+function computeAttemptHash(input: string) {
+  let hash = 2166136261;
+  for (let i = 0; i < input.length; i++) {
+    hash ^= input.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0).toString(16).padStart(8, '0');
+}
+
+function generateAttemptSeed() {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return `${Date.now()}-${Math.random()}`;
+}
+
 export default function CheckoutPaymentInteractive() {
   const router = useRouter();
-  const supabase = useMemo(() => getSupabaseBrowserClient(), []);
 
   const [isHydrated, setIsHydrated] = useState(false);
   const [isSummaryExpanded, setIsSummaryExpanded] = useState(false);
@@ -154,7 +137,6 @@ export default function CheckoutPaymentInteractive() {
   const [isProcessing, setIsProcessing] = useState(false);
 
   const [cart, setCart] = useState<CartItemType[]>([]);
-  const [uiPriceByCartId, setUiPriceByCartId] = useState<Record<string, number>>({});
   const [customerInfo, setCustomerInfo] = useState<CustomerInfo>({
     email: '',
     fullName: '',
@@ -170,84 +152,17 @@ export default function CheckoutPaymentInteractive() {
     setCart(readCart());
   }, []);
 
-
-  useEffect(() => {
-    let mounted = true;
-
-    async function refreshUiPrices() {
-      const ids = new Set<string>();
-      for (const it of cart) {
-        const identity = resolveItemIdentity(it);
-        if (!identity) continue;
-        ids.add(identity.kind === 'product' ? identity.productId : identity.parentProductId);
-      }
-
-      if (ids.size === 0) {
-        if (mounted) setUiPriceByCartId({});
-        return;
-      }
-
-      const { data, error } = await supabase
-        .from('products')
-        .select('id, price, cash_price, card_price, packs')
-        .in('id', Array.from(ids));
-
-      if (!mounted) return;
-      if (error) {
-        setUiPriceByCartId({});
-        return;
-      }
-
-      const byId = new Map<string, any>((data || []).map((p: any) => [p.id, p]));
-      const next: Record<string, number> = {};
-
-      for (const it of cart) {
-        const identity = resolveItemIdentity(it);
-        if (!identity) continue;
-
-        if (identity.kind === 'product') {
-          const p = byId.get(identity.productId);
-          if (!p) continue;
-          next[it.id] = getMethodPrice(selectedPaymentMethod, p.cash_price, p.card_price, p.price);
-          continue;
-        }
-
-        const parent = byId.get(identity.parentProductId);
-        if (!parent) continue;
-
-        let packs: any[] = [];
-        if (Array.isArray(parent.packs)) packs = parent.packs;
-        else if (typeof parent.packs === 'string') {
-          try { packs = JSON.parse(parent.packs); } catch {}
-        }
-
-        const pack = (packs || []).find((x: any) => String(x?.id || '') === identity.packId);
-        if (!pack) {
-          next[it.id] = getMethodPrice(selectedPaymentMethod, parent.cash_price, parent.card_price, parent.price);
-          continue;
-        }
-
-        next[it.id] = getMethodPrice(selectedPaymentMethod, pack.cash_price, pack.card_price, pack.price ?? parent.price);
-      }
-
-      setUiPriceByCartId(next);
-    }
-
-    refreshUiPrices();
-    return () => { mounted = false; };
-  }, [cart, selectedPaymentMethod, supabase]);
-
   const orderItems: OrderItem[] = useMemo(() => {
     return (cart || []).map((it) => ({
       id: it.id,
       name: it.name,
       model: it.model || '',
-      price: uiPriceByCartId[it.id] ?? it.price,
+      price: it.price,
       quantity: it.quantity,
       image: it.image,
       alt: it.alt,
     }));
-  }, [cart, uiPriceByCartId]);
+  }, [cart]);
 
   const subtotal = useMemo(
     () => orderItems.reduce((sum, item) => sum + item.price * item.quantity, 0),
@@ -260,6 +175,39 @@ export default function CheckoutPaymentInteractive() {
   }, [deliveryMethod, subtotal]);
 
   const total = subtotal + shipping;
+
+  const checkoutPayloadItems = useMemo(() => mapCartItemsToCheckoutPayload(cart), [cart]);
+
+  const attemptFingerprint = useMemo(() => {
+    const normalizedItems = [...checkoutPayloadItems]
+      .map((it) =>
+        it.type === 'product'
+          ? `product:${it.product_id}:${Number(it.quantity || 0)}`
+          : `pack:${it.parent_product_id}:${it.pack_id}:${Number(it.quantity || 0)}`,
+      )
+      .sort();
+
+    const payload = {
+      items: normalizedItems,
+      paymentMethod: selectedPaymentMethod,
+      deliveryMethod,
+      customerInfo: normalizeCustomerInfoForIdempotency(customerInfo, deliveryMethod),
+    };
+
+    return JSON.stringify(payload);
+  }, [checkoutPayloadItems, selectedPaymentMethod, deliveryMethod, customerInfo]);
+
+  const attemptRef = useRef<{ fingerprint: string; seed: string } | null>(null);
+  if (!attemptRef.current || attemptRef.current.fingerprint !== attemptFingerprint) {
+    attemptRef.current = {
+      fingerprint: attemptFingerprint,
+      seed: generateAttemptSeed(),
+    };
+  }
+
+  const createOrderIdempotencyKey = useMemo(() => {
+    return `co-${computeAttemptHash(`${attemptRef.current?.seed || ''}::${attemptFingerprint}`)}`;
+  }, [attemptFingerprint]);
 
   const referenceNumber = useMemo(() => {
     const year = new Date().getFullYear();
@@ -291,9 +239,10 @@ export default function CheckoutPaymentInteractive() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         customerInfo,
-        items: mapCartItemsToCheckoutPayload(cart),
+        items: checkoutPayloadItems,
         paymentMethod: selectedPaymentMethod,
         deliveryMethod,
+        idempotency_key: createOrderIdempotencyKey,
       }),
     });
 
@@ -364,7 +313,7 @@ export default function CheckoutPaymentInteractive() {
 
       // 3. Generamos Link de WhatsApp
       const whatsappNumber = '59897801202';
-      const message = `¡Hola POV Store! Quiero finalizar mi compra #${created.orderNumber} por Transferencia Bancaria. Total del pedido: $U ${Number(created.total || 0).toLocaleString('es-UY')}.`;
+      const message = `¡Hola POV Store! Quiero finalizar mi compra #${created.orderNumber} por Transferencia Bancaria para acceder al descuento del 5%.`;
       const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(message)}`;
 
       // 4. Redirigimos a WhatsApp

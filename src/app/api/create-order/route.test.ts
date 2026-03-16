@@ -11,9 +11,13 @@ vi.mock('next/server', () => ({
   },
 }));
 
-vi.mock('crypto', () => ({
-  randomUUID: vi.fn(() => 'group-fixed-uuid'),
-}));
+vi.mock('crypto', async () => {
+  const actual = await vi.importActual<typeof import('crypto')>('crypto');
+  return {
+    ...actual,
+    randomUUID: vi.fn(() => 'group-fixed-uuid'),
+  };
+});
 
 vi.mock('@/lib/supabaseAdmin', () => ({
   getSupabaseAdmin: vi.fn(() => currentSupabase),
@@ -34,19 +38,41 @@ type ProductRow = {
   packs?: any;
 };
 
+type OrderRow = {
+  id: string;
+  order_number: string;
+  total: number;
+  idempotency_key?: string | null;
+  idempotency_payload_hash?: string | null;
+};
+
 function makeSupabaseMock(params: {
   baseProducts: ProductRow[];
   componentProducts?: ProductRow[];
+  existingOrders?: OrderRow[];
 }) {
   const captures: {
     orderInsertPayload?: any;
     orderItemsInserted?: any[];
+    orderItemsInsertCallCount: number;
     productQueryIds: string[][];
+    orderInsertCallCount: number;
   } = {
     productQueryIds: [],
+    orderItemsInsertCallCount: 0,
+    orderInsertCallCount: 0,
   };
 
   let productQueryCount = 0;
+  const ordersByIdempotency = new Map<string, OrderRow>();
+  const seeded = params.existingOrders || [];
+  for (const o of seeded) {
+    if (o.idempotency_key) {
+      ordersByIdempotency.set(o.idempotency_key, o);
+    }
+  }
+
+  let orderSeq = seeded.length + 1;
 
   const supabase = {
     from: (table: string) => {
@@ -67,15 +93,49 @@ function makeSupabaseMock(params: {
 
       if (table === 'orders') {
         return {
+          select: (_sel: string) => ({
+            eq: (_column: string, key: string) => ({
+              maybeSingle: async () => ({
+                data: ordersByIdempotency.get(key) || null,
+                error: null,
+              }),
+            }),
+          }),
           insert: (rows: any[]) => {
+            captures.orderInsertCallCount += 1;
             captures.orderInsertPayload = rows?.[0];
+
+            const key = String(captures.orderInsertPayload?.idempotency_key || '');
+            if (key && ordersByIdempotency.has(key)) {
+              return {
+                select: (_sel: string) => ({
+                  single: async () => ({
+                    data: null,
+                    error: { code: '23505', message: 'duplicate key value violates unique constraint' },
+                  }),
+                }),
+              };
+            }
+
+            const inserted: OrderRow = {
+              id: `order-${orderSeq++}`,
+              order_number: captures.orderInsertPayload?.order_number || 'POV-000001',
+              total: captures.orderInsertPayload?.total ?? 0,
+              idempotency_key: captures.orderInsertPayload?.idempotency_key || null,
+              idempotency_payload_hash: captures.orderInsertPayload?.idempotency_payload_hash || null,
+            };
+
+            if (inserted.idempotency_key) {
+              ordersByIdempotency.set(inserted.idempotency_key, inserted);
+            }
+
             return {
               select: (_sel: string) => ({
                 single: async () => ({
                   data: {
-                    id: 'order-1',
-                    order_number: captures.orderInsertPayload?.order_number || 'POV-000001',
-                    total: captures.orderInsertPayload?.total ?? 0,
+                    id: inserted.id,
+                    order_number: inserted.order_number,
+                    total: inserted.total,
                     payment_status: 'pending',
                     order_status: 'pending',
                   },
@@ -90,6 +150,7 @@ function makeSupabaseMock(params: {
       if (table === 'order_items') {
         return {
           insert: async (rows: any[]) => {
+            captures.orderItemsInsertCallCount += 1;
             captures.orderItemsInserted = rows;
             return { error: null };
           },
@@ -100,27 +161,34 @@ function makeSupabaseMock(params: {
     },
   };
 
-  return { supabase, captures };
+  return { supabase, captures, ordersByIdempotency };
 }
 
-function buildRequest(items: any[]) {
+function buildRequest(args: {
+  items: any[];
+  idempotencyKey?: string;
+  paymentMethod?: 'mercadopago' | 'bank_transfer';
+  deliveryMethod?: 'pickup' | 'delivery';
+  customerInfo?: any;
+}) {
   return new Request('http://localhost/api/create-order', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      customerInfo: {
+      customerInfo: args.customerInfo || {
         email: 'qa@example.com',
         fullName: 'QA User',
         phone: '099123456',
       },
-      items,
-      paymentMethod: 'bank_transfer',
-      deliveryMethod: 'pickup',
+      items: args.items,
+      paymentMethod: args.paymentMethod || 'bank_transfer',
+      deliveryMethod: args.deliveryMethod || 'pickup',
+      ...(args.idempotencyKey !== undefined ? { idempotency_key: args.idempotencyKey } : {}),
     }),
   });
 }
 
-describe('create-order pack expansion', () => {
+describe('create-order pack expansion + idempotency', () => {
   beforeEach(() => {
     currentSupabase = null;
   });
@@ -146,7 +214,12 @@ describe('create-order pack expansion', () => {
     });
     currentSupabase = supabase;
 
-    const res: any = await POST(buildRequest([{ type: 'product', product_id: simpleProductId, quantity: 2 }]));
+    const res: any = await POST(
+      buildRequest({
+        idempotencyKey: 'idem-simple-1',
+        items: [{ type: 'product', product_id: simpleProductId, quantity: 2 }],
+      }),
+    );
 
     expect(res.status).toBe(200);
     expect(captures.orderItemsInserted).toHaveLength(1);
@@ -222,7 +295,12 @@ describe('create-order pack expansion', () => {
     });
     currentSupabase = supabase;
 
-    const res: any = await POST(buildRequest([{ type: 'pack', parent_product_id: parentId, pack_id: 'pack-1', quantity: 1 }]));
+    const res: any = await POST(
+      buildRequest({
+        idempotencyKey: 'idem-pack-1',
+        items: [{ type: 'pack', parent_product_id: parentId, pack_id: 'pack-1', quantity: 1 }],
+      }),
+    );
 
     expect(res.status).toBe(200);
     const packPrimary = captures.orderItemsInserted?.find((x) => x.line_type === 'pack_primary');
@@ -310,10 +388,13 @@ describe('create-order pack expansion', () => {
     currentSupabase = supabase;
 
     const res: any = await POST(
-      buildRequest([
-        { type: 'product', product_id: simpleId, quantity: 1 },
-        { type: 'pack', parent_product_id: parentId, pack_id: 'pack-1', quantity: 1 },
-      ]),
+      buildRequest({
+        idempotencyKey: 'idem-mixed-1',
+        items: [
+          { type: 'product', product_id: simpleId, quantity: 1 },
+          { type: 'pack', parent_product_id: parentId, pack_id: 'pack-1', quantity: 1 },
+        ],
+      }),
     );
 
     expect(res.status).toBe(200);
@@ -372,7 +453,12 @@ describe('create-order pack expansion', () => {
     });
     currentSupabase = supabase;
 
-    const res: any = await POST(buildRequest([{ type: 'pack', parent_product_id: parentId, pack_id: 'pack-multi', quantity: 2 }]));
+    const res: any = await POST(
+      buildRequest({
+        idempotencyKey: 'idem-pack-multi',
+        items: [{ type: 'pack', parent_product_id: parentId, pack_id: 'pack-multi', quantity: 2 }],
+      }),
+    );
 
     expect(res.status).toBe(200);
 
@@ -385,5 +471,115 @@ describe('create-order pack expansion', () => {
     expect(compA?.quantity).toBe(4); // 2 packs * 2
     expect(compB?.quantity).toBe(6); // 2 packs * 3
     expect(captures.orderInsertPayload?.subtotal).toBe(6400); // 3200 * 2 from pack_primary only
+  });
+
+  it('same idempotency_key + same logical payload returns same order without reinserting', async () => {
+    const simpleProductId = '11111111-1111-4111-8111-111111111111';
+    const { supabase, captures } = makeSupabaseMock({
+      baseProducts: [
+        {
+          id: simpleProductId,
+          name: 'Simple Cam',
+          price: 1200,
+          cash_price: 1000,
+          card_price: 1200,
+          stock_count: 10,
+          is_active: true,
+          packs: [],
+        },
+      ],
+    });
+    currentSupabase = supabase;
+
+    const req = buildRequest({
+      idempotencyKey: 'idem-retry-1',
+      items: [{ type: 'product', product_id: simpleProductId, quantity: 1 }],
+    });
+
+    const res1: any = await POST(req);
+    const res2: any = await POST(
+      buildRequest({
+        idempotencyKey: 'idem-retry-1',
+        items: [{ type: 'product', product_id: simpleProductId, quantity: 1 }],
+      }),
+    );
+
+    expect(res1.status).toBe(200);
+    expect(res2.status).toBe(200);
+    expect(res2.body.orderId).toBe(res1.body.orderId);
+    expect(captures.orderInsertCallCount).toBe(1);
+    expect(captures.orderItemsInsertCallCount).toBe(1);
+  });
+
+  it('same idempotency_key + different logical payload returns 409 conflict', async () => {
+    const simpleProductId = '11111111-1111-4111-8111-111111111111';
+    const { supabase } = makeSupabaseMock({
+      baseProducts: [
+        {
+          id: simpleProductId,
+          name: 'Simple Cam',
+          price: 1200,
+          cash_price: 1000,
+          card_price: 1200,
+          stock_count: 10,
+          is_active: true,
+          packs: [],
+        },
+      ],
+    });
+    currentSupabase = supabase;
+
+    const res1: any = await POST(
+      buildRequest({
+        idempotencyKey: 'idem-conflict-1',
+        items: [{ type: 'product', product_id: simpleProductId, quantity: 1 }],
+      }),
+    );
+    const res2: any = await POST(
+      buildRequest({
+        idempotencyKey: 'idem-conflict-1',
+        items: [{ type: 'product', product_id: simpleProductId, quantity: 2 }],
+      }),
+    );
+
+    expect(res1.status).toBe(200);
+    expect(res2.status).toBe(409);
+    expect(res2.body.error).toContain('Idempotency key already used');
+  });
+
+  it('missing or invalid idempotency_key returns 400', async () => {
+    const simpleProductId = '11111111-1111-4111-8111-111111111111';
+    const { supabase } = makeSupabaseMock({
+      baseProducts: [
+        {
+          id: simpleProductId,
+          name: 'Simple Cam',
+          price: 1200,
+          cash_price: 1000,
+          card_price: 1200,
+          stock_count: 10,
+          is_active: true,
+          packs: [],
+        },
+      ],
+    });
+    currentSupabase = supabase;
+
+    const missingKeyRes: any = await POST(
+      buildRequest({
+        items: [{ type: 'product', product_id: simpleProductId, quantity: 1 }],
+        idempotencyKey: undefined,
+      }),
+    );
+
+    const invalidKeyRes: any = await POST(
+      buildRequest({
+        idempotencyKey: 'x'.repeat(129),
+        items: [{ type: 'product', product_id: simpleProductId, quantity: 1 }],
+      }),
+    );
+
+    expect(missingKeyRes.status).toBe(400);
+    expect(invalidKeyRes.status).toBe(400);
   });
 });
