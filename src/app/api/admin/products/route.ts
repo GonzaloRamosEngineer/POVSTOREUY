@@ -1,10 +1,66 @@
 import { NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabaseAdmin';
+import { validatePackContracts } from '@/lib/packs/packContractValidator';
 
 export const dynamic = 'force-dynamic';
 
 function json(status: number, body: any) {
   return NextResponse.json(body, { status });
+}
+
+function hasOwn(obj: any, key: string) {
+  return Object.prototype.hasOwnProperty.call(obj || {}, key);
+}
+
+function collectComponentProductIds(packs: Array<{ components: Array<{ product_id: string }> }>) {
+  const ids = new Set<string>();
+  for (const pack of packs || []) {
+    for (const c of pack?.components || []) {
+      const id = String(c?.product_id || '').trim();
+      if (id) ids.add(id);
+    }
+  }
+  return Array.from(ids);
+}
+
+async function validateComponentProductsActive(ids: string[], supabase: any) {
+  const uniqueIds = Array.from(new Set((ids || []).filter(Boolean)));
+  if (uniqueIds.length === 0) return { ok: true as const };
+
+  const { data, error } = await supabase
+    .from('products')
+    .select('id, is_active')
+    .in('id', uniqueIds);
+
+  if (error) {
+    return {
+      ok: false as const,
+      status: 500,
+      body: { error: 'Failed to validate pack component products', details: error.message },
+    };
+  }
+
+  const byId = new Map<string, any>((data || []).map((p: any) => [String(p.id), p]));
+
+  for (const id of uniqueIds) {
+    const product = byId.get(id);
+    if (!product) {
+      return {
+        ok: false as const,
+        status: 400,
+        body: { error: 'PACK_COMPONENT_NOT_FOUND', details: { product_id: id } },
+      };
+    }
+    if (!product.is_active) {
+      return {
+        ok: false as const,
+        status: 400,
+        body: { error: 'PACK_COMPONENT_INACTIVE', details: { product_id: id } },
+      };
+    }
+  }
+
+  return { ok: true as const };
 }
 
 function getBearerToken(req: Request) {
@@ -87,6 +143,27 @@ export async function POST(req: Request) {
   let body: any;
   try { body = await req.json(); } catch { return json(400, { error: 'Invalid JSON' }); }
 
+  if (body?.packs !== undefined && !Array.isArray(body.packs)) {
+    return json(400, { error: 'Invalid packs: expected array when provided' });
+  }
+
+  if (Array.isArray(body?.packs)) {
+    const structural = validatePackContracts(body.packs);
+    if (!structural.ok) {
+      return json(400, {
+        error: 'Invalid pack contract',
+        details: structural.errors,
+      });
+    }
+
+    const isPublishable = Boolean(body?.is_active);
+    if (isPublishable && structural.normalized.length > 0) {
+      const componentIds = collectComponentProductIds(structural.normalized as any);
+      const dbValidation = await validateComponentProductsActive(componentIds, auth.supabase);
+      if (!dbValidation.ok) return json(dbValidation.status, dbValidation.body);
+    }
+  }
+
   const payload = {
     name: String(body?.name || '').trim(),
     slug: body?.slug ? String(body.slug).trim() : null,
@@ -106,6 +183,7 @@ export async function POST(req: Request) {
     features: Array.isArray(body?.features) ? body.features : [],
     badge: body?.badge ? String(body.badge).trim() : null,
     is_active: Boolean(body?.is_active),
+    packs: Array.isArray(body?.packs) ? body.packs : undefined,
   };
 
   const { data, error } = await auth.supabase.from('products').insert(payload).select('*').single();
@@ -125,6 +203,38 @@ export async function PATCH(req: Request) {
 
   let body: any;
   try { body = await req.json(); } catch { return json(400, { error: 'Invalid JSON' }); }
+
+  const hasPacksField = hasOwn(body, 'packs');
+  if (hasPacksField && !Array.isArray(body.packs)) {
+    return json(400, { error: 'Invalid packs: expected array when provided' });
+  }
+
+  if (hasPacksField) {
+    const structural = validatePackContracts(body.packs);
+    if (!structural.ok) {
+      return json(400, {
+        error: 'Invalid pack contract',
+        details: structural.errors,
+      });
+    }
+
+    const { data: currentProduct, error: currentErr } = await auth.supabase
+      .from('products')
+      .select('id, is_active')
+      .eq('id', id)
+      .single();
+
+    if (currentErr || !currentProduct) {
+      return json(404, { error: 'Not found' });
+    }
+
+    const finalIsActive = hasOwn(body, 'is_active') ? Boolean(body.is_active) : Boolean(currentProduct.is_active);
+    if (finalIsActive && structural.normalized.length > 0) {
+      const componentIds = collectComponentProductIds(structural.normalized as any);
+      const dbValidation = await validateComponentProductsActive(componentIds, auth.supabase);
+      if (!dbValidation.ok) return json(dbValidation.status, dbValidation.body);
+    }
+  }
 
   const { data, error } = await auth.supabase.from('products').update(body).eq('id', id).select('*').single();
   
