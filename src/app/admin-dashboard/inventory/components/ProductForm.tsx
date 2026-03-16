@@ -31,6 +31,15 @@ text: string;
 variant: 'red' | 'green' | 'orange' | 'blue';
 };
 
+type PackComponentRole = 'primary' | 'component';
+
+type ProductPackComponent = {
+id: string;
+product_id: string;
+quantity: number;
+role: PackComponentRole;
+};
+
 type ProductPack = {
 id: string;
 name: string;
@@ -45,6 +54,13 @@ show_on_home?: boolean;
 featured_in_menu?: boolean;
 stock?: number;
 badge?: PackBadge;
+
+// Contrato packs (2B.2 base): estado/modelo interno
+status?: 'draft' | 'active' | string;
+is_active?: boolean;
+publicable?: boolean;
+version?: number | null;
+components?: ProductPackComponent[];
 };
 
 type ProductReview = {
@@ -86,6 +102,159 @@ shipping_info: string;
 warranty_info: string;
 payment_info: string;
 };
+
+function normalizePackForForm(rawPack: any): ProductPack {
+const badge =
+    typeof rawPack?.badge === 'string'
+    ? { text: rawPack.badge, variant: 'red' as const }
+    : rawPack?.badge && typeof rawPack.badge === 'object'
+        ? {
+            text: String(rawPack.badge.text || ''),
+            variant: ['red', 'green', 'orange', 'blue'].includes(String(rawPack.badge.variant))
+            ? (rawPack.badge.variant as PackBadge['variant'])
+            : 'red',
+        }
+        : { text: '', variant: 'red' as const };
+
+const normalizedComponents: ProductPackComponent[] = Array.isArray(rawPack?.components)
+    ? rawPack.components
+        .map((c: any, idx: number) => {
+        const productId = String(c?.product_id || '').trim();
+        const role: PackComponentRole = c?.role === 'primary' ? 'primary' : 'component';
+        const quantityRaw = Number(c?.quantity ?? 1);
+        const quantity = Number.isFinite(quantityRaw) && quantityRaw > 0 ? Math.trunc(quantityRaw) : 1;
+        if (!productId) return null;
+        return {
+            id: String(c?.id || `cmp-${idx}-${productId}`),
+            product_id: productId,
+            quantity,
+            role,
+        };
+        })
+        .filter(Boolean) as ProductPackComponent[]
+    : [];
+
+const versionRaw = rawPack?.version;
+const version = versionRaw == null || versionRaw === '' ? null : Number.isFinite(Number(versionRaw)) ? Math.trunc(Number(versionRaw)) : null;
+
+return {
+    id: String(rawPack?.id || generateUUID()),
+    name: String(rawPack?.name || ''),
+    tagline: String(rawPack?.tagline || ''),
+    price: Number(rawPack?.price || 0),
+    original_price: rawPack?.original_price != null ? Number(rawPack.original_price) : null,
+    cash_price: rawPack?.cash_price != null ? Number(rawPack.cash_price) : null,
+    card_price: rawPack?.card_price != null ? Number(rawPack.card_price) : null,
+    includes: Array.isArray(rawPack?.includes) ? rawPack.includes.map((x: any) => String(x)) : [],
+    images: Array.isArray(rawPack?.images) ? rawPack.images.map((x: any) => String(x)).filter(Boolean) : [],
+    show_on_home: Boolean(rawPack?.show_on_home),
+    featured_in_menu: Boolean(rawPack?.featured_in_menu),
+    stock: rawPack?.stock != null && Number.isFinite(Number(rawPack.stock)) ? Number(rawPack.stock) : 0,
+    badge,
+    status: rawPack?.status ? String(rawPack.status) : undefined,
+    is_active: rawPack?.is_active !== undefined ? Boolean(rawPack.is_active) : undefined,
+    publicable: rawPack?.publicable !== undefined ? Boolean(rawPack.publicable) : undefined,
+    version,
+    components: normalizedComponents,
+};
+}
+
+
+
+function serializePackForSubmit(rawPack: any): Record<string, any> {
+const pack = normalizePackForForm(rawPack);
+
+const components = Array.isArray(pack.components)
+    ? pack.components
+        .map((c) => ({
+        product_id: String(c.product_id || '').trim(),
+        quantity: Number.isFinite(Number(c.quantity)) && Number(c.quantity) > 0 ? Math.trunc(Number(c.quantity)) : 1,
+        role: c.role === 'primary' ? 'primary' : 'component',
+        }))
+        .filter((c) => c.product_id)
+    : [];
+
+return {
+    id: pack.id,
+    name: pack.name,
+    tagline: pack.tagline,
+    price: Number(pack.price || 0),
+    original_price: pack.original_price != null ? Number(pack.original_price) : null,
+    cash_price: pack.cash_price != null ? Number(pack.cash_price) : null,
+    card_price: pack.card_price != null ? Number(pack.card_price) : null,
+    includes: Array.isArray(pack.includes) ? pack.includes.map((x) => String(x).trim()).filter(Boolean) : [],
+    images: Array.isArray(pack.images) ? pack.images.map((x) => String(x).trim()).filter(Boolean) : [],
+    show_on_home: Boolean(pack.show_on_home),
+    featured_in_menu: Boolean(pack.featured_in_menu),
+    stock: pack.stock != null && Number.isFinite(Number(pack.stock)) ? Number(pack.stock) : 0,
+    badge: pack.badge ? { text: String(pack.badge.text || ''), variant: pack.badge.variant || 'red' } : { text: '', variant: 'red' },
+    status: pack.status || undefined,
+    is_active: pack.is_active,
+    publicable: pack.publicable,
+    version: pack.version != null && Number.isFinite(Number(pack.version)) ? Math.trunc(Number(pack.version)) : undefined,
+    components,
+  };
+}
+
+function formatPackValidationIssue(issue: any): string {
+const code = String(issue?.code || 'UNKNOWN');
+const packIndex = issue?.packIndex != null ? Number(issue.packIndex) : null;
+const componentIndex = issue?.componentIndex != null ? Number(issue.componentIndex) : null;
+const packRef = issue?.packId ? `pack ${issue.packId}` : (packIndex != null ? `pack #${packIndex + 1}` : 'pack');
+
+if (code === 'PACK_COMPONENT_INVALID_PRODUCT_ID') {
+    return `${packRef}: componente${componentIndex != null ? ` #${componentIndex + 1}` : ''} con product_id inválido.`;
+}
+if (code === 'PACK_COMPONENT_INVALID_QUANTITY') {
+    return `${packRef}: componente${componentIndex != null ? ` #${componentIndex + 1}` : ''} con cantidad inválida (debe ser entero > 0).`;
+}
+if (code === 'PACK_COMPONENT_INVALID_ROLE') {
+    return `${packRef}: componente${componentIndex != null ? ` #${componentIndex + 1}` : ''} con rol inválido.`;
+}
+if (code === 'PACK_PRIMARY_COUNT_INVALID') {
+    return `${packRef}: debe tener exactamente un componente primary.`;
+}
+if (code === 'PACK_COMPONENTS_REQUIRED') {
+    return `${packRef}: debe incluir al menos un componente.`;
+}
+if (code === 'PACK_MISSING_ID') {
+    return `${packRef}: falta id del pack.`;
+}
+
+if (issue?.message) return `${packRef}: ${String(issue.message)}`;
+return `${packRef}: error de validación (${code}).`;
+}
+
+function formatAdminSaveError(err: any): string {
+const codeOrError = String(err?.error || '').trim();
+
+if (codeOrError === 'Invalid pack contract') {
+    const details = Array.isArray(err?.details) ? err.details : [];
+    if (details.length === 0) return 'No se pudo guardar: contrato de pack inválido.';
+    const messages = details.slice(0, 6).map((d: any) => `• ${formatPackValidationIssue(d)}`);
+    const suffix = details.length > 6 ? `
+• ... y ${details.length - 6} error(es) más.` : '';
+    return `No se pudo guardar el producto por validaciones de packs:
+${messages.join('\n')}${suffix}`;
+}
+
+if (codeOrError === 'PACK_COMPONENT_NOT_FOUND') {
+    const pid = err?.details?.product_id ? String(err.details.product_id) : 'desconocido';
+    return `No se puede publicar: el componente ${pid} no existe.`;
+}
+
+if (codeOrError === 'PACK_COMPONENT_INACTIVE') {
+    const pid = err?.details?.product_id ? String(err.details.product_id) : 'desconocido';
+    return `No se puede publicar: el componente ${pid} está inactivo.`;
+}
+
+return codeOrError || 'Error al guardar';
+}
+
+function serializePacksForSubmit(packs: ProductPack[]) {
+return (packs || []).map((pack) => serializePackForSubmit(pack));
+}
+
 
 // Generador de ID únicos seguro
 function generateUUID() {
@@ -606,7 +775,7 @@ const handleVariantImageUpload = async (e: React.ChangeEvent<HTMLInputElement>, 
 
 // --- AÑADIR PACK CON NUEVOS PRECIOS ---
 const addPack = () => {
-    const newPack: ProductPack = {
+    const newPack: ProductPack = normalizePackForForm({
     id: Math.random().toString(36).substr(2, 9),
     name: '',
     tagline: '',
@@ -619,11 +788,14 @@ const addPack = () => {
     show_on_home: false,
     featured_in_menu: false,
     stock: 0,
+    status: 'draft',
+    version: 1,
+    components: [],
     badge: {
         text: '',
         variant: 'red',
     },
-    };
+    });
     setForm((s) => ({ ...s, packs: [...(s.packs || []), newPack] }));
 };
 
@@ -637,6 +809,91 @@ const updatePack = (idx: number, field: keyof ProductPack, val: any) => {
 
 const removePack = (idx: number) => {
     setForm((s) => ({ ...s, packs: (s.packs || []).filter((_, i) => i !== idx) }));
+};
+
+
+const addPackComponent = (packIdx: number) => {
+    setForm((s) => {
+    const nextPacks = [...(s.packs || [])];
+    const target = nextPacks[packIdx];
+    if (!target) return s;
+
+    const existing = Array.isArray(target.components) ? [...target.components] : [];
+    const hasPrimary = existing.some((c) => c.role === 'primary');
+
+    existing.push({
+        id: generateUUID(),
+        product_id: '',
+        quantity: 1,
+        role: hasPrimary ? 'component' : 'primary',
+    });
+
+    nextPacks[packIdx] = { ...target, components: existing };
+    return { ...s, packs: nextPacks };
+    });
+};
+
+const updatePackComponent = (
+    packIdx: number,
+    componentIdx: number,
+    field: 'product_id' | 'quantity' | 'role',
+    value: string | number,
+) => {
+    setForm((s) => {
+    const nextPacks = [...(s.packs || [])];
+    const target = nextPacks[packIdx];
+    if (!target) return s;
+
+    const components = Array.isArray(target.components) ? [...target.components] : [];
+    const current = components[componentIdx];
+    if (!current) return s;
+
+    if (field === 'role') {
+        const nextRole = value === 'primary' ? 'primary' : 'component';
+        if (nextRole === 'primary') {
+        for (let i = 0; i < components.length; i++) {
+            components[i] = { ...components[i], role: i === componentIdx ? 'primary' : 'component' };
+        }
+        } else {
+        components[componentIdx] = { ...current, role: 'component' };
+        if (!components.some((c, i) => c.role === 'primary' && i !== componentIdx)) {
+            components[0] = { ...components[0], role: 'primary' };
+        }
+        }
+    } else if (field === 'quantity') {
+        const n = Number(value);
+        components[componentIdx] = {
+        ...current,
+        quantity: Number.isFinite(n) && n > 0 ? Math.trunc(n) : 1,
+        };
+    } else {
+        components[componentIdx] = { ...current, product_id: String(value || '') };
+    }
+
+    nextPacks[packIdx] = { ...target, components };
+    return { ...s, packs: nextPacks };
+    });
+};
+
+const removePackComponent = (packIdx: number, componentIdx: number) => {
+    setForm((s) => {
+    const nextPacks = [...(s.packs || [])];
+    const target = nextPacks[packIdx];
+    if (!target) return s;
+
+    let components = Array.isArray(target.components) ? [...target.components] : [];
+    if (componentIdx < 0 || componentIdx >= components.length) return s;
+
+    const removed = components[componentIdx];
+    components = components.filter((_, i) => i !== componentIdx);
+
+    if (components.length > 0 && removed?.role === 'primary' && !components.some((c) => c.role === 'primary')) {
+        components[0] = { ...components[0], role: 'primary' };
+    }
+
+    nextPacks[packIdx] = { ...target, components };
+    return { ...s, packs: nextPacks };
+    });
 };
 
 useEffect(() => {
@@ -668,15 +925,7 @@ useEffect(() => {
             .order('created_at', { ascending: true });
 
         const normalizedPacks = Array.isArray(p.packs)
-            ? p.packs.map((pack: any) => ({
-                ...pack,
-                cash_price: pack.cash_price ? Number(pack.cash_price) : null,
-                card_price: pack.card_price ? Number(pack.card_price) : null,
-                badge:
-                typeof pack.badge === 'string'
-                    ? { text: pack.badge, variant: 'red' }
-                    : pack.badge || { text: '', variant: 'red' },
-            }))
+            ? p.packs.map((pack: any) => normalizePackForForm(pack))
             : [];
 
         setForm({
@@ -729,8 +978,11 @@ const onSubmit = async () => {
 
     const finalSlug = form.slug.trim() !== '' ? generateSlug(form.slug) : generateSlug(form.name);
 
+    const serializedPacks = serializePacksForSubmit(form.packs || []);
+
     const payload = {
     ...productData,
+    packs: serializedPacks,
     slug: finalSlug,
     stock_count:
         form.colors.length > 0 ? form.colors.reduce((acc, c) => acc + (c.stock || 0), 0) : form.stock_count,
@@ -748,8 +1000,8 @@ const onSubmit = async () => {
     });
 
     if (!res.ok) {
-    const err = await res.json();
-    setErrorMsg(err.error || 'Error al guardar');
+    const err = await res.json().catch(() => ({}));
+    setErrorMsg(formatAdminSaveError(err));
     setSaving(false);
     } else {
     try {
@@ -763,7 +1015,7 @@ const onSubmit = async () => {
         await supabase
             .from('products')
             .update({
-            packs: form.packs,
+            packs: serializedPacks,
             is_outlet: form.is_outlet,
             is_accessory: form.is_accessory,
             shipping_info: form.shipping_info,
@@ -1190,6 +1442,79 @@ return (
                     onChange={(newImgs) => updatePack(idx, 'images', newImgs)}
                     onUpload={uploadToSupabase}
                 />
+                </div>
+
+                <div className="space-y-2 border border-indigo-100 rounded-lg bg-indigo-50/40 p-3">
+                <div className="flex items-center justify-between">
+                    <label className="text-[10px] font-black uppercase text-indigo-700">Componentes del Pack</label>
+                    <button
+                    type="button"
+                    onClick={() => addPackComponent(idx)}
+                    className="text-[10px] font-bold px-2 py-1 rounded border border-indigo-300 text-indigo-700 hover:bg-indigo-100"
+                    >
+                    + Agregar componente
+                    </button>
+                </div>
+
+                {(pack.components || []).length === 0 ? (
+                    <div className="text-xs text-indigo-700 bg-white border border-dashed border-indigo-200 rounded p-2">
+                    Este pack aún no tiene componentes cargados.
+                    </div>
+                ) : (
+                    <div className="space-y-2">
+                    {(pack.components || []).map((component, cIdx) => (
+                        <div key={component.id || cIdx} className="grid grid-cols-1 md:grid-cols-12 gap-2 bg-white border border-indigo-100 rounded p-2">
+                        <div className="md:col-span-6">
+                            <label className="text-[10px] font-bold uppercase text-gray-500 mb-1 block">Producto componente</label>
+                            <select
+                            value={component.product_id || ''}
+                            onChange={(e) => updatePackComponent(idx, cIdx, 'product_id', e.target.value)}
+                            className="w-full p-2 border rounded-md text-xs"
+                            >
+                            <option value="">Seleccionar producto</option>
+                            {allProducts.map((ap) => (
+                                <option key={ap.id} value={ap.id}>{ap.name}</option>
+                            ))}
+                            </select>
+                        </div>
+
+                        <div className="md:col-span-2">
+                            <label className="text-[10px] font-bold uppercase text-gray-500 mb-1 block">Cantidad</label>
+                            <input
+                            type="number"
+                            min={1}
+                            value={component.quantity ?? 1}
+                            onChange={(e) => updatePackComponent(idx, cIdx, 'quantity', Number(e.target.value || 1))}
+                            className="w-full p-2 border rounded-md text-xs"
+                            />
+                        </div>
+
+                        <div className="md:col-span-3">
+                            <label className="text-[10px] font-bold uppercase text-gray-500 mb-1 block">Rol</label>
+                            <select
+                            value={component.role}
+                            onChange={(e) => updatePackComponent(idx, cIdx, 'role', e.target.value)}
+                            className="w-full p-2 border rounded-md text-xs"
+                            >
+                            <option value="primary">Primary</option>
+                            <option value="component">Component</option>
+                            </select>
+                        </div>
+
+                        <div className="md:col-span-1 flex items-end">
+                            <button
+                            type="button"
+                            onClick={() => removePackComponent(idx, cIdx)}
+                            className="w-full p-2 text-xs rounded border border-red-200 text-red-700 hover:bg-red-50"
+                            title="Eliminar componente"
+                            >
+                            ×
+                            </button>
+                        </div>
+                        </div>
+                    ))}
+                    </div>
+                )}
                 </div>
 
                 <div>

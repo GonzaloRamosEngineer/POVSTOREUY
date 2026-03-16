@@ -62,14 +62,23 @@ export async function POST(request: Request) {
     // 2. Cargar Items
     const { data: orderItems, error: iErr } = await supabase
       .from('order_items')
-      .select('product_name, product_model, quantity, unit_price')
+      .select('line_type, product_name, product_model, quantity, unit_price')
       .eq('order_id', orderId);
 
     if (iErr) return NextResponse.json({ error: 'Failed to load order items', details: iErr.message }, { status: 500 });
     if (!orderItems || orderItems.length === 0) return NextResponse.json({ error: 'Order has no items' }, { status: 400 });
 
-    // Mapeo de items
-    const mpItems = orderItems.map((it: any) => ({
+    // Mapeo de items comerciales únicamente (Etapa 2A)
+    const commercialItems = (orderItems || []).filter((it: any) => {
+      const lineType = String(it?.line_type || 'simple');
+      return lineType === 'simple' || lineType === 'pack_primary';
+    });
+
+    if (commercialItems.length === 0) {
+      return NextResponse.json({ error: 'Order has no commercial items for Mercado Pago' }, { status: 400 });
+    }
+
+    const mpItems = commercialItems.map((it: any) => ({
       title: `${it.product_name}${it.product_model ? ` - ${it.product_model}` : ''}`,
       quantity: Number(it.quantity),
       unit_price: Number(it.unit_price),
