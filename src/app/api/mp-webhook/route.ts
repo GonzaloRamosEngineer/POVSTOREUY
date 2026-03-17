@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabaseAdmin';
-import { applyStockOnceForOrder } from '../../../lib/stock/applyStockOnce';
+import { applyOrderStockOnce } from '../../../lib/stock/applyOrderStockOnce';
 
 export const dynamic = 'force-dynamic';
 
@@ -38,16 +38,14 @@ export async function POST(request: Request) {
     const supabase = getSupabaseAdmin();
     const url = new URL(request.url);
     const searchParams = url.searchParams;
-    
-    const topic = searchParams.get('topic') || searchParams.get('type');
+
     const id = searchParams.get('id') || searchParams.get('data.id');
 
     if (!id) {
       console.warn('Webhook without ID');
-      return NextResponse.json({ ok: true }); 
+      return NextResponse.json({ ok: true });
     }
 
-    // 1. Verificar Estado en MP
     const payment = await mpGetPayment(accessToken, id);
     const orderId = payment.external_reference || payment.metadata?.order_id || payment.metadata?.orderId;
 
@@ -58,10 +56,9 @@ export async function POST(request: Request) {
 
     const { payment_status, order_status } = mapMpToDbStatuses(payment.status);
 
-    // 2. Verificar si ya se procesó
     const { data: existingOrder, error: getErr } = await supabase
       .from('orders')
-      .select('id, payment_status, order_status')
+      .select('id, payment_status, stock_applied_at')
       .eq('id', orderId)
       .single();
 
@@ -73,23 +70,7 @@ export async function POST(request: Request) {
     const targetIsCompleted = payment_status === 'completed';
     const targetIsFailed = payment_status === 'failed';
 
-    if (existingOrder.payment_status === payment_status) {
-      return NextResponse.json({ ok: true, no_op: true, reason: 'same_payment_status' });
-    }
-
-    if (targetIsCompleted && existingOrder.payment_status === 'completed') {
-      return NextResponse.json({ ok: true, no_op: true, reason: 'already_completed' });
-    }
-
-    if (targetIsFailed && existingOrder.payment_status === 'failed') {
-      return NextResponse.json({ ok: true, no_op: true, reason: 'already_failed' });
-    }
-
-    const invalidTransition =
-      (existingOrder.payment_status === 'completed' && targetIsFailed) ||
-      (existingOrder.payment_status === 'failed' && targetIsCompleted);
-
-    if (invalidTransition) {
+    if ((existingOrder.payment_status === 'completed' && targetIsFailed) || (existingOrder.payment_status === 'failed' && targetIsCompleted)) {
       return NextResponse.json(
         {
           ok: false,
@@ -99,33 +80,40 @@ export async function POST(request: Request) {
       );
     }
 
-    // 3. Actualizar Orden
-    const { error: upErr } = await supabase
-      .from('orders')
-      .update({
-        payment_status,
-        order_status,
-        payment_id: String(id),
-        mp_status: payment.status,
-        mp_status_detail: payment.status_detail,
-      })
-      .eq('id', orderId);
+    const sameStatus = existingOrder.payment_status === payment_status;
+    const mustRecoverStock = targetIsCompleted && sameStatus && !existingOrder.stock_applied_at;
 
-    if (upErr) {
-      console.error('Failed updating order:', upErr);
-      return NextResponse.json({ ok: true });
+    if (!sameStatus) {
+      const { error: upErr } = await supabase
+        .from('orders')
+        .update({
+          payment_status,
+          order_status,
+          payment_id: String(id),
+          mp_status: payment.status,
+          mp_status_detail: payment.status_detail,
+        })
+        .eq('id', orderId);
+
+      if (upErr) {
+        console.error('Failed updating order:', upErr);
+        return NextResponse.json({ ok: true });
+      }
+    } else if (!mustRecoverStock) {
+      return NextResponse.json({ ok: true, no_op: true, reason: 'same_payment_status' });
     }
 
-    // 4. Descontar Stock (si se aprobó) de forma idempotente por orden
-    if (payment_status === 'completed') {
-      const stockResult = await applyStockOnceForOrder({
+    if (targetIsCompleted) {
+      const stockResult = await applyOrderStockOnce({
         supabase,
         orderId,
       });
 
       if (!stockResult.ok) {
-        console.error('Failed applying stock once:', stockResult.error);
-        return NextResponse.json({ ok: true });
+        return NextResponse.json(
+          { ok: false, error: `stock_apply_failed:${stockResult.reason}` },
+          { status: 500 }
+        );
       }
 
       if (stockResult.no_op) {
@@ -134,7 +122,6 @@ export async function POST(request: Request) {
     }
 
     return NextResponse.json({ ok: true });
-
   } catch (e: any) {
     console.error('Webhook Error:', e);
     return NextResponse.json({ ok: true });
