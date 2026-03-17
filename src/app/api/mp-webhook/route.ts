@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabaseAdmin';
+import { applyStockOnceForOrder } from '../../../lib/stock/applyStockOnce';
 
 export const dynamic = 'force-dynamic';
 
@@ -60,7 +61,7 @@ export async function POST(request: Request) {
     // 2. Verificar si ya se procesó
     const { data: existingOrder, error: getErr } = await supabase
       .from('orders')
-      .select('id, payment_status')
+      .select('id, payment_status, order_status')
       .eq('id', orderId)
       .single();
 
@@ -69,8 +70,33 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: true });
     }
 
-    if (existingOrder.payment_status === 'completed') {
-      return NextResponse.json({ ok: true });
+    const targetIsCompleted = payment_status === 'completed';
+    const targetIsFailed = payment_status === 'failed';
+
+    if (existingOrder.payment_status === payment_status) {
+      return NextResponse.json({ ok: true, no_op: true, reason: 'same_payment_status' });
+    }
+
+    if (targetIsCompleted && existingOrder.payment_status === 'completed') {
+      return NextResponse.json({ ok: true, no_op: true, reason: 'already_completed' });
+    }
+
+    if (targetIsFailed && existingOrder.payment_status === 'failed') {
+      return NextResponse.json({ ok: true, no_op: true, reason: 'already_failed' });
+    }
+
+    const invalidTransition =
+      (existingOrder.payment_status === 'completed' && targetIsFailed) ||
+      (existingOrder.payment_status === 'failed' && targetIsCompleted);
+
+    if (invalidTransition) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: `Invalid webhook transition from payment_status='${existingOrder.payment_status}' to '${payment_status}'`,
+        },
+        { status: 409 }
+      );
     }
 
     // 3. Actualizar Orden
@@ -90,21 +116,20 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: true });
     }
 
-    // 4. Descontar Stock (si se aprobó)
+    // 4. Descontar Stock (si se aprobó) de forma idempotente por orden
     if (payment_status === 'completed') {
-      const { data: items } = await supabase
-        .from('order_items')
-        .select('product_id, quantity')
-        .eq('order_id', orderId);
+      const stockResult = await applyStockOnceForOrder({
+        supabase,
+        orderId,
+      });
 
-      if (items) {
-        for (const it of items) {
-          const { data: p } = await supabase.from('products').select('stock_count').eq('id', it.product_id).single();
-          if (p) {
-            const next = Math.max(0, (p.stock_count || 0) - it.quantity);
-            await supabase.from('products').update({ stock_count: next }).eq('id', it.product_id);
-          }
-        }
+      if (!stockResult.ok) {
+        console.error('Failed applying stock once:', stockResult.error);
+        return NextResponse.json({ ok: true });
+      }
+
+      if (stockResult.no_op) {
+        return NextResponse.json({ ok: true, no_op: true, reason: stockResult.reason });
       }
     }
 
