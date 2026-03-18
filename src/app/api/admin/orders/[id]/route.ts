@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabaseAdmin'; 
+import { applyOrderStockOnce } from '../../../../../lib/stock/applyOrderStockOnce';
 
 export async function GET(
   request: NextRequest,
@@ -250,6 +251,24 @@ export async function PATCH(
         );
       }
 
+      if (payment_status === 'completed') {
+        if (!isBankTransfer) {
+          return NextResponse.json(
+            { error: 'La confirmación manual de pago aplica solo a transferencias bancarias' },
+            { status: 409 }
+          );
+        }
+
+        if (!['pending', 'completed'].includes(currentOrder.payment_status)) {
+          return NextResponse.json(
+            {
+              error: `Transición inválida: no se puede confirmar pago desde payment_status='${currentOrder.payment_status}'`,
+            },
+            { status: 409 }
+          );
+        }
+      }
+
       updateData.payment_status = payment_status;
     }
 
@@ -267,6 +286,43 @@ export async function PATCH(
         { error: error.message },
         { status: 400 }
       );
+    }
+
+    if (payment_status === 'completed' && isBankTransfer) {
+      console.info('[stock] admin-order-patch:apply_attempt', {
+        orderId: currentOrder.id,
+        orderNumber: orderIdentifier,
+        previousPaymentStatus: currentOrder.payment_status,
+        previousStockAppliedAt: currentOrder.stock_applied_at,
+      });
+
+      const stockResult = await applyOrderStockOnce({
+        supabase,
+        orderId: currentOrder.id,
+        source: 'admin-order-patch',
+      });
+
+      if (!stockResult.ok) {
+        return NextResponse.json(
+          { error: 'Error al aplicar descuento de stock', details: stockResult.reason },
+          { status: 500 }
+        );
+      }
+
+      if (stockResult.no_op) {
+        console.warn('[stock] admin-order-patch:no_op', {
+          orderId: currentOrder.id,
+          orderNumber: orderIdentifier,
+          reason: stockResult.reason,
+        });
+        return NextResponse.json({ ...data, no_op: true, stock_reason: stockResult.reason });
+      }
+
+      console.info('[stock] admin-order-patch:apply_success', {
+        orderId: currentOrder.id,
+        orderNumber: orderIdentifier,
+        reason: stockResult.reason,
+      });
     }
 
     console.log(`✅ Orden ${orderIdentifier} actualizada exitosamente`);

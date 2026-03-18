@@ -73,6 +73,10 @@ Build the application for production:
   npm run build
   ```
 
+## 🩺 Operación de stock
+
+- Runbook de observabilidad y diagnóstico: `docs/stock-observability-runbook.md`
+
 ## 📚 Learn More
 
 To learn more about Next.js, take a look at the following resources:
