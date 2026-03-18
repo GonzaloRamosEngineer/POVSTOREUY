@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabaseAdmin'; 
+import { applyOrderStockOnce } from '../../../../../lib/stock/applyOrderStockOnce';
 
 export async function GET(
   request: NextRequest,
@@ -80,9 +81,6 @@ export async function PATCH(
     const isBankTransfer = currentOrder.payment_method === 'bank_transfer';
     const isMercadoPago = currentOrder.payment_method === 'mercadopago';
 
-    const safeNoop = (order: any, message: string) =>
-      NextResponse.json({ ...order, no_op: true, message });
-
     // ✅ Construir objeto de actualización dinámicamente
     const updateData: Record<string, any> = {
       updated_at: new Date().toISOString()
@@ -97,27 +95,6 @@ export async function PATCH(
           { error: `Estado inválido: ${status}` },
           { status: 400 }
         );
-      }
-
-      if (status === 'cancelled') {
-        const allowedCancelOrigins = ['pending', 'processing', 'ready', 'shipped'];
-
-        if (currentOrder.order_status === 'cancelled') {
-          return safeNoop(currentOrder, 'La orden ya estaba cancelada');
-        }
-
-        if (!allowedCancelOrigins.includes(currentOrder.order_status)) {
-          return NextResponse.json(
-            {
-              error: `Transición inválida: no se puede cancelar desde order_status='${currentOrder.order_status}'`,
-            },
-            { status: 409 }
-          );
-        }
-
-        if (currentOrder.payment_status === 'pending') {
-          updateData.payment_status = 'failed';
-        }
       }
 
       // ✅ VALIDACIÓN: Si es retiro, no permitir estado "shipped"
@@ -282,11 +259,7 @@ export async function PATCH(
           );
         }
 
-        if (currentOrder.payment_status === 'completed') {
-          return safeNoop(currentOrder, 'El pago ya estaba confirmado manualmente');
-        }
-
-        if (currentOrder.payment_status !== 'pending') {
+        if (!['pending', 'completed'].includes(currentOrder.payment_status)) {
           return NextResponse.json(
             {
               error: `Transición inválida: no se puede confirmar pago desde payment_status='${currentOrder.payment_status}'`,
@@ -313,6 +286,24 @@ export async function PATCH(
         { error: error.message },
         { status: 400 }
       );
+    }
+
+    if (payment_status === 'completed' && isBankTransfer) {
+      const stockResult = await applyOrderStockOnce({
+        supabase,
+        orderId: currentOrder.id,
+      });
+
+      if (!stockResult.ok) {
+        return NextResponse.json(
+          { error: 'Error al aplicar descuento de stock', details: stockResult.reason },
+          { status: 500 }
+        );
+      }
+
+      if (stockResult.no_op) {
+        return NextResponse.json({ ...data, no_op: true, stock_reason: stockResult.reason });
+      }
     }
 
     console.log(`✅ Orden ${orderIdentifier} actualizada exitosamente`);
