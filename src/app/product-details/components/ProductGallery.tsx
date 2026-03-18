@@ -52,6 +52,13 @@ export default function ProductGallery({ images = [], productName }: ProductGall
         className="relative bg-white border border-gray-100 rounded-2xl overflow-hidden aspect-square group shadow-sm z-10"
         onMouseLeave={() => setIsZoomed(false)}
       >
+        {/* --- CARTEL DE ENVÍO GRATIS (ESTILO IMAGEN 2) --- */}
+        <div className="absolute top-4 right-4 z-30 pointer-events-none">
+          <span className="px-4 py-1.5 bg-[#1ED760] text-black text-[13px] font-bold tracking-wide rounded-full shadow-md">
+            ENVÍO GRATIS
+          </span>
+        </div>
+
         {selectedImage.type === 'video' ? (
           // Vista de Video
           <div className="w-full h-full flex items-center justify-center bg-gray-50">

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import OrderSummary from './OrderSummary';
 import PaymentMethodSelector from './PaymentMethodSelector';
@@ -31,6 +31,51 @@ interface PaymentMethod {
   badge?: string;
 }
 
+
+interface CheckoutPayloadItemProduct {
+  type: 'product';
+  product_id: string;
+  quantity: number;
+}
+
+interface CheckoutPayloadItemPack {
+  type: 'pack';
+  parent_product_id: string;
+  pack_id: string;
+  quantity: number;
+}
+
+type CheckoutPayloadItem = CheckoutPayloadItemProduct | CheckoutPayloadItemPack;
+
+
+function mapCartItemsToCheckoutPayload(items: CartItemType[]): CheckoutPayloadItem[] {
+  const mapped: CheckoutPayloadItem[] = [];
+
+  for (const i of (items || [])) {
+    const quantity = Number(i?.quantity ?? 0);
+    if (!Number.isFinite(quantity) || quantity <= 0) continue;
+
+    const rawId = String(i?.id || '');
+
+    if (rawId.startsWith('pack::')) {
+      const [, parentProductId, packId] = rawId.split('::');
+      if (!parentProductId || !packId) continue;
+      mapped.push({ type: 'pack', parent_product_id: parentProductId, pack_id: packId, quantity });
+      continue;
+    }
+
+    const legacyPack = rawId.match(/^([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})-(.+)$/i);
+    if (legacyPack) {
+      mapped.push({ type: 'pack', parent_product_id: legacyPack[1], pack_id: legacyPack[2], quantity });
+      continue;
+    }
+
+    mapped.push({ type: 'product', product_id: rawId, quantity });
+  }
+
+  return mapped;
+}
+
 interface CustomerInfo {
   email: string;
   fullName: string;
@@ -51,6 +96,35 @@ function isCustomerInfoValid(ci: CustomerInfo, method: DeliveryMethod) {
   if (!baseOk) return false;
   if (method === 'pickup') return true;
   return Boolean(ci.address && ci.city && ci.department);
+}
+
+
+function normalizeCustomerInfoForIdempotency(ci: CustomerInfo, deliveryMethod: DeliveryMethod) {
+  return {
+    email: String(ci?.email || '').trim().toLowerCase(),
+    fullName: String(ci?.fullName || '').trim(),
+    phone: String(ci?.phone || '').trim(),
+    address: deliveryMethod === 'pickup' ? '' : String(ci?.address || '').trim(),
+    city: deliveryMethod === 'pickup' ? '' : String(ci?.city || '').trim(),
+    department: deliveryMethod === 'pickup' ? '' : String(ci?.department || '').trim(),
+    postalCode: deliveryMethod === 'pickup' ? '' : String(ci?.postalCode || '').trim(),
+  };
+}
+
+function computeAttemptHash(input: string) {
+  let hash = 2166136261;
+  for (let i = 0; i < input.length; i++) {
+    hash ^= input.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0).toString(16).padStart(8, '0');
+}
+
+function generateAttemptSeed() {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return `${Date.now()}-${Math.random()}`;
 }
 
 export default function CheckoutPaymentInteractive() {
@@ -97,10 +171,43 @@ export default function CheckoutPaymentInteractive() {
 
   const shipping = useMemo(() => {
     if (deliveryMethod === 'pickup') return 0;
-    return subtotal >= 2000 ? 0 : 250;
+    return subtotal >= 2000 ? 0 : 300;
   }, [deliveryMethod, subtotal]);
 
   const total = subtotal + shipping;
+
+  const checkoutPayloadItems = useMemo(() => mapCartItemsToCheckoutPayload(cart), [cart]);
+
+  const attemptFingerprint = useMemo(() => {
+    const normalizedItems = [...checkoutPayloadItems]
+      .map((it) =>
+        it.type === 'product'
+          ? `product:${it.product_id}:${Number(it.quantity || 0)}`
+          : `pack:${it.parent_product_id}:${it.pack_id}:${Number(it.quantity || 0)}`,
+      )
+      .sort();
+
+    const payload = {
+      items: normalizedItems,
+      paymentMethod: selectedPaymentMethod,
+      deliveryMethod,
+      customerInfo: normalizeCustomerInfoForIdempotency(customerInfo, deliveryMethod),
+    };
+
+    return JSON.stringify(payload);
+  }, [checkoutPayloadItems, selectedPaymentMethod, deliveryMethod, customerInfo]);
+
+  const attemptRef = useRef<{ fingerprint: string; seed: string } | null>(null);
+  if (!attemptRef.current || attemptRef.current.fingerprint !== attemptFingerprint) {
+    attemptRef.current = {
+      fingerprint: attemptFingerprint,
+      seed: generateAttemptSeed(),
+    };
+  }
+
+  const createOrderIdempotencyKey = useMemo(() => {
+    return `co-${computeAttemptHash(`${attemptRef.current?.seed || ''}::${attemptFingerprint}`)}`;
+  }, [attemptFingerprint]);
 
   const referenceNumber = useMemo(() => {
     const year = new Date().getFullYear();
@@ -132,9 +239,10 @@ export default function CheckoutPaymentInteractive() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         customerInfo,
-        items: cart.map((i) => ({ id: i.id, quantity: i.quantity })),
+        items: checkoutPayloadItems,
         paymentMethod: selectedPaymentMethod,
         deliveryMethod,
+        idempotency_key: createOrderIdempotencyKey,
       }),
     });
 

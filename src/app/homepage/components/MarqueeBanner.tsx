@@ -1,53 +1,41 @@
 'use client';
 
-import { GifIcon } from '@heroicons/react/24/outline';
-import { Zap, Truck, CreditCard, Package, Shield, Clock, GiftIcon, RocketIcon } from 'lucide-react';
+import { Package, Zap, Clock, RocketIcon } from 'lucide-react';
 
 const MarqueeBanner = () => {
   const messages = [
     {
       icon: <Package className="w-4 h-4" />,
-      text: "ÚLTIMAS UNIDADES EN STOCK",
-      highlight: true, // Urgencia máxima
-    },
-    {
-      icon: <Truck className="w-4 h-4" />,
-      text: "ENVÍO GRATIS 24-48HS",
-      highlight: false,
+      text: "🔥 ÚLTIMAS UNIDADES CON PRECIO PROMOCIONAL 🔥",
+      highlight: true, 
     },
     {
       icon: <Zap className="w-4 h-4" />,
-      text: "POV 4K HANDS-FREE • CALIDAD PROFESIONAL",
+      text: "KITS CON STOCK MUY LIMITADO",
       highlight: false,
     },
     {
-      icon: <CreditCard className="w-4 h-4" />,
-      text: "HASTA 12 CUOTAS SIN INTERÉS",
-      highlight: false,
+      icon: <Clock className="w-4 h-4" />,
+      text: "⏳ LA OFERTA ESPECIAL ACABA HOY",
+      highlight: true,
     },
     {
       icon: <RocketIcon className="w-4 h-4" />,
       text: "LLEGADA SEGUNDO DROP 02/03",
       highlight: false,
-    },
-    {
-      icon: <Clock className="w-4 h-4" />,
-      text: "OFERTA VÁLIDA HOY",
-      highlight: true,
-    },
+    }
   ];
 
   return (
     <div className="relative w-full bg-gradient-to-r from-red-600 via-red-500 to-red-600 overflow-hidden shadow-lg">
-      {/* Animated gradient overlay */}
       <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent animate-shimmer" />
-      
-      {/* Ruido sutil para textura premium */}
       <div className="absolute inset-0 bg-noise opacity-20 mix-blend-overlay" />
       
-      <div className="relative flex py-3">
-        {/* Primera pasada del marquee */}
-        <div className="flex animate-marquee-smooth whitespace-nowrap">
+      {/* Añadido w-full y overflow-hidden para evitar cortes en mobile */}
+      <div className="relative flex py-2.5 w-full overflow-hidden">
+        
+        {/* Agregado min-w-full y flex-shrink-0 para que funcione el loop en iPhone/Android */}
+        <div className="flex min-w-full flex-shrink-0 animate-marquee-smooth whitespace-nowrap">
           {messages.map((msg, idx) => (
             <div
               key={`msg-1-${idx}`}
@@ -59,7 +47,7 @@ const MarqueeBanner = () => {
                 {msg.icon}
               </div>
               <span
-                className={`text-sm font-bold tracking-wide ${
+                className={`text-[13px] font-black tracking-widest uppercase ${
                   msg.highlight
                     ? 'text-yellow-300 drop-shadow-[0_0_8px_rgba(253,224,71,0.5)]'
                     : 'text-white'
@@ -71,8 +59,7 @@ const MarqueeBanner = () => {
           ))}
         </div>
 
-        {/* Segunda pasada del marquee (para loop seamless) */}
-        <div className="flex animate-marquee-smooth whitespace-nowrap" aria-hidden="true">
+        <div className="flex min-w-full flex-shrink-0 animate-marquee-smooth whitespace-nowrap" aria-hidden="true">
           {messages.map((msg, idx) => (
             <div
               key={`msg-2-${idx}`}
@@ -84,7 +71,7 @@ const MarqueeBanner = () => {
                 {msg.icon}
               </div>
               <span
-                className={`text-sm font-bold tracking-wide ${
+                className={`text-[13px] font-black tracking-widest uppercase ${
                   msg.highlight
                     ? 'text-yellow-300 drop-shadow-[0_0_8px_rgba(253,224,71,0.5)]'
                     : 'text-white'
@@ -99,56 +86,25 @@ const MarqueeBanner = () => {
 
       <style jsx>{`
         @keyframes marquee-smooth {
-          0% {
-            transform: translateX(0);
-          }
-          100% {
-            transform: translateX(-100%);
-          }
+          0% { transform: translateX(0); }
+          100% { transform: translateX(-100%); }
         }
-
         @keyframes shimmer {
-          0% {
-            transform: translateX(-100%);
-          }
-          100% {
-            transform: translateX(100%);
-          }
+          0% { transform: translateX(-100%); }
+          100% { transform: translateX(100%); }
         }
-
         @keyframes pulse-glow {
-          0%, 100% {
-            opacity: 1;
-          }
-          50% {
-            opacity: 0.85;
-          }
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.85; }
         }
-
         @keyframes bounce-subtle {
-          0%, 100% {
-            transform: translateY(0);
-          }
-          50% {
-            transform: translateY(-2px);
-          }
+          0%, 100% { transform: translateY(0); }
+          50% { transform: translateY(-2px); }
         }
-
-        .animate-marquee-smooth {
-          animation: marquee-smooth 30s linear infinite;
-        }
-
-        .animate-shimmer {
-          animation: shimmer 3s linear infinite;
-        }
-
-        .animate-pulse-glow {
-          animation: pulse-glow 2s ease-in-out infinite;
-        }
-
-        .animate-bounce-subtle {
-          animation: bounce-subtle 1.5s ease-in-out infinite;
-        }
+        .animate-marquee-smooth { animation: marquee-smooth 25s linear infinite; }
+        .animate-shimmer { animation: shimmer 3s linear infinite; }
+        .animate-pulse-glow { animation: pulse-glow 2s ease-in-out infinite; }
+        .animate-bounce-subtle { animation: bounce-subtle 1.5s ease-in-out infinite; }
       `}</style>
     </div>
   );
