@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import ProductGallery from './ProductGallery';
 import ProductInfo from './ProductInfo';
@@ -27,8 +27,8 @@ interface ProductPack {
   tagline: string;
   price: number;
   original_price: number | null;
-  cash_price?: number | null; // NUEVO
-  card_price?: number | null; // NUEVO
+  cash_price?: number | null;
+  card_price?: number | null;
   includes: string[];
   images?: string[];
   stock?: number;
@@ -43,8 +43,8 @@ interface ProductData {
   resumen?: string;
   price: number;
   original_price: number | null;
-  cash_price?: number | null; // NUEVO
-  card_price?: number | null; // NUEVO
+  cash_price?: number | null;
+  card_price?: number | null;
   image_url: string;
   stock_count: number;
   features: string[] | string;
@@ -60,7 +60,7 @@ interface ProductData {
 interface ProductInteractiveProps {
   productInitial: ProductData;
   galleryInitial: GalleryImage[];
-  addonsDictionary?: any[]; // Recibe el diccionario de accesorios para armar las recetas
+  addonsDictionary?: any[];
 }
 
 function TrustAccordion({
@@ -173,6 +173,8 @@ export default function ProductDetailsInteractive({
   const [mounted, setMounted] = useState(false);
   const [timeLeft, setTimeLeft] = useState({ hours: 0, minutes: 0, seconds: 0 });
 
+  const topRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     setMounted(true);
 
@@ -255,22 +257,22 @@ export default function ProductDetailsInteractive({
 
   const currentStock = useMemo(() => {
     if (!selectedPack) return Number(product.stock_count);
-    
+
     let minStock = Number(product.stock_count);
 
     if (selectedPack.includes && selectedPack.includes.length > 0 && addonsDictionary.length > 0) {
-        selectedPack.includes.forEach(itemId => {
-            const addonReal = addonsDictionary.find(a => a.id === itemId);
-            if (addonReal && addonReal.stock_count < minStock) {
-                minStock = addonReal.stock_count;
-            }
-        });
+      selectedPack.includes.forEach((itemId) => {
+        const addonReal = addonsDictionary.find((a) => a.id === itemId);
+        if (addonReal && addonReal.stock_count < minStock) {
+          minStock = addonReal.stock_count;
+        }
+      });
     }
-    
+
     if (selectedPack.stock !== undefined && selectedPack.stock < minStock) {
-        minStock = selectedPack.stock;
+      minStock = selectedPack.stock;
     }
-    
+
     return minStock;
   }, [selectedPack, product.stock_count, addonsDictionary]);
 
@@ -293,6 +295,15 @@ export default function ProductDetailsInteractive({
   const currentOriginalPrice = selectedPack ? selectedPack.original_price : product.original_price;
   const hasDiscount = currentOriginalPrice ? currentOriginalPrice > currentDisplayPrice : false;
 
+  const handlePackSelect = (pack: ProductPack) => {
+    setSelectedPack(pack);
+    if (topRef.current) {
+      const offset = 80; // altura del navbar sticky aproximada
+      const top = topRef.current.getBoundingClientRect().top + window.scrollY - offset;
+      window.scrollTo({ top, behavior: 'smooth' });
+    }
+  };
+
   const handleAddToCart = () => {
     if (currentStock <= 0) return;
 
@@ -307,7 +318,6 @@ export default function ProductDetailsInteractive({
     const isPack = Boolean(selectedPack);
     const cartItemId = isPack ? `pack::${product.id}::${selectedPack!.id}` : product.id;
 
-    // Para el carrito usamos price como preview UI; backend recalcula precio final.
     upsertCartItem({
       id: cartItemId,
       name: cartProductName,
@@ -377,17 +387,11 @@ export default function ProductDetailsInteractive({
         </div>
       )}
 
-      <div className="max-w-[1200px] mx-auto px-4 lg:px-8 pt-0 pb-12 md:pb-16">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 md:gap-12 lg:gap-16 items-start">
-          <div className="w-full lg:sticky lg:top-24 z-10 bg-white">
-            <ProductGallery
-              key={selectedPack?.id || 'main'}
-              images={dynamicGallery}
-              productName={product.name}
-            />
-          </div>
+      <div ref={topRef} className="max-w-[1200px] mx-auto px-4 lg:px-8 pt-0 pb-12 md:pb-16">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-12 lg:gap-16 items-start">
 
-          <div className="space-y-6 md:space-y-8 relative z-20 bg-white">
+          {/* BLOQUE 1 mobile: Título + descripción */}
+          <div className="order-1 lg:hidden bg-white">
             <ProductInfo
               name={selectedPack ? `${product.name} - ${selectedPack.name}` : product.name}
               model={product.model ?? ''}
@@ -399,7 +403,54 @@ export default function ProductDetailsInteractive({
               reviewCount={product.review_count || 0}
               description={product.description}
               resumen={selectedPack?.tagline || product.resumen}
+              mode="header"
             />
+          </div>
+
+          {/* BLOQUE 2 mobile: Galería */}
+          <div className="order-2 lg:order-1 w-full lg:sticky lg:top-24 z-10 bg-white">
+            <ProductGallery
+              key={selectedPack?.id || 'main'}
+              images={dynamicGallery}
+              productName={product.name}
+            />
+          </div>
+
+          {/* BLOQUE 3 mobile: Precio */}
+          <div className="order-3 lg:hidden bg-white border-t border-gray-100 pt-4">
+            <ProductInfo
+              name={selectedPack ? `${product.name} - ${selectedPack.name}` : product.name}
+              model={product.model ?? ''}
+              price={currentDisplayPrice}
+              originalPrice={currentOriginalPrice ?? undefined}
+              cashPrice={selectedPack ? selectedPack.cash_price : product.cash_price}
+              cardPrice={selectedPack ? selectedPack.card_price : product.card_price}
+              rating={product.rating || 5}
+              reviewCount={product.review_count || 0}
+              description={product.description}
+              resumen={selectedPack?.tagline || product.resumen}
+              mode="pricing"
+            />
+          </div>
+
+          {/* BLOQUE 4 mobile / Columna derecha desktop: Kits + CTA */}
+          <div className="order-4 lg:order-2 space-y-6 md:space-y-8 relative z-20 bg-white">
+
+            {/* En desktop mostramos ProductInfo completo aquí */}
+            <div className="hidden lg:block">
+              <ProductInfo
+                name={selectedPack ? `${product.name} - ${selectedPack.name}` : product.name}
+                model={product.model ?? ''}
+                price={currentDisplayPrice}
+                originalPrice={currentOriginalPrice ?? undefined}
+                cashPrice={selectedPack ? selectedPack.cash_price : product.cash_price}
+                cardPrice={selectedPack ? selectedPack.card_price : product.card_price}
+                rating={product.rating || 5}
+                reviewCount={product.review_count || 0}
+                description={product.description}
+                resumen={selectedPack?.tagline || product.resumen}
+              />
+            </div>
 
             {dbPacks.length > 0 && (
               <div className="pt-4 md:pt-6 border-t border-gray-100">
@@ -412,10 +463,14 @@ export default function ProductDetailsInteractive({
                   {dbPacks.map((pack) => {
                     const isSelected = selectedPack?.id === pack.id;
                     const packHasDiscount = pack.original_price && pack.original_price > pack.price;
-                    
+
                     const packCashPrice = pack.cash_price || pack.price;
                     const packCardPrice = pack.card_price || pack.price;
-                    const packHasDualPricing = !!(pack.cash_price && pack.card_price && pack.cash_price < pack.card_price);
+                    const packHasDualPricing = !!(
+                      pack.cash_price &&
+                      pack.card_price &&
+                      pack.cash_price < pack.card_price
+                    );
 
                     return (
                       <div
@@ -441,70 +496,63 @@ export default function ProductDetailsInteractive({
 
                         <button
                           type="button"
-                          onClick={() => setSelectedPack(pack)}
+                          onClick={() => handlePackSelect(pack)}
                           className="w-full p-4 md:p-5 text-left"
                         >
                           <div className="flex items-start justify-between gap-4">
-                            
-                            {/* Radio Button y Textos */}
                             <div className="flex-1 flex gap-3">
-                                <div
-                                  className={`mt-1 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all flex-shrink-0 ${
-                                    isSelected ? 'border-red-500' : 'border-gray-300'
-                                  }`}
-                                >
-                                  {isSelected && (
-                                    <div className="w-2.5 h-2.5 rounded-full bg-red-500" />
-                                  )}
-                                </div>
-                                <div>
-                                    <span className="font-bold text-lg leading-tight text-gray-900 block mb-0.5">
-                                      {pack.name}
-                                    </span>
-                                    {pack.tagline && (
-                                      <p className="text-xs text-gray-500">
-                                        {pack.tagline}
-                                      </p>
-                                    )}
-                                </div>
+                              <div
+                                className={`mt-1 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all flex-shrink-0 ${
+                                  isSelected ? 'border-red-500' : 'border-gray-300'
+                                }`}
+                              >
+                                {isSelected && <div className="w-2.5 h-2.5 rounded-full bg-red-500" />}
+                              </div>
+                              <div>
+                                <span className="font-bold text-lg leading-tight text-gray-900 block mb-0.5">
+                                  {pack.name}
+                                </span>
+                                {pack.tagline && (
+                                  <p className="text-xs text-gray-500">{pack.tagline}</p>
+                                )}
+                              </div>
                             </div>
 
-                            {/* Sección de Precios */}
                             <div className="text-right flex-shrink-0 flex flex-col items-end pt-1">
-                                {packHasDualPricing ? (
-                                    <>
-                                        <div className="flex flex-col items-end gap-1 mb-2">
-                                            <span className="text-[9px] font-black text-[#10b981] bg-[#10b981]/15 px-2 py-0.5 rounded uppercase tracking-wider inline-block">
-                                                Ahorrás $U {(packCardPrice - packCashPrice).toLocaleString('es-UY')}
-                                            </span>
-                                            <div className="font-black text-[#10b981] text-xl md:text-2xl leading-none">
-                                                $U {packCashPrice.toLocaleString('es-UY')}
-                                            </div>
-                                            <div className="text-[10px] font-bold text-[#10b981]">
-                                                Transferencia bancaria
-                                            </div>
-                                        </div>
-                                        
-                                        <div className="flex flex-col items-end">
-                                            <div className="font-black text-gray-900 text-sm sm:text-base leading-none">
-                                                $U {packCardPrice.toLocaleString('es-UY')}
-                                            </div>
-                                            <div className="text-[10px] font-medium text-gray-500">
-                                                Tarjeta / MercadoPago
-                                            </div>
-                                        </div>
-                                    </>
-                                ) : (
-                                    <div className="font-black text-gray-900 text-xl md:text-2xl leading-none">
-                                        $U {pack.price.toLocaleString('es-UY')}
+                              {packHasDualPricing ? (
+                                <>
+                                  <div className="flex flex-col items-end gap-1 mb-2">
+                                    <span className="text-[9px] font-black text-[#10b981] bg-[#10b981]/15 px-2 py-0.5 rounded uppercase tracking-wider inline-block">
+                                      Ahorrás $U {(packCardPrice - packCashPrice).toLocaleString('es-UY')}
+                                    </span>
+                                    <div className="font-black text-[#10b981] text-xl md:text-2xl leading-none">
+                                      $U {packCashPrice.toLocaleString('es-UY')}
                                     </div>
-                                )}
-
-                                {packHasDiscount && (
-                                  <div className="mt-1.5 text-xs text-gray-400 line-through">
-                                    $U {pack.original_price?.toLocaleString('es-UY')}
+                                    <div className="text-[10px] font-bold text-[#10b981]">
+                                      Transferencia bancaria
+                                    </div>
                                   </div>
-                                )}
+
+                                  <div className="flex flex-col items-end">
+                                    <div className="font-black text-gray-900 text-sm sm:text-base leading-none">
+                                      $U {packCardPrice.toLocaleString('es-UY')}
+                                    </div>
+                                    <div className="text-[10px] font-medium text-gray-500">
+                                      Tarjeta / MercadoPago
+                                    </div>
+                                  </div>
+                                </>
+                              ) : (
+                                <div className="font-black text-gray-900 text-xl md:text-2xl leading-none">
+                                  $U {pack.price.toLocaleString('es-UY')}
+                                </div>
+                              )}
+
+                              {packHasDiscount && (
+                                <div className="mt-1.5 text-xs text-gray-400 line-through">
+                                  $U {pack.original_price?.toLocaleString('es-UY')}
+                                </div>
+                              )}
                             </div>
                           </div>
                         </button>
@@ -523,35 +571,49 @@ export default function ProductDetailsInteractive({
 
                                 <div className="space-y-3">
                                   {pack.includes.map((itemId, idx) => {
-                                      const itemData = addonsDictionary.find(a => a.id === itemId);
-                                      
-                                      if (itemData) {
-                                          return (
-                                              <div key={itemId} className="flex items-center gap-3 p-2.5 rounded-xl border border-blue-100 bg-blue-50/20">
-                                                  <div className="w-5 h-5 rounded-full flex items-center justify-center bg-blue-100 text-blue-600 flex-shrink-0">
-                                                      <Icon name="CheckIcon" size={12} />
-                                                  </div>
-                                                  <div className="w-10 h-10 bg-white rounded-lg border border-gray-200 p-1 flex-shrink-0 shadow-sm">
-                                                      <img src={itemData.image_url} className="w-full h-full object-contain" alt="" />
-                                                  </div>
-                                                  <div className="flex-1">
-                                                      <div className="text-xs sm:text-sm font-bold text-gray-900 leading-tight">{itemData.name}</div>
-                                                  </div>
-                                                  <div className="text-[9px] font-black text-blue-600 uppercase tracking-widest bg-blue-100/50 px-2 py-1 rounded">
-                                                      Incluido
-                                                  </div>
-                                              </div>
-                                          );
-                                      }
-                                      
+                                    const itemData = addonsDictionary.find((a) => a.id === itemId);
+
+                                    if (itemData) {
                                       return (
-                                          <div key={`${itemId}-${idx}`} className="flex items-center gap-3 p-2.5 rounded-xl border border-gray-100 bg-gray-50">
-                                              <div className="w-5 h-5 rounded-full flex items-center justify-center bg-gray-200 text-gray-500 flex-shrink-0">
-                                                  <Icon name="CheckIcon" size={12} />
-                                              </div>
-                                              <span className="text-xs sm:text-sm font-bold text-gray-700">{itemId}</span>
+                                        <div
+                                          key={itemId}
+                                          className="flex items-center gap-3 p-2.5 rounded-xl border border-blue-100 bg-blue-50/20"
+                                        >
+                                          <div className="w-5 h-5 rounded-full flex items-center justify-center bg-blue-100 text-blue-600 flex-shrink-0">
+                                            <Icon name="CheckIcon" size={12} />
                                           </div>
+                                          <div className="w-10 h-10 bg-white rounded-lg border border-gray-200 p-1 flex-shrink-0 shadow-sm">
+                                            <img
+                                              src={itemData.image_url}
+                                              className="w-full h-full object-contain"
+                                              alt=""
+                                            />
+                                          </div>
+                                          <div className="flex-1">
+                                            <div className="text-xs sm:text-sm font-bold text-gray-900 leading-tight">
+                                              {itemData.name}
+                                            </div>
+                                          </div>
+                                          <div className="text-[9px] font-black text-blue-600 uppercase tracking-widest bg-blue-100/50 px-2 py-1 rounded">
+                                            Incluido
+                                          </div>
+                                        </div>
                                       );
+                                    }
+
+                                    return (
+                                      <div
+                                        key={`${itemId}-${idx}`}
+                                        className="flex items-center gap-3 p-2.5 rounded-xl border border-gray-100 bg-gray-50"
+                                      >
+                                        <div className="w-5 h-5 rounded-full flex items-center justify-center bg-gray-200 text-gray-500 flex-shrink-0">
+                                          <Icon name="CheckIcon" size={12} />
+                                        </div>
+                                        <span className="text-xs sm:text-sm font-bold text-gray-700">
+                                          {itemId}
+                                        </span>
+                                      </div>
+                                    );
                                   })}
                                 </div>
                               </div>
