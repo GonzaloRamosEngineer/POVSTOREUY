@@ -3,7 +3,6 @@ import { notFound } from 'next/navigation';
 
 // --- COMPONENTES DEL PRODUCTO ---
 import ProductDetailsInteractive from '@/app/product-details/components/ProductDetailsInteractive';
-import ProductStickyNav from '@/app/product-details/components/ProductStickyNav';
 import DynamicStoryRenderer, { StoryBlock } from '@/app/product-details/components/DynamicStoryRenderer';
 import TechSpecsTable from '@/app/product-details/components/TechSpecsTable';
 // import ProductComparison from '@/app/product-details/components/ProductComparison';
@@ -34,8 +33,6 @@ function cleanMarkdown(text: string | null) {
     .substring(0, 160);
 }
 
-// --- DETECTOR DE UUID (ID) ---
-// Función para saber si el texto de la URL es un ID largo o un nombre amigable
 const isUUID = (str: string) => {
   const regexExp = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
   return regexExp.test(str);
@@ -44,7 +41,6 @@ const isUUID = (str: string) => {
 export async function generateMetadata({ params }: Props) {
   const { slug } = await params;
 
-  // Lógica de búsqueda inteligente para Metadata
   let query = supabase.from('products').select('name, description');
   if (isUUID(slug)) {
     query = query.eq('id', slug);
@@ -65,7 +61,6 @@ export async function generateMetadata({ params }: Props) {
 export default async function ProductPage({ params }: Props) {
   const { slug } = await params;
 
-  // Lógica de búsqueda inteligente para la Página
   let productQuery = supabase.from('products').select('*');
   if (isUUID(slug)) {
     productQuery = productQuery.eq('id', slug);
@@ -73,9 +68,7 @@ export default async function ProductPage({ params }: Props) {
     productQuery = productQuery.eq('slug', slug);
   }
 
-  const [{ data: product }] = await Promise.all([
-    productQuery.single(),
-  ]);
+  const [{ data: product }] = await Promise.all([productQuery.single()]);
 
   if (!product) notFound();
 
@@ -115,15 +108,6 @@ export default async function ProductPage({ params }: Props) {
     <div className="min-h-screen bg-white">
       {/* ✅ NO renderizamos Header acá porque ya viene desde layout.tsx */}
 
-      <ProductStickyNav
-        productName={product.name}
-        productPrice={product.price}
-        productImage={product.image_url}
-        averageRating={averageRatingValue}
-        totalReviews={totalReviewsCount}
-      />
-
-      {/* ✅ Sin pt-20 porque layout.tsx ya aplica el espacio del header */}
       <main className="pt-0">
         <section id="overview" className="max-w-7xl mx-auto px-4 py-0 md:py-0">
           <ProductDetailsInteractive

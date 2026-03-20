@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import ProductGallery from './ProductGallery';
 import ProductInfo from './ProductInfo';
+import ProductStickyNav from './ProductStickyNav';
 import { getSupabaseBrowserClient } from '@/lib/supabaseClient';
 import { upsertCartItem } from '@/lib/cart';
 import Icon from '@/components/ui/AppIcon';
@@ -295,10 +296,15 @@ export default function ProductDetailsInteractive({
   const currentOriginalPrice = selectedPack ? selectedPack.original_price : product.original_price;
   const hasDiscount = currentOriginalPrice ? currentOriginalPrice > currentDisplayPrice : false;
 
+  const currentName = selectedPack ? `${product.name} - ${selectedPack.name}` : product.name;
+  const currentImage = dynamicGallery[0]?.url || product.image_url;
+  const currentRating = product.rating || 5;
+  const currentReviewCount = product.review_count || 0;
+
   const handlePackSelect = (pack: ProductPack) => {
     setSelectedPack(pack);
     if (topRef.current) {
-      const offset = 80; // altura del navbar sticky aproximada
+      const offset = 80;
       const top = topRef.current.getBoundingClientRect().top + window.scrollY - offset;
       window.scrollTo({ top, behavior: 'smooth' });
     }
@@ -357,6 +363,14 @@ export default function ProductDetailsInteractive({
 
   return (
     <>
+      <ProductStickyNav
+        productName={currentName}
+        productPrice={currentDisplayPrice}
+        productImage={currentImage}
+        averageRating={currentRating}
+        totalReviews={currentReviewCount}
+      />
+
       {mounted && hasDiscount && (
         <div className="relative left-1/2 right-1/2 ml-[-50vw] mr-[-50vw] w-screen mb-6">
           <div className="w-full bg-neutral-950 border-b border-white/5 py-3 px-4 flex justify-center items-center relative overflow-hidden">
@@ -389,18 +403,17 @@ export default function ProductDetailsInteractive({
 
       <div ref={topRef} className="max-w-[1200px] mx-auto px-4 lg:px-8 pt-0 pb-12 md:pb-16">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-12 lg:gap-16 items-start">
-
           {/* BLOQUE 1 mobile: Título + descripción */}
           <div className="order-1 lg:hidden bg-white">
             <ProductInfo
-              name={selectedPack ? `${product.name} - ${selectedPack.name}` : product.name}
+              name={currentName}
               model={product.model ?? ''}
               price={currentDisplayPrice}
               originalPrice={currentOriginalPrice ?? undefined}
               cashPrice={selectedPack ? selectedPack.cash_price : product.cash_price}
               cardPrice={selectedPack ? selectedPack.card_price : product.card_price}
-              rating={product.rating || 5}
-              reviewCount={product.review_count || 0}
+              rating={currentRating}
+              reviewCount={currentReviewCount}
               description={product.description}
               resumen={selectedPack?.tagline || product.resumen}
               mode="header"
@@ -419,14 +432,14 @@ export default function ProductDetailsInteractive({
           {/* BLOQUE 3 mobile: Precio */}
           <div className="order-3 lg:hidden bg-white border-t border-gray-100 pt-4">
             <ProductInfo
-              name={selectedPack ? `${product.name} - ${selectedPack.name}` : product.name}
+              name={currentName}
               model={product.model ?? ''}
               price={currentDisplayPrice}
               originalPrice={currentOriginalPrice ?? undefined}
               cashPrice={selectedPack ? selectedPack.cash_price : product.cash_price}
               cardPrice={selectedPack ? selectedPack.card_price : product.card_price}
-              rating={product.rating || 5}
-              reviewCount={product.review_count || 0}
+              rating={currentRating}
+              reviewCount={currentReviewCount}
               description={product.description}
               resumen={selectedPack?.tagline || product.resumen}
               mode="pricing"
@@ -435,18 +448,16 @@ export default function ProductDetailsInteractive({
 
           {/* BLOQUE 4 mobile / Columna derecha desktop: Kits + CTA */}
           <div className="order-4 lg:order-2 space-y-6 md:space-y-8 relative z-20 bg-white">
-
-            {/* En desktop mostramos ProductInfo completo aquí */}
             <div className="hidden lg:block">
               <ProductInfo
-                name={selectedPack ? `${product.name} - ${selectedPack.name}` : product.name}
+                name={currentName}
                 model={product.model ?? ''}
                 price={currentDisplayPrice}
                 originalPrice={currentOriginalPrice ?? undefined}
                 cashPrice={selectedPack ? selectedPack.cash_price : product.cash_price}
                 cardPrice={selectedPack ? selectedPack.card_price : product.card_price}
-                rating={product.rating || 5}
-                reviewCount={product.review_count || 0}
+                rating={currentRating}
+                reviewCount={currentReviewCount}
                 description={product.description}
                 resumen={selectedPack?.tagline || product.resumen}
               />
