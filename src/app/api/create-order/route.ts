@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { createHash, randomUUID } from 'crypto';
 import { getSupabaseAdmin } from '@/lib/supabaseAdmin';
+// IMPORTAMOS EL NUEVO DICCIONARIO
+import { apiErrorMessages } from '@/messages/apiErrorMessages';
 
 const URUGUAY_DEPARTMENTS = new Set([
   'Montevideo', 'Canelones', 'Maldonado', 'Colonia', 'Salto',
@@ -56,17 +58,18 @@ function parseLegacyItem(item: any): NormalizedReqItem | null {
 
 function normalizeReqItems(items: any[]): { data: NormalizedReqItem[] | null; error?: string } {
   const normalized: NormalizedReqItem[] = [];
+  const { validation } = apiErrorMessages.createOrder;
 
   for (const i of items) {
     const quantity = Number(i?.quantity ?? 0);
     if (!Number.isFinite(quantity) || quantity <= 0) {
-      return { data: null, error: 'Each item must include valid quantity' };
+      return { data: null, error: validation.quantity };
     }
 
     if (i?.type === 'product') {
       const productId = String(i?.product_id || '').trim();
       if (!productId || !UUID_RE.test(productId)) {
-        return { data: null, error: 'Invalid product item: product_id is required' };
+        return { data: null, error: validation.missingProductId };
       }
       normalized.push({ kind: 'product', productId, quantity });
       continue;
@@ -76,7 +79,7 @@ function normalizeReqItems(items: any[]): { data: NormalizedReqItem[] | null; er
       const parentProductId = String(i?.parent_product_id || '').trim();
       const packId = String(i?.pack_id || '').trim();
       if (!parentProductId || !UUID_RE.test(parentProductId) || !packId) {
-        return { data: null, error: 'Invalid pack item: parent_product_id and pack_id are required' };
+        return { data: null, error: validation.missingPackIds };
       }
       normalized.push({ kind: 'pack', parentProductId, packId, quantity });
       continue;
@@ -84,7 +87,7 @@ function normalizeReqItems(items: any[]): { data: NormalizedReqItem[] | null; er
 
     const legacyParsed = parseLegacyItem(i);
     if (!legacyParsed) {
-      return { data: null, error: 'Invalid item shape. Use type=product|pack' };
+      return { data: null, error: validation.invalidShape };
     }
     normalized.push(legacyParsed);
   }
@@ -126,11 +129,13 @@ function getIdempotencyPayloadHash(payload: any): string {
 }
 
 function validatePackOrNull(packRaw: any): { ok: true; pack: ValidatedPack } | { ok: false; error: string } {
-  if (!packRaw || typeof packRaw !== 'object') return { ok: false, error: 'Pack data is invalid' };
+  const { validation } = apiErrorMessages.createOrder;
+  
+  if (!packRaw || typeof packRaw !== 'object') return { ok: false, error: validation.packInvalid };
 
   const componentsRaw = Array.isArray(packRaw.components) ? packRaw.components : null;
   if (!componentsRaw || componentsRaw.length === 0) {
-    return { ok: false, error: 'Pack does not define valid components' };
+    return { ok: false, error: validation.packNoComponents };
   }
 
   const components: PackComponent[] = [];
@@ -142,13 +147,13 @@ function validatePackOrNull(packRaw: any): { ok: true; pack: ValidatedPack } | {
     const quantity = Number(c?.quantity ?? 0);
 
     if (!product_id || !UUID_RE.test(product_id)) {
-      return { ok: false, error: 'Pack has component with invalid product_id' };
+      return { ok: false, error: validation.packInvalidProductId };
     }
     if (!role) {
-      return { ok: false, error: 'Pack has component with invalid role' };
+      return { ok: false, error: validation.packInvalidRole };
     }
     if (!Number.isFinite(quantity) || quantity <= 0) {
-      return { ok: false, error: 'Pack has component with invalid quantity' };
+      return { ok: false, error: validation.packInvalidQuantity };
     }
 
     if (role === 'primary') primaryCount += 1;
@@ -156,7 +161,7 @@ function validatePackOrNull(packRaw: any): { ok: true; pack: ValidatedPack } | {
   }
 
   if (primaryCount !== 1) {
-    return { ok: false, error: 'Pack must define exactly one primary component' };
+    return { ok: false, error: validation.packMultiplePrimary };
   }
 
   const versionRaw = Number(packRaw.version ?? 1);
@@ -178,6 +183,8 @@ function validatePackOrNull(packRaw: any): { ok: true; pack: ValidatedPack } | {
 }
 
 export async function POST(request: Request) {
+  const msgs = apiErrorMessages.createOrder;
+
   try {
     const supabase = getSupabaseAdmin();
     const body = await request.json();
@@ -185,39 +192,39 @@ export async function POST(request: Request) {
 
     const idempotencyKey = String(idempotency_key || '').trim();
     if (!idempotencyKey || idempotencyKey.length > 128) {
-      return NextResponse.json({ error: 'Missing or invalid idempotency_key' }, { status: 400 });
+      return NextResponse.json({ error: msgs.missingIdempotency }, { status: 400 });
     }
 
     const dm = deliveryMethod === 'pickup' ? 'pickup' : 'delivery';
 
     if (!customerInfo || !items || !Array.isArray(items) || items.length === 0) {
-      return NextResponse.json({ error: 'Missing customerInfo or items' }, { status: 400 });
+      return NextResponse.json({ error: msgs.missingCustomerOrItems }, { status: 400 });
     }
 
     const requiredBaseFields = ['email', 'fullName', 'phone'];
     for (const f of requiredBaseFields) {
       // @ts-ignore
-      if (!customerInfo[f]) return NextResponse.json({ error: `Missing customerInfo.${f}` }, { status: 400 });
+      if (!customerInfo[f]) return NextResponse.json({ error: msgs.missingField(f) }, { status: 400 });
     }
 
     if (dm === 'delivery') {
       const requiredDeliveryFields = ['address', 'city', 'department'];
       for (const f of requiredDeliveryFields) {
         // @ts-ignore
-        if (!customerInfo[f]) return NextResponse.json({ error: `Missing customerInfo.${f}` }, { status: 400 });
+        if (!customerInfo[f]) return NextResponse.json({ error: msgs.missingField(f) }, { status: 400 });
       }
       if (!URUGUAY_DEPARTMENTS.has(customerInfo.department)) {
-        return NextResponse.json({ error: `Invalid customerInfo.department: ${customerInfo.department}` }, { status: 400 });
+        return NextResponse.json({ error: msgs.invalidDepartment(customerInfo.department) }, { status: 400 });
       }
     }
 
     if (!paymentMethod || !['mercadopago', 'bank_transfer'].includes(paymentMethod)) {
-      return NextResponse.json({ error: 'Invalid paymentMethod' }, { status: 400 });
+      return NextResponse.json({ error: msgs.invalidPaymentMethod }, { status: 400 });
     }
 
     const normalizedReqResult = normalizeReqItems(items);
     if (!normalizedReqResult.data) {
-      return NextResponse.json({ error: normalizedReqResult.error || 'Invalid items' }, { status: 400 });
+      return NextResponse.json({ error: normalizedReqResult.error || msgs.validation.invalidShape }, { status: 400 });
     }
     const normalizedReqItems = normalizedReqResult.data;
 
@@ -242,12 +249,12 @@ export async function POST(request: Request) {
       .maybeSingle();
 
     if (existingByIdempotencyErr) {
-      return NextResponse.json({ error: 'Failed to check idempotency', details: existingByIdempotencyErr.message }, { status: 500 });
+      return NextResponse.json({ error: msgs.idempotencyCheckFailed, details: existingByIdempotencyErr.message }, { status: 500 });
     }
 
     if (existingByIdempotency) {
       if (String(existingByIdempotency.idempotency_payload_hash || '') !== idempotencyPayloadHash) {
-        return NextResponse.json({ error: 'Idempotency key already used with a different payload' }, { status: 409 });
+        return NextResponse.json({ error: msgs.idempotencyConflict }, { status: 409 });
       }
       return NextResponse.json({
         ok: true,
@@ -266,7 +273,7 @@ export async function POST(request: Request) {
       .select('id,name,model,price,cash_price,card_price,image_url,stock_count,is_active,packs')
       .in('id', baseProductIds);
 
-    if (prodErr) return NextResponse.json({ error: 'Failed to load products', details: prodErr.message }, { status: 500 });
+    if (prodErr) return NextResponse.json({ error: msgs.productsLoadFailed, details: prodErr.message }, { status: 500 });
 
     const byId = new Map<string, any>((products || []).map((p: any) => [p.id, p]));
     const neededComponentIds = new Set<string>();
@@ -275,18 +282,18 @@ export async function POST(request: Request) {
       if (reqItem.kind !== 'pack') continue;
 
       const parent = byId.get(reqItem.parentProductId);
-      if (!parent) return NextResponse.json({ error: `Product not found: ${reqItem.parentProductId}` }, { status: 400 });
-      if (!parent.is_active) return NextResponse.json({ error: `Product inactive: ${parent.name}` }, { status: 400 });
+      if (!parent) return NextResponse.json({ error: msgs.productNotFound }, { status: 400 });
+      if (!parent.is_active) return NextResponse.json({ error: msgs.productInactive(parent.name) }, { status: 400 });
 
       const packs = parseMaybeJson(parent.packs);
       const packRaw = packs.find((x: any) => String(x?.id || '') === reqItem.packId);
       if (!packRaw) {
-        return NextResponse.json({ error: `Pack not found: ${reqItem.packId} in product ${parent.id}` }, { status: 400 });
+        return NextResponse.json({ error: msgs.packNotFound }, { status: 400 });
       }
 
       const validatedPack = validatePackOrNull(packRaw);
       if (validatedPack.ok === false) {
-        return NextResponse.json({ error: `Invalid pack ${reqItem.packId}: ${validatedPack.error}` }, { status: 400 });
+        return NextResponse.json({ error: msgs.invalidPack, details: validatedPack.error }, { status: 400 });
       }
 
       for (const c of validatedPack.pack.components) {
@@ -302,7 +309,7 @@ export async function POST(request: Request) {
         .in('id', missingComponentIds);
 
       if (compErr) {
-        return NextResponse.json({ error: 'Failed to load pack components', details: compErr.message }, { status: 500 });
+        return NextResponse.json({ error: msgs.packComponentsLoadFailed, details: compErr.message }, { status: 500 });
       }
 
       for (const p of (componentProducts || [])) byId.set(p.id, p);
@@ -315,8 +322,8 @@ export async function POST(request: Request) {
     for (const reqItem of normalizedReqItems) {
       if (reqItem.kind === 'product') {
         const p = byId.get(reqItem.productId);
-        if (!p) return NextResponse.json({ error: `Product not found: ${reqItem.productId}` }, { status: 400 });
-        if (!p.is_active) return NextResponse.json({ error: `Product inactive: ${p.name}` }, { status: 400 });
+        if (!p) return NextResponse.json({ error: msgs.productNotFound }, { status: 400 });
+        if (!p.is_active) return NextResponse.json({ error: msgs.productInactive(p.name) }, { status: 400 });
 
         const unitPrice = getMethodPrice(paymentMethod, p.cash_price, p.card_price, p.price);
         const qty = reqItem.quantity;
@@ -341,18 +348,18 @@ export async function POST(request: Request) {
       }
 
       const parent = byId.get(reqItem.parentProductId);
-      if (!parent) return NextResponse.json({ error: `Product not found: ${reqItem.parentProductId}` }, { status: 400 });
-      if (!parent.is_active) return NextResponse.json({ error: `Product inactive: ${parent.name}` }, { status: 400 });
+      if (!parent) return NextResponse.json({ error: msgs.productNotFound }, { status: 400 });
+      if (!parent.is_active) return NextResponse.json({ error: msgs.productInactive(parent.name) }, { status: 400 });
 
       const packs = parseMaybeJson(parent.packs);
       const packRaw = packs.find((x: any) => String(x?.id || '') === reqItem.packId);
       if (!packRaw) {
-        return NextResponse.json({ error: `Pack not found: ${reqItem.packId} in product ${parent.id}` }, { status: 400 });
+        return NextResponse.json({ error: msgs.packNotFound }, { status: 400 });
       }
 
       const validatedPack = validatePackOrNull(packRaw);
       if (validatedPack.ok === false) {
-        return NextResponse.json({ error: `Invalid pack ${reqItem.packId}: ${validatedPack.error}` }, { status: 400 });
+        return NextResponse.json({ error: msgs.invalidPack, details: validatedPack.error }, { status: 400 });
       }
 
       const pack = validatedPack.pack;
@@ -362,15 +369,15 @@ export async function POST(request: Request) {
       const primaryComponent = pack.components.find((c) => c.role === 'primary');
 
       if (!primaryComponent) {
-        return NextResponse.json({ error: `Invalid pack ${reqItem.packId}: missing primary component` }, { status: 400 });
+        return NextResponse.json({ error: msgs.invalidPack }, { status: 400 });
       }
 
       const primaryProduct = byId.get(primaryComponent.product_id);
       if (!primaryProduct) {
-        return NextResponse.json({ error: `Pack primary component not found: ${primaryComponent.product_id}` }, { status: 400 });
+        return NextResponse.json({ error: msgs.packComponentNotFound }, { status: 400 });
       }
       if (!primaryProduct.is_active) {
-        return NextResponse.json({ error: `Pack primary component inactive: ${primaryProduct.name}` }, { status: 400 });
+        return NextResponse.json({ error: msgs.packComponentInactive(primaryProduct.name) }, { status: 400 });
       }
 
       packLines.push({
@@ -391,10 +398,10 @@ export async function POST(request: Request) {
       for (const c of pack.components) {
         const componentProduct = byId.get(c.product_id);
         if (!componentProduct) {
-          return NextResponse.json({ error: `Pack component not found: ${c.product_id}` }, { status: 400 });
+          return NextResponse.json({ error: msgs.packComponentNotFound }, { status: 400 });
         }
         if (!componentProduct.is_active) {
-          return NextResponse.json({ error: `Pack component inactive: ${componentProduct.name}` }, { status: 400 });
+          return NextResponse.json({ error: msgs.packComponentInactive(componentProduct.name) }, { status: 400 });
         }
 
         const componentQty = packRequestedQty * c.quantity;
@@ -422,7 +429,7 @@ export async function POST(request: Request) {
       if (!p) continue;
       const stock = Number(p.stock_count ?? 0);
       if (qty > stock) {
-        return NextResponse.json({ error: `Not enough stock for ${p.name}`, stock }, { status: 400 });
+        return NextResponse.json({ error: msgs.notEnoughStock(p.name), stock }, { status: 400 });
       }
     }
 
@@ -483,11 +490,11 @@ export async function POST(request: Request) {
           .maybeSingle();
 
         if (existingAfterConflictErr || !existingAfterConflict) {
-          return NextResponse.json({ error: 'Failed to resolve idempotent create-order conflict' }, { status: 500 });
+          return NextResponse.json({ error: msgs.idempotencyResolveFailed }, { status: 500 });
         }
 
         if (String(existingAfterConflict.idempotency_payload_hash || '') !== idempotencyPayloadHash) {
-          return NextResponse.json({ error: 'Idempotency key already used with a different payload' }, { status: 409 });
+          return NextResponse.json({ error: msgs.idempotencyConflict }, { status: 409 });
         }
 
         return NextResponse.json({
@@ -498,7 +505,7 @@ export async function POST(request: Request) {
         });
       }
 
-      return NextResponse.json({ error: 'Failed to create order', details: orderErr.message }, { status: 500 });
+      return NextResponse.json({ error: msgs.orderCreationFailed, details: orderErr.message }, { status: 500 });
     }
 
     const orderId = orderInserted.id;
@@ -509,7 +516,7 @@ export async function POST(request: Request) {
     }));
 
     const { error: itemsErr } = await supabase.from('order_items').insert(itemsToInsert);
-    if (itemsErr) return NextResponse.json({ error: 'Failed to create order items', details: itemsErr.message }, { status: 500 });
+    if (itemsErr) return NextResponse.json({ error: msgs.orderItemsCreationFailed, details: itemsErr.message }, { status: 500 });
 
     return NextResponse.json({
       ok: true,
@@ -520,6 +527,6 @@ export async function POST(request: Request) {
 
   } catch (e: any) {
     console.error(e);
-    return NextResponse.json({ error: 'Unexpected error', details: e.message }, { status: 500 });
+    return NextResponse.json({ error: msgs.unexpected, details: e.message }, { status: 500 });
   }
 }

@@ -1,6 +1,8 @@
 'use client';
 
 import Icon from '@/components/ui/AppIcon';
+// IMPORTAMOS EL DICCIONARIO
+import { checkoutMessages } from '@/messages/checkoutMessages';
 
 interface MercadoPagoFormProps {
   onPay: () => void;
@@ -8,14 +10,16 @@ interface MercadoPagoFormProps {
 }
 
 export default function MercadoPagoForm({ onPay, isProcessing }: MercadoPagoFormProps) {
+  const { mercadoPagoForm } = checkoutMessages;
+
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-3 p-4 bg-success/10 border border-success/20 rounded-lg">
         <Icon name="LockClosedIcon" size={20} className="text-success" variant="solid" />
         <div>
-          <p className="text-sm font-medium text-foreground">Pago Seguro con MercadoPago</p>
+          <p className="text-sm font-medium text-foreground">{mercadoPagoForm.securePaymentTitle}</p>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Serás redirigido al checkout oficial de MercadoPago
+            {mercadoPagoForm.securePaymentDesc}
           </p>
         </div>
       </div>
@@ -29,22 +33,24 @@ export default function MercadoPagoForm({ onPay, isProcessing }: MercadoPagoForm
         {isProcessing ? (
           <>
             <div className="w-5 h-5 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin" />
-            Iniciando pago...
+            {mercadoPagoForm.processing}
           </>
         ) : (
           <>
             <Icon name="CreditCardIcon" size={20} className="text-primary-foreground" variant="solid" />
-            Pagar con MercadoPago
+            {mercadoPagoForm.payButton}
           </>
         )}
       </button>
 
       <div className="flex items-center justify-center gap-4 pt-4 border-t border-border">
-        <div className="text-xs text-muted-foreground">Aceptamos:</div>
+        <div className="text-xs text-muted-foreground">{mercadoPagoForm.acceptedCardsLabel}</div>
         <div className="flex items-center gap-2">
-          <div className="px-3 py-1 bg-muted rounded text-xs font-medium text-foreground">Visa</div>
-          <div className="px-3 py-1 bg-muted rounded text-xs font-medium text-foreground">Mastercard</div>
-          <div className="px-3 py-1 bg-muted rounded text-xs font-medium text-foreground">OCA</div>
+          {mercadoPagoForm.cards.map(card => (
+            <div key={card} className="px-3 py-1 bg-muted rounded text-xs font-medium text-foreground">
+              {card}
+            </div>
+          ))}
         </div>
       </div>
     </div>

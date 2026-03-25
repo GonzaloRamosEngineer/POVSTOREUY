@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import Icon from '@/components/ui/AppIcon';
+// IMPORTAMOS EL DICCIONARIO
+import { checkoutMessages } from '@/messages/checkoutMessages';
 
 type DeliveryMethod = 'delivery' | 'pickup';
 
@@ -20,7 +22,6 @@ interface CustomerInfoFormProps {
   initialData?: Partial<CustomerInfo>;
   deliveryMethod: DeliveryMethod;
   pickupAddress: string;
-  // 👇 NUEVO: Función para cambiar el método desde aquí
   onDeliveryChange: (method: DeliveryMethod) => void; 
 }
 
@@ -29,7 +30,7 @@ export default function CustomerInfoForm({
   initialData,
   deliveryMethod,
   pickupAddress,
-  onDeliveryChange, // 👇 Recibimos la función
+  onDeliveryChange,
 }: CustomerInfoFormProps) {
   const [formData, setFormData] = useState<CustomerInfo>({
     email: initialData?.email || '',
@@ -83,21 +84,23 @@ export default function CustomerInfoForm({
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
   };
 
+  // AQUÍ USAMOS LOS ERRORES CENTRALIZADOS
   const handleBlur = (field: keyof CustomerInfo) => {
     const newErrors = { ...errors };
+    const { validation } = checkoutMessages.customerForm;
 
     switch (field) {
       case 'email':
-        if (!formData.email) newErrors.email = 'Email requerido';
-        else if (!validateEmail(formData.email)) newErrors.email = 'Email inválido';
+        if (!formData.email) newErrors.email = validation.emailRequired;
+        else if (!validateEmail(formData.email)) newErrors.email = validation.emailInvalid;
         else delete newErrors.email;
         break;
       case 'fullName':
-        if (!formData.fullName || formData.fullName.length < 3) newErrors.fullName = 'Nombre completo requerido';
+        if (!formData.fullName || formData.fullName.length < 3) newErrors.fullName = validation.nameRequired;
         else delete newErrors.fullName;
         break;
       case 'phone':
-        if (!formData.phone || formData.phone.length < 8) newErrors.phone = 'Teléfono inválido';
+        if (!formData.phone || formData.phone.length < 8) newErrors.phone = validation.phoneInvalid;
         else delete newErrors.phone;
         break;
       case 'address':
@@ -105,7 +108,7 @@ export default function CustomerInfoForm({
           delete newErrors.address;
           break;
         }
-        if (!formData.address || formData.address.length < 5) newErrors.address = 'Dirección requerida';
+        if (!formData.address || formData.address.length < 5) newErrors.address = validation.addressRequired;
         else delete newErrors.address;
         break;
       case 'city':
@@ -113,22 +116,24 @@ export default function CustomerInfoForm({
           delete newErrors.city;
           break;
         }
-        if (!formData.city) newErrors.city = 'Ciudad requerida';
+        if (!formData.city) newErrors.city = validation.cityRequired;
         else delete newErrors.city;
         break;
     }
     setErrors(newErrors);
   };
 
+  const { customerForm } = checkoutMessages;
+
   return (
-    <div className="space-y-8"> {/* Aumenté un poco el espacio vertical global */}
+    <div className="space-y-8">
       
       {/* 1. SECCIÓN CONTACTO */}
       <div className="space-y-6">
         <div className="flex items-center gap-3">
           <Icon name="UserIcon" size={24} className="text-primary" />
           <h3 className="text-lg font-heading font-semibold text-foreground">
-            Información de Contacto
+            {customerForm.sections.contact}
           </h3>
         </div>
 
@@ -136,7 +141,7 @@ export default function CustomerInfoForm({
           {/* Email */}
           <div>
             <label htmlFor="email" className="block text-sm font-medium text-foreground mb-2">
-              Email <span className="text-error">*</span>
+              {customerForm.labels.email} <span className="text-error">*</span>
             </label>
             <input
               type="email"
@@ -145,7 +150,7 @@ export default function CustomerInfoForm({
               value={formData.email}
               onChange={handleChange}
               onBlur={() => handleBlur('email')}
-              placeholder="tu@email.com"
+              placeholder={customerForm.placeholders.email}
               className={`w-full px-4 py-3 bg-input border rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary transition-smooth ${
                 errors.email ? 'border-error' : 'border-border'
               }`}
@@ -161,7 +166,7 @@ export default function CustomerInfoForm({
           {/* Full Name */}
           <div>
             <label htmlFor="fullName" className="block text-sm font-medium text-foreground mb-2">
-              Nombre Completo <span className="text-error">*</span>
+              {customerForm.labels.fullName} <span className="text-error">*</span>
             </label>
             <input
               type="text"
@@ -170,7 +175,7 @@ export default function CustomerInfoForm({
               value={formData.fullName}
               onChange={handleChange}
               onBlur={() => handleBlur('fullName')}
-              placeholder="Juan Pérez"
+              placeholder={customerForm.placeholders.fullName}
               className={`w-full px-4 py-3 bg-input border rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary transition-smooth ${
                 errors.fullName ? 'border-error' : 'border-border'
               }`}
@@ -186,7 +191,7 @@ export default function CustomerInfoForm({
           {/* Phone */}
           <div>
             <label htmlFor="phone" className="block text-sm font-medium text-foreground mb-2">
-              Teléfono <span className="text-error">*</span>
+              {customerForm.labels.phone} <span className="text-error">*</span>
             </label>
             <input
               type="tel"
@@ -195,7 +200,7 @@ export default function CustomerInfoForm({
               value={formData.phone}
               onChange={handleChange}
               onBlur={() => handleBlur('phone')}
-              placeholder="099 123 456"
+              placeholder={customerForm.placeholders.phone}
               className={`w-full px-4 py-3 bg-input border rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary transition-smooth ${
                 errors.phone ? 'border-error' : 'border-border'
               }`}
@@ -210,12 +215,12 @@ export default function CustomerInfoForm({
         </div>
       </div>
 
-      <div className="h-px bg-border/50 w-full" /> {/* Separador Sutil */}
+      <div className="h-px bg-border/50 w-full" />
 
-      {/* 2. SELECCIÓN DE MÉTODO DE ENTREGA (NUEVO) */}
+      {/* 2. SELECCIÓN DE MÉTODO DE ENTREGA */}
       <div className="space-y-4">
         <label className="block text-sm font-medium text-foreground mb-2">
-          ¿Cómo deseas recibir tu pedido?
+          {customerForm.sections.deliveryMethod}
         </label>
         <div className="grid grid-cols-2 gap-4">
           <button
@@ -228,7 +233,7 @@ export default function CustomerInfoForm({
             }`}
           >
             <Icon name="TruckIcon" size={28} />
-            <span className="font-bold text-sm">Envío a Domicilio</span>
+            <span className="font-bold text-sm">{customerForm.labels.delivery}</span>
           </button>
 
           <button
@@ -241,7 +246,7 @@ export default function CustomerInfoForm({
             }`}
           >
             <Icon name="MapPinIcon" size={28} />
-            <span className="font-bold text-sm">Retiro en Local</span>
+            <span className="font-bold text-sm">{customerForm.labels.pickup}</span>
           </button>
         </div>
       </div>
@@ -251,14 +256,14 @@ export default function CustomerInfoForm({
         <div className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
           <div className="flex items-center gap-3 pt-2">
             <h3 className="text-lg font-heading font-semibold text-foreground">
-              Datos del Envío
+              {customerForm.sections.shippingData}
             </h3>
           </div>
 
           {/* Address */}
           <div>
             <label htmlFor="address" className="block text-sm font-medium text-foreground mb-2">
-              Dirección <span className="text-error">*</span>
+              {customerForm.labels.address} <span className="text-error">*</span>
             </label>
             <input
               type="text"
@@ -267,7 +272,7 @@ export default function CustomerInfoForm({
               value={formData.address}
               onChange={handleChange}
               onBlur={() => handleBlur('address')}
-              placeholder="Av. 18 de Julio 1234, Apto 501"
+              placeholder={customerForm.placeholders.address}
               className={`w-full px-4 py-3 bg-input border rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary transition-smooth ${
                 errors.address ? 'border-error' : 'border-border'
               }`}
@@ -284,7 +289,7 @@ export default function CustomerInfoForm({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label htmlFor="city" className="block text-sm font-medium text-foreground mb-2">
-                Ciudad <span className="text-error">*</span>
+                {customerForm.labels.city} <span className="text-error">*</span>
               </label>
               <input
                 type="text"
@@ -293,7 +298,7 @@ export default function CustomerInfoForm({
                 value={formData.city}
                 onChange={handleChange}
                 onBlur={() => handleBlur('city')}
-                placeholder="Montevideo"
+                placeholder={customerForm.placeholders.city}
                 className={`w-full px-4 py-3 bg-input border rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary transition-smooth ${
                   errors.city ? 'border-error' : 'border-border'
                 }`}
@@ -308,7 +313,7 @@ export default function CustomerInfoForm({
 
             <div>
               <label htmlFor="department" className="block text-sm font-medium text-foreground mb-2">
-                Departamento <span className="text-error">*</span>
+                {customerForm.labels.department} <span className="text-error">*</span>
               </label>
               <select
                 id="department"
@@ -329,7 +334,7 @@ export default function CustomerInfoForm({
           {/* Postal Code */}
           <div>
             <label htmlFor="postalCode" className="block text-sm font-medium text-foreground mb-2">
-              Código Postal
+              {customerForm.labels.postalCode}
             </label>
             <input
               type="text"
@@ -337,7 +342,7 @@ export default function CustomerInfoForm({
               name="postalCode"
               value={formData.postalCode}
               onChange={handleChange}
-              placeholder="11000"
+              placeholder={customerForm.placeholders.postalCode}
               maxLength={5}
               className="w-full px-4 py-3 bg-input border border-border rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary transition-smooth"
             />
@@ -352,10 +357,10 @@ export default function CustomerInfoForm({
                  <Icon name="MapPinIcon" size={24} className="text-primary" />
                </div>
                <div>
-                 <p className="text-sm font-bold text-foreground">Dirección de retiro</p>
+                 <p className="text-sm font-bold text-foreground">{customerForm.pickup.title}</p>
                  <p className="text-sm text-foreground/80 mt-1">{pickupAddress}</p>
                  <p className="text-xs text-muted-foreground mt-2 bg-background/50 p-2 rounded inline-block">
-                   Te contactaremos por WhatsApp/Email cuando tu pedido esté listo para retirar.
+                   {customerForm.pickup.description}
                  </p>
                </div>
             </div>
@@ -367,7 +372,7 @@ export default function CustomerInfoForm({
       <div className="flex items-center gap-3 p-4 bg-blue-500/10 border border-blue-500/20 rounded-lg">
         <Icon name="InformationCircleIcon" size={20} className="text-blue-500 flex-shrink-0" variant="solid" />
         <p className="text-xs text-foreground/80">
-          <span className="font-bold text-foreground">Compra Rápida:</span> No necesitas crear cuenta. Te enviaremos el seguimiento a tu email.
+          <span className="font-bold text-foreground">{customerForm.guestInfo.title}</span> {customerForm.guestInfo.description}
         </p>
       </div>
     </div>

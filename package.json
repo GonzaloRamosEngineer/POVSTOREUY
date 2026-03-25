@@ -60,6 +60,7 @@
     "next": "15.1.11",
     "react": "19.0.3",
     "react-dom": "19.0.3",
+    "react-hot-toast": "^2.6.0",
     "recharts": "^2.15.2"
   },
   "devDependencies": {

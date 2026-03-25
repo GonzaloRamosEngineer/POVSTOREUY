@@ -3,7 +3,10 @@ import type { Metadata, Viewport } from 'next';
 import '../styles/index.css';
 import Header from '@/components/common/Header';
 import Footer from '@/components/common/Footer';
-import WhatsAppButton from '@/components/common/WhatsAppButton'; // <-- NUEVA IMPORTACIÓN DEL BOTÓN
+import WhatsAppButton from '@/components/common/WhatsAppButton'; 
+
+// <-- AGREGAMOS LA IMPORTACIÓN DEL TOASTER AQUÍ -->
+import { Toaster } from 'react-hot-toast';
 
 export const viewport: Viewport = {
   width: 'device-width',
@@ -27,7 +30,6 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="es">
-      {/* CAMBIO A MODO CLARO: bg-[#F9F9F9] y texto oscuro */}
       <body className="bg-[#F9F9F9] text-gray-900 min-h-screen flex flex-col font-sans">
         <Header />
         
@@ -37,7 +39,9 @@ export default function RootLayout({
 
         <Footer />
         
-        {/* <-- AGREGAMOS EL BOTÓN FLOTANTE AQUÍ --> */}
+        {/* <-- AGREGAMOS EL COMPONENTE TOASTER AQUÍ --> */}
+        <Toaster position="bottom-right" />
+        
         <WhatsAppButton />
       </body>
     </html>

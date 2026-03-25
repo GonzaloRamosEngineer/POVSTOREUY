@@ -9,10 +9,12 @@ import BankTransferForm from './BankTransferForm';
 import CustomerInfoForm from './CustomerInfoForm';
 import { readCart, clearCart, type CartItem as CartItemType } from '@/lib/cart';
 
-// ... (Interfaces OrderItem, PaymentMethod, CustomerInfo se mantienen igual)
-// ... (PICKUP_ADDRESS y isCustomerInfoValid se mantienen igual)
-// Copia las interfaces del archivo original para no ocupar espacio, aquí pongo el componente:
+// IMPORTAMOS NUESTRO NUEVO DICCIONARIO
+import { checkoutMessages } from '@/messages/checkoutMessages';
+// IMPORTAMOS LA LIBRERÍA DE TOASTS
+import { toast } from 'react-hot-toast';
 
+// ... (Interfaces OrderItem, PaymentMethod, CustomerInfo se mantienen igual)
 interface OrderItem {
   id: string;
   name: string;
@@ -31,7 +33,6 @@ interface PaymentMethod {
   badge?: string;
 }
 
-
 interface CheckoutPayloadItemProduct {
   type: 'product';
   product_id: string;
@@ -46,7 +47,6 @@ interface CheckoutPayloadItemPack {
 }
 
 type CheckoutPayloadItem = CheckoutPayloadItemProduct | CheckoutPayloadItemPack;
-
 
 function mapCartItemsToCheckoutPayload(items: CartItemType[]): CheckoutPayloadItem[] {
   const mapped: CheckoutPayloadItem[] = [];
@@ -97,7 +97,6 @@ function isCustomerInfoValid(ci: CustomerInfo, method: DeliveryMethod) {
   if (method === 'pickup') return true;
   return Boolean(ci.address && ci.city && ci.department);
 }
-
 
 function normalizeCustomerInfoForIdempotency(ci: CustomerInfo, deliveryMethod: DeliveryMethod) {
   return {
@@ -218,15 +217,15 @@ export default function CheckoutPaymentInteractive() {
   const paymentMethods: PaymentMethod[] = [
     {
       id: 'mercadopago',
-      name: 'MercadoPago',
-      description: 'Pago seguro con checkout de MercadoPago',
+      name: checkoutMessages.paymentMethods.mercadopago.name,
+      description: checkoutMessages.paymentMethods.mercadopago.description,
       icon: 'CreditCardIcon',
-      badge: 'Recomendado',
+      badge: checkoutMessages.paymentMethods.mercadopago.badge,
     },
     {
       id: 'bank_transfer',
-      name: 'Transferencia Bancaria',
-      description: 'Pago directo desde tu banco - Procesamiento en 24-48hs',
+      name: checkoutMessages.paymentMethods.transfer.name,
+      description: checkoutMessages.paymentMethods.transfer.description,
       icon: 'BuildingLibraryIcon',
     },
   ];
@@ -272,7 +271,8 @@ export default function CheckoutPaymentInteractive() {
         return;
       }
       if (!isCustomerInfoValid(customerInfo, deliveryMethod)) {
-        alert('Completá tus datos de contacto antes de pagar.');
+        // REEMPLAZO DE ALERT POR TOAST.ERROR
+        toast.error(checkoutMessages.errors.incompleteDataMp);
         return;
       }
       setIsProcessing(true);
@@ -283,12 +283,12 @@ export default function CheckoutPaymentInteractive() {
       window.location.href = url;
     } catch (e: any) {
       console.error(e);
-      alert(e?.message || 'Error al iniciar pago con MercadoPago');
+      // REEMPLAZO DE ALERT POR TOAST.ERROR
+      toast.error(e?.message || checkoutMessages.errors.mercadoPagoInit);
       setIsProcessing(false);
     }
   };
 
-  // --- LÓGICA CORREGIDA PARA TRANSFERENCIA ---
   const handleBankTransferSubmit = async () => {
     try {
       if (!cart.length) {
@@ -297,31 +297,27 @@ export default function CheckoutPaymentInteractive() {
       }
 
       if (!isCustomerInfoValid(customerInfo, deliveryMethod)) {
-        alert('Completá tus datos de contacto antes de confirmar.');
-        // Hacemos scroll arriba para que vean el error
+        // REEMPLAZO DE ALERT POR TOAST.ERROR
+        toast.error(checkoutMessages.errors.incompleteDataTransfer);
         window.scrollTo({ top: 0, behavior: 'smooth' });
         return;
       }
 
       setIsProcessing(true);
 
-      // 1. Guardamos la orden en BD (estado pending)
       const created = await createOrder();
-
-      // 2. Limpiamos carrito
       clearCart();
 
-      // 3. Generamos Link de WhatsApp
       const whatsappNumber = '59897801202';
-      const message = `¡Hola POV Store! Quiero finalizar mi compra #${created.orderNumber} por Transferencia Bancaria para acceder al descuento del 5%.`;
+      const message = checkoutMessages.whatsapp.template(created.orderNumber);
       const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(message)}`;
 
-      // 4. Redirigimos a WhatsApp
       window.location.href = whatsappUrl;
 
     } catch (e: any) {
       console.error(e);
-      alert(e?.message || 'Error al crear pedido por transferencia');
+      // REEMPLAZO DE ALERT POR TOAST.ERROR
+      toast.error(e?.message || checkoutMessages.errors.transferInit);
       setIsProcessing(false);
     }
   };
@@ -338,9 +334,11 @@ export default function CheckoutPaymentInteractive() {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-6 text-center">
         <div className="max-w-md">
-          <p className="text-lg font-medium text-foreground mb-2">Tu carrito está vacío</p>
-          <p className="text-sm text-muted-foreground mb-6">Agregá productos antes de finalizar la compra.</p>
-          <button onClick={() => router.push('/homepage')} className="px-6 py-3 bg-primary text-primary-foreground font-semibold rounded-lg">Volver a la tienda</button>
+          <p className="text-lg font-medium text-foreground mb-2">{checkoutMessages.emptyCart.title}</p>
+          <p className="text-sm text-muted-foreground mb-6">{checkoutMessages.emptyCart.description}</p>
+          <button onClick={() => router.push('/homepage')} className="px-6 py-3 bg-primary text-primary-foreground font-semibold rounded-lg">
+            {checkoutMessages.emptyCart.button}
+          </button>
         </div>
       </div>
     );
@@ -350,8 +348,8 @@ export default function CheckoutPaymentInteractive() {
     <div className="min-h-screen bg-background">
       <div className="max-w-[1400px] mx-auto px-4 lg:px-6 py-8">
         <div className="mb-8">
-          <h1 className="text-3xl lg:text-4xl font-heading font-bold text-foreground">Finalizar Compra</h1>
-          <p className="text-muted-foreground mt-2">Completa tu información y elige tu método de pago preferido</p>
+          <h1 className="text-3xl lg:text-4xl font-heading font-bold text-foreground">{checkoutMessages.header.title}</h1>
+          <p className="text-muted-foreground mt-2">{checkoutMessages.header.subtitle}</p>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
@@ -382,7 +380,7 @@ export default function CheckoutPaymentInteractive() {
                 <BankTransferForm 
                   onSubmit={handleBankTransferSubmit} 
                   referenceNumber={referenceNumber}
-                  isProcessing={isProcessing} // Pasamos el estado de carga
+                  isProcessing={isProcessing}
                 />
               )}
             </div>

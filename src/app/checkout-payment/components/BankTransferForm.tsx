@@ -1,17 +1,17 @@
 'use client';
 
 import Icon from '@/components/ui/AppIcon';
+// IMPORTAMOS EL DICCIONARIO
+import { checkoutMessages } from '@/messages/checkoutMessages';
 
 interface BankTransferFormProps {
   onSubmit: () => void; 
   referenceNumber: string;
-  isProcessing: boolean; // AGREGADO: Para saber si está guardando
+  isProcessing: boolean;
 }
 
 export default function BankTransferForm({ referenceNumber, onSubmit, isProcessing }: BankTransferFormProps) {
-  
-  // Nota: La URL de WhatsApp ahora se generará en el padre después de guardar, 
-  // o usamos este botón para disparar el proceso.
+  const { bankTransferForm } = checkoutMessages;
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
@@ -27,16 +27,16 @@ export default function BankTransferForm({ referenceNumber, onSubmit, isProcessi
           </div>
           
           <h3 className="text-xl font-heading font-bold text-green-900 mb-2">
-            ¡Beneficio Pago Directo!
+            {bankTransferForm.benefitTitle}
           </h3>
           
           <p className="text-green-700 text-sm max-w-xs mx-auto mb-6">
-            Al pagar por transferencia bancaria directa, te ahorrás las comisiones y te regalamos un descuento especial.
+            {bankTransferForm.benefitDesc}
           </p>
 
           <div className="inline-flex items-center gap-2 px-4 py-2 bg-white rounded-full border border-green-200 shadow-sm mb-2">
              <Icon name="TagIcon" size={18} className="text-green-600" variant="solid" />
-             <span className="font-bold text-green-800">5% DE DESCUENTO APLICADO</span>
+             <span className="font-bold text-green-800">{bankTransferForm.discountApplied}</span>
           </div>
         </div>
       </div>
@@ -45,12 +45,12 @@ export default function BankTransferForm({ referenceNumber, onSubmit, isProcessi
       <div className="flex items-start gap-3 px-2">
         <Icon name="InformationCircleIcon" size={20} className="text-gray-400 flex-shrink-0 mt-0.5" />
         <p className="text-sm text-gray-500">
-          Para aplicar el descuento correctamente y verificar el stock inmediato, 
-          <strong>un asesor procesará tu pedido manualmente por WhatsApp.</strong>
+          {bankTransferForm.explanationPrefix}
+          <strong>{bankTransferForm.explanationBold}</strong>
         </p>
       </div>
 
-      {/* Botón de Acción Principal (AHORA ES UN BUTTON, NO UN LINK) */}
+      {/* Botón de Acción Principal */}
       <button
         onClick={onSubmit}
         disabled={isProcessing}
@@ -59,19 +59,19 @@ export default function BankTransferForm({ referenceNumber, onSubmit, isProcessi
         {isProcessing ? (
           <>
             <Icon name="ArrowPathIcon" size={24} className="animate-spin" />
-            <span>Registrando pedido...</span>
+            <span>{bankTransferForm.processing}</span>
           </>
         ) : (
           <>
             <Icon name="ChatBubbleLeftRightIcon" size={28} className="text-white" />
-            <span>Finalizar compra por WhatsApp</span>
+            <span>{bankTransferForm.payButton}</span>
             <Icon name="ArrowRightIcon" size={20} className="group-hover:translate-x-1 transition-transform" />
           </>
         )}
       </button>
 
       <p className="text-center text-xs text-gray-400">
-        Referencia de pedido: <span className="font-mono font-bold text-gray-600">{referenceNumber}</span>
+        {bankTransferForm.referenceLabel} <span className="font-mono font-bold text-gray-600">{referenceNumber}</span>
       </p>
 
     </div>

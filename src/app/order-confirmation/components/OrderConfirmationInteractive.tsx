@@ -13,6 +13,9 @@ import NextStepsCard from './NextStepsCard';
 import EmailConfirmationCard from './EmailConfirmationCard';
 import SocialShareCard from './SocialShareCard';
 
+// IMPORTAMOS EL NUEVO DICCIONARIO
+import { orderMessages } from '@/messages/orderMessages';
+
 type PaymentStatus = 'completed' | 'pending' | 'failed' | 'refunded';
 
 interface ApiOrderItem {
@@ -60,7 +63,6 @@ interface ApiResponse {
 
 function formatUY(dateIso: string) {
   const d = new Date(dateIso);
-  // ojo: si querés exactitud zona horaria, lo ajustamos luego; esto sirve para UI
   return d.toLocaleDateString('es-UY');
 }
 
@@ -70,10 +72,7 @@ function toNumber(n: any) {
 }
 
 function computeUIStatus(urlStatus: string | null, dbStatus?: PaymentStatus): PaymentStatus {
-  // prioridad: DB (fuente de verdad) si existe
   if (dbStatus) return dbStatus;
-
-  // fallback: query param MP
   if (urlStatus === 'success') return 'completed';
   if (urlStatus === 'pending') return 'pending';
   return 'failed';
@@ -91,13 +90,15 @@ const OrderConfirmationInteractive: React.FC = () => {
   const router = useRouter();
 
   const orderId = searchParams.get('orderId');
-  const urlStatus = searchParams.get('status'); // success|pending|failure (o lo que venga)
+  const urlStatus = searchParams.get('status');
 
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const [order, setOrder] = useState<ApiOrder | null>(null);
   const [items, setItems] = useState<ApiOrderItem[]>([]);
+
+  const { confirmation } = orderMessages;
 
   useEffect(() => {
     let alive = true;
@@ -108,7 +109,7 @@ const OrderConfirmationInteractive: React.FC = () => {
         setErrorMsg(null);
 
         if (!orderId) {
-          setErrorMsg('Falta orderId en la URL. Volvé al carrito e intentá nuevamente.');
+          setErrorMsg(confirmation.errors.missingOrderId);
           setLoading(false);
           return;
         }
@@ -121,7 +122,7 @@ const OrderConfirmationInteractive: React.FC = () => {
         const data = (await res.json().catch(() => null)) as ApiResponse | null;
 
         if (!res.ok || !data?.ok) {
-          throw new Error((data as any)?.error || 'No se pudo cargar la orden');
+          throw new Error((data as any)?.error || confirmation.errors.fetchFailed);
         }
 
         if (!alive) return;
@@ -130,7 +131,7 @@ const OrderConfirmationInteractive: React.FC = () => {
         setLoading(false);
       } catch (e: any) {
         if (!alive) return;
-        setErrorMsg(e?.message || 'Error al cargar la confirmación');
+        setErrorMsg(e?.message || confirmation.errors.generic);
         setLoading(false);
       }
     }
@@ -139,7 +140,7 @@ const OrderConfirmationInteractive: React.FC = () => {
     return () => {
       alive = false;
     };
-  }, [orderId]);
+  }, [orderId, confirmation.errors]);
 
   const ui = useMemo(() => {
     if (!order) return null;
@@ -153,28 +154,8 @@ const OrderConfirmationInteractive: React.FC = () => {
     const pickupAddress = parsePickupFromNotes(order.notes);
     const isPickup = Boolean(pickupAddress);
 
-    const headerTitle =
-      paymentStatus === 'completed'
-        ? '¡Pedido Confirmado!'
-        : paymentStatus === 'pending'
-          ? 'Pedido en proceso'
-          : 'No se pudo confirmar el pago';
-
-    const headerSubtitle =
-      paymentStatus === 'completed'
-        ? (isPickup
-            ? 'Gracias por tu compra. Tu pedido quedó confirmado para retiro en local.'
-            : 'Gracias por tu compra. Tu pedido está siendo preparado para el envío.')
-        : paymentStatus === 'pending'
-          ? 'Tu pago está pendiente. Apenas se acredite, te avisamos.'
-          : 'El pago no se acreditó. Podés reintentar o cambiar el método de pago.';
-
-    const shippingMethod = isPickup ? 'Retiro en Local Físico' : 'Envío a domicilio';
-
-    // estimativo simple; si es retiro, no tiene “fecha entrega”
-    const estimatedDelivery = isPickup
-      ? 'Coordinaremos por WhatsApp / Email'
-      : '24-72 hs hábiles (estimado)';
+    const shippingMethod = isPickup ? confirmation.deliveryInfo.methodPickup : confirmation.deliveryInfo.methodDelivery;
+    const estimatedDelivery = isPickup ? confirmation.deliveryInfo.estimatePickup : confirmation.deliveryInfo.estimateDelivery;
 
     const mappedItems = items.map((it) => ({
       id: it.id,
@@ -213,7 +194,7 @@ const OrderConfirmationInteractive: React.FC = () => {
       isPickup,
       pickupAddress: pickupAddress || null,
     };
-  }, [order, items, urlStatus]);
+  }, [order, items, urlStatus, confirmation.deliveryInfo]);
 
   if (loading) {
     return (
@@ -232,8 +213,8 @@ const OrderConfirmationInteractive: React.FC = () => {
           <div className="inline-flex items-center justify-center w-14 h-14 bg-error/10 rounded-full">
             <Icon name="XCircleIcon" size={34} className="text-error" variant="solid" />
           </div>
-          <h1 className="text-2xl font-heading font-bold text-foreground">Ups…</h1>
-          <p className="text-sm text-muted-foreground">{errorMsg || 'No pudimos mostrar la confirmación.'}</p>
+          <h1 className="text-2xl font-heading font-bold text-foreground">{confirmation.errors.notFoundTitle}</h1>
+          <p className="text-sm text-muted-foreground">{errorMsg || confirmation.errors.notFoundDesc}</p>
 
           <div className="flex flex-col sm:flex-row gap-3 justify-center pt-2">
             <button
@@ -241,7 +222,7 @@ const OrderConfirmationInteractive: React.FC = () => {
               className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-primary text-primary-foreground rounded-md font-medium"
             >
               <Icon name="ShoppingCartIcon" size={18} className="text-primary-foreground" />
-              Volver al carrito
+              {confirmation.buttons.backToCart}
             </button>
 
             <Link
@@ -249,7 +230,7 @@ const OrderConfirmationInteractive: React.FC = () => {
               className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-muted text-foreground rounded-md font-medium"
             >
               <Icon name="HomeIcon" size={18} className="text-foreground" />
-              Ir al inicio
+              {confirmation.buttons.goHome}
             </Link>
           </div>
         </div>
@@ -277,17 +258,17 @@ const OrderConfirmationInteractive: React.FC = () => {
           </div>
 
           <h1 className="text-3xl lg:text-4xl font-heading font-bold text-foreground mb-2">
-            {isSuccess ? '¡Pedido Confirmado!' : isPending ? 'Pedido en proceso' : 'Pago no confirmado'}
+            {isSuccess ? confirmation.states.completed.title : isPending ? confirmation.states.pending.title : confirmation.states.failed.title}
           </h1>
 
           <p className="text-base lg:text-lg text-muted-foreground max-w-2xl mx-auto">
             {isSuccess
               ? (ui.isPickup
-                  ? 'Gracias por tu compra. Tu pedido quedó confirmado para retiro en local.'
-                  : 'Gracias por tu compra. Tu pedido está siendo preparado para el envío.')
+                  ? confirmation.states.completed.subtitlePickup
+                  : confirmation.states.completed.subtitleDelivery)
               : isPending
-                ? 'Tu pago está pendiente. Si ya pagaste, puede demorar unos minutos en reflejarse.'
-                : 'El pago no se acreditó. Podés reintentar el pago o cambiar el método.'}
+                ? confirmation.states.pending.desc
+                : confirmation.states.failed.desc}
           </p>
         </div>
 
@@ -348,7 +329,7 @@ const OrderConfirmationInteractive: React.FC = () => {
             className="inline-flex items-center justify-center gap-2 px-8 py-3 bg-primary hover:bg-primary/90 text-primary-foreground font-medium rounded-md transition-smooth focus-ring"
           >
             <Icon name="HomeIcon" size={20} className="text-primary-foreground" />
-            Volver al Inicio
+            {confirmation.buttons.goHome}
           </Link>
 
           <button
@@ -356,20 +337,20 @@ const OrderConfirmationInteractive: React.FC = () => {
             className="inline-flex items-center justify-center gap-2 px-8 py-3 bg-muted hover:bg-muted/80 text-foreground font-medium rounded-md transition-smooth focus-ring"
           >
             <Icon name="PrinterIcon" size={20} className="text-foreground" />
-            Imprimir Confirmación
+            {confirmation.buttons.print}
           </button>
         </div>
 
         {/* Help */}
         <div className="mt-12 text-center">
           <p className="text-sm text-muted-foreground mb-4">
-            ¿Tenés alguna pregunta sobre tu pedido?
+            {confirmation.footerHelp}
           </p>
           <Link
             href="/homepage"
             className="inline-flex items-center gap-2 text-sm font-medium text-primary hover:text-primary/80 transition-smooth"
           >
-            Contactar Soporte
+            {confirmation.buttons.contactSupport}
             <Icon name="ArrowRightIcon" size={16} className="text-primary" />
           </Link>
         </div>
