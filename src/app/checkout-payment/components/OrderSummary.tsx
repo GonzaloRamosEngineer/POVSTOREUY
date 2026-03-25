@@ -1,6 +1,8 @@
 'use client';
 
 import Icon from '@/components/ui/AppIcon';
+// IMPORTAMOS EL DICCIONARIO
+import { globalMessages } from '@/messages/globalMessages';
 
 type DeliveryMethod = 'delivery' | 'pickup';
 
@@ -35,11 +37,13 @@ export default function OrderSummary({
   deliveryMethod,
   pickupAddress,
 }: OrderSummaryProps) {
+  const { orderSummary } = globalMessages;
+
   return (
     <div className="bg-card rounded-lg border border-border p-6 space-y-5">
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-heading font-semibold text-foreground">
-          Resumen del Pedido
+          {orderSummary.title}
         </h2>
 
         <button
@@ -47,7 +51,7 @@ export default function OrderSummary({
           onClick={onToggle}
           className="text-sm text-muted-foreground hover:text-foreground transition-smooth"
         >
-          {isExpanded ? 'Ocultar' : 'Ver detalle'}
+          {isExpanded ? orderSummary.actions.toggleHide : orderSummary.actions.toggleShow}
         </button>
       </div>
 
@@ -77,20 +81,20 @@ export default function OrderSummary({
 
       <div className="space-y-3 pt-2">
         <div className="flex items-center justify-between">
-          <span className="text-sm text-muted-foreground">Subtotal</span>
+          <span className="text-sm text-muted-foreground">{orderSummary.subtotal}</span>
           <span className="text-sm font-mono text-foreground">
             ${subtotal.toLocaleString('es-UY')}
           </span>
         </div>
 
         <div className="flex items-start justify-between gap-4">
-          <span className="text-sm text-muted-foreground">Envío</span>
+          <span className="text-sm text-muted-foreground">{orderSummary.shipping}</span>
           <div className="text-right">
             <span className="text-sm font-mono text-foreground">
               {deliveryMethod === 'pickup'
-                ? 'Retiro (Gratis)'
+                ? orderSummary.pickupFree
                 : shipping === 0
-                  ? 'Gratis'
+                  ? orderSummary.free
                   : `$${shipping.toLocaleString('es-UY')}`}
             </span>
 
@@ -105,7 +109,7 @@ export default function OrderSummary({
 
         <div className="pt-3 border-t border-border">
           <div className="flex items-center justify-between">
-            <span className="text-base font-medium text-foreground">Total</span>
+            <span className="text-base font-medium text-foreground">{orderSummary.total}</span>
             <span className="text-2xl font-mono font-bold text-primary">
               ${total.toLocaleString('es-UY')}
             </span>

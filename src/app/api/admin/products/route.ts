@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabaseAdmin';
 import { validatePackContracts } from '@/lib/packs/packContractValidator';
+// IMPORTAMOS EL DICCIONARIO
+import { adminProductsApiMessages } from '@/messages/adminProductsApiMessages';
 
 export const dynamic = 'force-dynamic';
 
@@ -24,6 +26,7 @@ function collectComponentProductIds(packs: Array<{ components: Array<{ product_i
 }
 
 async function validateComponentProductsActive(ids: string[], supabase: any) {
+  const { validation } = adminProductsApiMessages;
   const uniqueIds = Array.from(new Set((ids || []).filter(Boolean)));
   if (uniqueIds.length === 0) return { ok: true as const };
 
@@ -36,7 +39,7 @@ async function validateComponentProductsActive(ids: string[], supabase: any) {
     return {
       ok: false as const,
       status: 500,
-      body: { error: 'Failed to validate pack component products', details: error.message },
+      body: { error: validation.packValidateError, details: error.message },
     };
   }
 
@@ -48,14 +51,14 @@ async function validateComponentProductsActive(ids: string[], supabase: any) {
       return {
         ok: false as const,
         status: 400,
-        body: { error: 'PACK_COMPONENT_NOT_FOUND', details: { product_id: id } },
+        body: { error: validation.packComponentNotFound, details: { product_id: id } },
       };
     }
     if (!product.is_active) {
       return {
         ok: false as const,
         status: 400,
-        body: { error: 'PACK_COMPONENT_INACTIVE', details: { product_id: id } },
+        body: { error: validation.packComponentInactive, details: { product_id: id } },
       };
     }
   }
@@ -70,13 +73,14 @@ function getBearerToken(req: Request) {
 }
 
 async function requireAdmin(req: Request) {
+  const { auth: authMsgs } = adminProductsApiMessages;
   const token = getBearerToken(req);
-  if (!token) return { ok: false as const, res: json(401, { error: 'Missing Token' }) };
+  if (!token) return { ok: false as const, res: json(401, { error: authMsgs.missingToken }) };
 
   const supabase = getSupabaseAdmin();
   const { data: userData, error: uErr } = await supabase.auth.getUser(token);
   const user = userData?.user;
-  if (uErr || !user) return { ok: false as const, res: json(401, { error: 'Invalid Token' }) };
+  if (uErr || !user) return { ok: false as const, res: json(401, { error: authMsgs.invalidToken }) };
 
   const { data: profile, error: pErr } = await supabase
     .from('user_profiles')
@@ -85,7 +89,7 @@ async function requireAdmin(req: Request) {
     .single();
 
   if (pErr || !profile || profile.role !== 'admin') {
-    return { ok: false as const, res: json(403, { error: 'Admin Required' }) };
+    return { ok: false as const, res: json(403, { error: authMsgs.adminRequired }) };
   }
 
   return { ok: true as const, supabase };
@@ -102,7 +106,7 @@ export async function GET(req: Request) {
   // CASO 1: Obtener producto individual (Edición)
   if (id) {
     const { data, error } = await auth.supabase.from('products').select('*').eq('id', id).single();
-    if (error) return json(404, { error: 'Not found' });
+    if (error) return json(404, { error: adminProductsApiMessages.responses.notFound });
     return json(200, { product: data });
   }
 
@@ -112,7 +116,6 @@ export async function GET(req: Request) {
 
   let query = auth.supabase
     .from('products')
-    // NUEVO: Agregamos cash_price y card_price al selector
     .select('id, name, model, price, original_price, cash_price, card_price, stock_count, stock_status, is_active, updated_at')
     .order('updated_at', { ascending: false });
 
@@ -140,18 +143,20 @@ export async function POST(req: Request) {
   const auth = await requireAdmin(req);
   if (!auth.ok) return auth.res;
 
+  const { validation } = adminProductsApiMessages;
+
   let body: any;
-  try { body = await req.json(); } catch { return json(400, { error: 'Invalid JSON' }); }
+  try { body = await req.json(); } catch { return json(400, { error: validation.invalidJson }); }
 
   if (body?.packs !== undefined && !Array.isArray(body.packs)) {
-    return json(400, { error: 'Invalid packs: expected array when provided' });
+    return json(400, { error: validation.invalidPacksArray });
   }
 
   if (Array.isArray(body?.packs)) {
     const structural = validatePackContracts(body.packs);
     if (!structural.ok) {
       return json(400, {
-        error: 'Invalid pack contract',
+        error: validation.invalidPackContract,
         details: structural.errors,
       });
     }
@@ -169,10 +174,10 @@ export async function POST(req: Request) {
     slug: body?.slug ? String(body.slug).trim() : null,
     model: String(body?.model || '').trim(),
     description: String(body?.description || '').trim(),
-    price: Number(body?.price || 0), // Se mantiene para compatibilidad con lógica base
+    price: Number(body?.price || 0), 
     original_price: body?.original_price ? Number(body?.original_price) : null,
-    cash_price: body?.cash_price ? Number(body?.cash_price) : null, // NUEVO CAMPO
-    card_price: body?.card_price ? Number(body?.card_price) : null, // NUEVO CAMPO
+    cash_price: body?.cash_price ? Number(body?.cash_price) : null, 
+    card_price: body?.card_price ? Number(body?.card_price) : null, 
     image_url: String(body?.image_url || '').trim(),
     gallery: Array.isArray(body?.gallery) ? body.gallery : [],
     video_url: body?.video_url ? String(body.video_url).trim() : null,
@@ -196,24 +201,26 @@ export async function PATCH(req: Request) {
   const auth = await requireAdmin(req);
   if (!auth.ok) return auth.res;
 
+  const { validation, responses } = adminProductsApiMessages;
+
   const url = new URL(req.url);
   const id = url.searchParams.get('id');
 
-  if (!id) return json(400, { error: 'ID param required' });
+  if (!id) return json(400, { error: validation.missingId });
 
   let body: any;
-  try { body = await req.json(); } catch { return json(400, { error: 'Invalid JSON' }); }
+  try { body = await req.json(); } catch { return json(400, { error: validation.invalidJson }); }
 
   const hasPacksField = hasOwn(body, 'packs');
   if (hasPacksField && !Array.isArray(body.packs)) {
-    return json(400, { error: 'Invalid packs: expected array when provided' });
+    return json(400, { error: validation.invalidPacksArray });
   }
 
   if (hasPacksField) {
     const structural = validatePackContracts(body.packs);
     if (!structural.ok) {
       return json(400, {
-        error: 'Invalid pack contract',
+        error: validation.invalidPackContract,
         details: structural.errors,
       });
     }
@@ -225,7 +232,7 @@ export async function PATCH(req: Request) {
       .single();
 
     if (currentErr || !currentProduct) {
-      return json(404, { error: 'Not found' });
+      return json(404, { error: responses.notFound });
     }
 
     const finalIsActive = hasOwn(body, 'is_active') ? Boolean(body.is_active) : Boolean(currentProduct.is_active);
@@ -250,7 +257,7 @@ export async function DELETE(req: Request) {
   const url = new URL(req.url);
   const id = url.searchParams.get('id');
 
-  if (!id) return json(400, { error: 'ID param required' });
+  if (!id) return json(400, { error: adminProductsApiMessages.validation.missingId });
 
   const { data, error } = await auth.supabase
     .from('products')

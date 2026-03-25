@@ -1,3 +1,6 @@
+// IMPORTAMOS EL DICCIONARIO
+import { packValidationMessages } from '@/messages/packValidationMessages';
+
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export type PackValidationErrorCode =
@@ -44,12 +47,11 @@ export type PackValidationSummary = {
 
 function buildError(
   code: PackValidationErrorCode,
-  message: string,
   ctx: { packIndex?: number; packId?: string; componentIndex?: number } = {},
 ): PackValidationError {
   return {
     code,
-    message,
+    message: packValidationMessages[code], // USAMOS EL DICCIONARIO DIRECTAMENTE
     ...ctx,
   };
 }
@@ -61,7 +63,7 @@ export function validatePackContract(
   if (!pack || typeof pack !== 'object' || Array.isArray(pack)) {
     return {
       ok: false,
-      errors: [buildError('PACK_INVALID_SHAPE', 'Pack must be an object', { packIndex: ctx.index, packId: ctx.packId })],
+      errors: [buildError('PACK_INVALID_SHAPE', { packIndex: ctx.index, packId: ctx.packId })],
     };
   }
 
@@ -70,12 +72,12 @@ export function validatePackContract(
   const errors: PackValidationError[] = [];
 
   if (!packId) {
-    errors.push(buildError('PACK_MISSING_ID', 'Pack id is required', { packIndex: ctx.index }));
+    errors.push(buildError('PACK_MISSING_ID', { packIndex: ctx.index }));
   }
 
   const componentsRaw = rawPack.components;
   if (!Array.isArray(componentsRaw) || componentsRaw.length === 0) {
-    errors.push(buildError('PACK_COMPONENTS_REQUIRED', 'Pack components must be a non-empty array', { packIndex: ctx.index, packId }));
+    errors.push(buildError('PACK_COMPONENTS_REQUIRED', { packIndex: ctx.index, packId }));
   }
 
   const normalizedComponents: NormalizedPackComponent[] = [];
@@ -85,7 +87,7 @@ export function validatePackContract(
     componentsRaw.forEach((comp: any, componentIndex: number) => {
       if (!comp || typeof comp !== 'object' || Array.isArray(comp)) {
         errors.push(
-          buildError('PACK_COMPONENT_INVALID_SHAPE', 'Pack component must be an object', {
+          buildError('PACK_COMPONENT_INVALID_SHAPE', {
             packIndex: ctx.index,
             packId,
             componentIndex,
@@ -100,7 +102,7 @@ export function validatePackContract(
 
       if (!productId || !UUID_RE.test(productId)) {
         errors.push(
-          buildError('PACK_COMPONENT_INVALID_PRODUCT_ID', 'Component product_id must be a valid UUID', {
+          buildError('PACK_COMPONENT_INVALID_PRODUCT_ID', {
             packIndex: ctx.index,
             packId,
             componentIndex,
@@ -110,7 +112,7 @@ export function validatePackContract(
 
       if (!Number.isFinite(quantityNumber) || quantityNumber <= 0 || !Number.isInteger(quantityNumber)) {
         errors.push(
-          buildError('PACK_COMPONENT_INVALID_QUANTITY', 'Component quantity must be an integer greater than 0', {
+          buildError('PACK_COMPONENT_INVALID_QUANTITY', {
             packIndex: ctx.index,
             packId,
             componentIndex,
@@ -120,7 +122,7 @@ export function validatePackContract(
 
       if (!role) {
         errors.push(
-          buildError('PACK_COMPONENT_INVALID_ROLE', 'Component role must be either primary or component', {
+          buildError('PACK_COMPONENT_INVALID_ROLE', {
             packIndex: ctx.index,
             packId,
             componentIndex,
@@ -142,7 +144,7 @@ export function validatePackContract(
 
   if (Array.isArray(componentsRaw) && primaryCount !== 1) {
     errors.push(
-      buildError('PACK_PRIMARY_COUNT_INVALID', 'Pack must contain exactly one primary component', {
+      buildError('PACK_PRIMARY_COUNT_INVALID', {
         packIndex: ctx.index,
         packId,
       }),
@@ -153,7 +155,7 @@ export function validatePackContract(
   if (rawPack.version !== undefined && rawPack.version !== null && rawPack.version !== '') {
     const versionNum = Number(rawPack.version);
     if (!Number.isFinite(versionNum) || versionNum < 1 || !Number.isInteger(versionNum)) {
-      errors.push(buildError('PACK_VERSION_INVALID', 'Pack version must be an integer greater than or equal to 1', {
+      errors.push(buildError('PACK_VERSION_INVALID', {
         packIndex: ctx.index,
         packId,
       }));

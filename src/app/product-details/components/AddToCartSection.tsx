@@ -2,6 +2,8 @@
 
 import { useMemo, useState } from 'react';
 import Icon from '@/components/ui/AppIcon';
+// IMPORTAMOS EL DICCIONARIO
+import { globalMessages } from '@/messages/globalMessages';
 
 interface AddToCartSectionProps {
   productId: string;
@@ -9,10 +11,8 @@ interface AddToCartSectionProps {
   price: number;
   stockStatus: 'in-stock' | 'low-stock' | 'out-of-stock';
 
-  // Si no tenés modelos, podés pasar []
   availableModels?: Array<{ id: string; name: string; price: number }>;
 
-  // ✅ callbacks para que ProductDetailsInteractive maneje el carrito / navegación
   onAddToCart?: (payload: {
     productId: string;
     productName: string;
@@ -73,7 +73,6 @@ export default function AddToCartSection({
         selectedModelId: hasModels ? selectedModelData?.id : undefined,
       });
     } finally {
-      // feedback visual corto
       setTimeout(() => setIsAdding(false), 450);
     }
   };
@@ -88,13 +87,17 @@ export default function AddToCartSection({
     });
   };
 
+  // EXTRAEMOS LOS TEXTOS DEL DICCIONARIO
+  const { addToCart } = globalMessages;
+
   return (
     <div className="sticky top-20 bg-card rounded-lg p-6 space-y-6 shadow-lg">
+      
       {/* Model Selection */}
       {hasModels && (
         <div>
           <label className="block text-sm font-medium text-foreground mb-3">
-            Seleccionar Modelo
+            {addToCart.labels.selectModel}
           </label>
           <div className="grid grid-cols-2 gap-3">
             {availableModels.map((model) => (
@@ -120,7 +123,7 @@ export default function AddToCartSection({
 
       {/* Quantity Selector */}
       <div>
-        <label className="block text-sm font-medium text-foreground mb-3">Cantidad</label>
+        <label className="block text-sm font-medium text-foreground mb-3">{addToCart.labels.quantity}</label>
         <div className="flex items-center gap-4">
           <button
             onClick={() => handleQuantityChange(-1)}
@@ -149,21 +152,21 @@ export default function AddToCartSection({
       {/* Price Summary */}
       <div className="p-4 bg-muted rounded-md">
         <div className="flex items-center justify-between mb-2">
-          <span className="text-sm text-muted-foreground">Subtotal</span>
+          <span className="text-sm text-muted-foreground">{addToCart.labels.subtotal}</span>
           <span className="text-base font-mono font-medium text-foreground">
             ${totalPrice.toLocaleString('es-UY')}
           </span>
         </div>
 
         <div className="flex items-center justify-between">
-          <span className="text-sm text-muted-foreground">Envío</span>
-          <span className="text-base font-mono font-medium text-success">Gratis</span>
+          <span className="text-sm text-muted-foreground">{addToCart.labels.shipping}</span>
+          <span className="text-base font-mono font-medium text-success">{addToCart.labels.freeShipping}</span>
         </div>
 
         <div className="h-px bg-border my-3" />
 
         <div className="flex items-center justify-between">
-          <span className="text-base font-medium text-foreground">Total</span>
+          <span className="text-base font-medium text-foreground">{addToCart.labels.total}</span>
           <span className="text-2xl font-mono font-bold text-primary">
             ${totalPrice.toLocaleString('es-UY')}
           </span>
@@ -181,12 +184,12 @@ export default function AddToCartSection({
           {isAdding ? (
             <>
               <Icon name="CheckCircleIcon" size={20} variant="solid" />
-              Agregado
+              {addToCart.buttons.adding}
             </>
           ) : (
             <>
               <Icon name="ShoppingCartIcon" size={20} />
-              Agregar al carrito
+              {addToCart.buttons.add}
             </>
           )}
         </button>
@@ -198,7 +201,7 @@ export default function AddToCartSection({
           type="button"
         >
           <Icon name="BoltIcon" size={20} variant="solid" />
-          Comprar ahora
+          {addToCart.buttons.buyNow}
         </button>
       </div>
 
@@ -211,7 +214,7 @@ export default function AddToCartSection({
             className="text-warning flex-shrink-0"
             variant="solid"
           />
-          <p className="text-sm text-warning">¡Stock limitado! Quedan pocas unidades.</p>
+          <p className="text-sm text-warning">{addToCart.alerts.lowStock}</p>
         </div>
       )}
 
@@ -219,19 +222,19 @@ export default function AddToCartSection({
       <div className="grid grid-cols-2 gap-3 pt-4 border-t border-border">
         <div className="flex items-center gap-2">
           <Icon name="TruckIcon" size={16} className="text-primary" />
-          <span className="text-xs text-muted-foreground">Envío gratis</span>
+          <span className="text-xs text-muted-foreground">{addToCart.trustBadges.shipping}</span>
         </div>
         <div className="flex items-center gap-2">
           <Icon name="ShieldCheckIcon" size={16} className="text-primary" />
-          <span className="text-xs text-muted-foreground">Compra segura</span>
+          <span className="text-xs text-muted-foreground">{addToCart.trustBadges.secure}</span>
         </div>
         <div className="flex items-center gap-2">
           <Icon name="ArrowPathIcon" size={16} className="text-primary" />
-          <span className="text-xs text-muted-foreground">Devolución 30 días</span>
+          <span className="text-xs text-muted-foreground">{addToCart.trustBadges.return}</span>
         </div>
         <div className="flex items-center gap-2">
           <Icon name="CreditCardIcon" size={16} className="text-primary" />
-          <span className="text-xs text-muted-foreground">Pago seguro</span>
+          <span className="text-xs text-muted-foreground">{addToCart.trustBadges.payment}</span>
         </div>
       </div>
     </div>
