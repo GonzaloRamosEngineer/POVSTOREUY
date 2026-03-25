@@ -9,7 +9,7 @@ describe('validatePackContract', () => {
     const result = validatePackContract(null);
 
     expect(result.ok).toBe(false);
-    if (result.ok) return;
+    if (result.ok) throw new Error('Expected validation to fail');
     expect(result.errors.some((e) => e.code === 'PACK_INVALID_SHAPE')).toBe(true);
   });
 
@@ -19,7 +19,7 @@ describe('validatePackContract', () => {
     });
 
     expect(result.ok).toBe(false);
-    if (result.ok) return;
+    if (result.ok) throw new Error('Expected validation to fail');
     expect(result.errors.some((e) => e.code === 'PACK_MISSING_ID')).toBe(true);
   });
 
@@ -30,7 +30,7 @@ describe('validatePackContract', () => {
     });
 
     expect(result.ok).toBe(false);
-    if (result.ok) return;
+    if (result.ok) throw new Error('Expected validation to fail');
     expect(result.errors.some((e) => e.code === 'PACK_COMPONENTS_REQUIRED')).toBe(true);
     expect(result.errors.some((e) => e.code === 'PACK_PRIMARY_COUNT_INVALID')).toBe(true);
   });
@@ -42,7 +42,7 @@ describe('validatePackContract', () => {
     });
 
     expect(result.ok).toBe(false);
-    if (result.ok) return;
+    if (result.ok) throw new Error('Expected validation to fail');
     expect(result.errors.some((e) => e.code === 'PACK_COMPONENT_INVALID_PRODUCT_ID')).toBe(true);
   });
 
@@ -53,7 +53,7 @@ describe('validatePackContract', () => {
     });
 
     expect(result.ok).toBe(false);
-    if (result.ok) return;
+    if (result.ok) throw new Error('Expected validation to fail');
     expect(result.errors.some((e) => e.code === 'PACK_COMPONENT_INVALID_QUANTITY')).toBe(true);
   });
 
@@ -64,7 +64,7 @@ describe('validatePackContract', () => {
     });
 
     expect(result.ok).toBe(false);
-    if (result.ok) return;
+    if (result.ok) throw new Error('Expected validation to fail');
     expect(result.errors.some((e) => e.code === 'PACK_COMPONENT_INVALID_ROLE')).toBe(true);
   });
 
@@ -75,7 +75,7 @@ describe('validatePackContract', () => {
     });
 
     expect(result.ok).toBe(false);
-    if (result.ok) return;
+    if (result.ok) throw new Error('Expected validation to fail');
     expect(result.errors.some((e) => e.code === 'PACK_PRIMARY_COUNT_INVALID')).toBe(true);
   });
 
@@ -89,7 +89,7 @@ describe('validatePackContract', () => {
     });
 
     expect(result.ok).toBe(false);
-    if (result.ok) return;
+    if (result.ok) throw new Error('Expected validation to fail');
     expect(result.errors.some((e) => e.code === 'PACK_PRIMARY_COUNT_INVALID')).toBe(true);
   });
 
@@ -101,7 +101,7 @@ describe('validatePackContract', () => {
     });
 
     expect(result.ok).toBe(false);
-    if (result.ok) return;
+    if (result.ok) throw new Error('Expected validation to fail');
     expect(result.errors.some((e) => e.code === 'PACK_VERSION_INVALID')).toBe(true);
   });
 
@@ -117,7 +117,7 @@ describe('validatePackContract', () => {
     });
 
     expect(result.ok).toBe(true);
-    if (!result.ok) return;
+    if (!result.ok) throw new Error('Expected validation to pass');
 
     expect(result.normalized.id).toBe('pack-ok');
     expect(result.normalized.version).toBe(2);

@@ -1,13 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
+// FORZAMOS DINÁMICO PARA EL BUILD
+export const dynamic = 'force-dynamic';
 
 export async function POST(request: NextRequest) {
   try {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+
+    if (!supabaseUrl || !supabaseServiceKey) {
+      return NextResponse.json({ error: 'Configuración de base de datos faltante' }, { status: 500 });
+    }
+
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
     const { email } = await request.json();
 
     if (!email || !email.includes('@')) {
@@ -17,7 +23,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Verificar si el email ya existe
     const { data: existingSubscriber, error: checkError } = await supabase
       .from('newsletter_subscribers')
       .select('*')
@@ -25,7 +30,6 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (checkError && checkError.code !== 'PGRST116') {
-      // PGRST116 es el código cuando no se encuentra el registro
       console.error('Error checking subscriber:', checkError);
       return NextResponse.json(
         { error: 'Error al verificar suscripción' },
@@ -33,7 +37,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Si ya existe y está activo
     if (existingSubscriber && existingSubscriber.is_active) {
       return NextResponse.json(
         { message: 'Este email ya está suscrito', alreadySubscribed: true },
@@ -41,7 +44,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Si existe pero fue dado de baja, reactivarlo
     if (existingSubscriber && !existingSubscriber.is_active) {
       const { error: updateError } = await supabase
         .from('newsletter_subscribers')
@@ -66,7 +68,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Insertar nuevo suscriptor
     const { error: insertError } = await supabase
       .from('newsletter_subscribers')
       .insert([

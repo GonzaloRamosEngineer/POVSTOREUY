@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Icon from '@/components/ui/AppIcon';
 import { getSupabaseBrowserClient } from '@/lib/supabaseClient';
+import { toast } from 'react-hot-toast';
 
 type Mode = 'create' | 'edit';
 type SimpleProduct = { id: string; name: string };
@@ -356,9 +357,9 @@ const handleFormat = (tag: string) => {
     const selected = value.substring(start, end);
 
     if (!selected) {
-    alert('Primero seleccioná la palabra que querés formatear con el mouse.');
+    toast.error('Primero seleccioná la palabra que querés formatear con el mouse.');
     return;
-    }
+}
 
     const before = value.substring(0, start);
     const after = value.substring(end, value.length);
@@ -543,12 +544,12 @@ const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     setUploading(true);
     try {
     await onUpload(e.target.files[0]);
-    } catch (error) {
+  } catch (error) {
     console.error(error);
-    alert('Error al subir');
-    } finally {
+    toast.error('Error al subir');
+  } finally {
     setUploading(false);
-    }
+  }
 };
 
 return (

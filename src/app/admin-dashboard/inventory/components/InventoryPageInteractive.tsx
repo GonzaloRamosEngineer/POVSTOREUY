@@ -6,6 +6,8 @@ import { useRouter } from 'next/navigation';
 import Icon from '@/components/ui/AppIcon';
 import { getSupabaseBrowserClient } from '@/lib/supabaseClient';
 import ProductTable, { type ProductRow } from './ProductTable';
+// IMPORTAMOS EL TOAST
+import { toast } from 'react-hot-toast';
 
 type AdminCheck = { ok: true } | { ok: false; message: string };
 
@@ -56,21 +58,12 @@ export default function InventoryPageInteractive() {
       return;
     }
 
-    // Construimos la query para la API
-    // (Nota: Si tu API filtra por 'q', bien. Si no, filtraremos en cliente o ajustamos la API).
     const params = new URLSearchParams();
     if (q.trim()) params.set('q', q.trim());
     params.set('includeInactive', includeInactive ? 'true' : 'false');
-
-    // Opción A: Usar la API existente (si soporta los campos nuevos)
-    // Opción B: Consulta directa a Supabase aquí (más flexible para dashboard)
-    
-    // Vamos a usar consulta directa a Supabase para garantizar que traemos image_url y colors
-    // sin depender de si la API /api/admin/products fue actualizada o no.
     
     let query = supabase
       .from('products')
-      // 👇 AQUÍ ESTÁ LA CLAVE: Pedimos image_url y colors
       .select('id, name, model, price, original_price, stock_count, is_active, updated_at, image_url, colors')
       .order('created_at', { ascending: false });
 
@@ -79,7 +72,6 @@ export default function InventoryPageInteractive() {
     }
 
     if (q.trim()) {
-      // Búsqueda simple por nombre o modelo
       query = query.or(`name.ilike.%${q.trim()}%,model.ilike.%${q.trim()}%`);
     }
 
@@ -92,12 +84,9 @@ export default function InventoryPageInteractive() {
       return;
     }
 
-    // Mapeamos para asegurar que colors sea un array válido (defensivo)
     const safeRows: ProductRow[] = (data || []).map((p: any) => ({
         ...p,
-        // Aseguramos que colors sea un array, por si viene null de la DB
         colors: Array.isArray(p.colors) ? p.colors : [],
-        // Aseguramos stock_status (calculado al vuelo)
         stock_status: p.stock_count === 0 ? 'Sin stock' : p.stock_count <= 5 ? 'Bajo stock' : 'En stock'
     }));
 
@@ -109,20 +98,10 @@ export default function InventoryPageInteractive() {
     const token = await getAccessToken();
     if (!token) return;
 
-    // Para desactivar, podemos usar la API o Supabase directo.
-    // Usamos la API para mantener la lógica de negocio si la hay.
     const res = await fetch(`/api/admin/products?id=${id}`, {
-      method: 'DELETE', // O PATCH { is_active: false } dependiendo de tu API
+      method: 'DELETE', 
       headers: { Authorization: `Bearer ${token}` },
     });
-
-    // Si tu API usa DELETE para borrar físico, cuidado.
-    // Si usa DELETE para soft-delete (is_active=false), está bien.
-    // Voy a asumir que quieres cambiar el estado is_active.
-    
-    /* NOTA: Si tu endpoint DELETE borra el registro, úsalo.
-       Si quieres hacer toggle (activar/desactivar), mejor haz un update directo aquí:
-    */
     
     const product = rows.find(r => r.id === id);
     if (!product) return;
@@ -133,7 +112,8 @@ export default function InventoryPageInteractive() {
         .eq('id', id);
 
     if (error) {
-        alert('Error al actualizar estado');
+        // REEMPLAZAMOS EL ALERT
+        toast.error('Error al actualizar estado');
         return;
     }
 
@@ -147,8 +127,7 @@ export default function InventoryPageInteractive() {
       if (check.ok) await loadProducts();
       else setLoading(false);
     })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [q, includeInactive]); // Recargar si cambian los filtros
+  }, [q, includeInactive]); 
 
   if (admin?.ok === false) {
     return (
@@ -170,7 +149,6 @@ export default function InventoryPageInteractive() {
 
   return (
     <div className="space-y-6">
-      {/* Toolbar */}
       <div className="bg-card rounded-lg p-4 card-elevation flex flex-col lg:flex-row gap-3 lg:items-center lg:justify-between">
         <div className="flex-1 flex flex-col md:flex-row gap-3 md:items-center">
           <div className="relative flex-1">
@@ -213,7 +191,6 @@ export default function InventoryPageInteractive() {
         </Link>
       </div>
 
-      {/* Content */}
       {errorMsg ? (
         <div className="bg-card rounded-lg p-6 card-elevation border-l-4 border-red-500">
           <h3 className="text-lg font-heading font-semibold text-foreground mb-1">Error</h3>
