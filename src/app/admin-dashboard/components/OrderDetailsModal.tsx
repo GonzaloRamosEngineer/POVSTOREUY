@@ -2,6 +2,9 @@
 
 import { useEffect, useState } from 'react';
 import Icon from '@/components/ui/AppIcon';
+// IMPORTAMOS EL TOAST Y NUESTRO DICCIONARIO
+import { toast } from 'react-hot-toast';
+import { adminOrderMessages } from '@/messages/adminOrderMessages';
 
 interface OrderItem {
   id: string;
@@ -55,22 +58,23 @@ interface OrderDetailsModalProps {
 }
 
 function getLineTypeBadge(lineType?: OrderItem['line_type']) {
+  const { labels } = adminOrderMessages.items;
   if (lineType === 'pack_primary') {
     return {
-      label: 'PACK PRIMARY',
+      label: labels.packPrimary,
       className: 'bg-blue-500/10 text-blue-600 border-blue-500/20',
     };
   }
 
   if (lineType === 'pack_component') {
     return {
-      label: 'PACK COMPONENT',
+      label: labels.packComponent,
       className: 'bg-purple-500/10 text-purple-600 border-purple-500/20',
     };
   }
 
   return {
-    label: 'SIMPLE',
+    label: labels.simple,
     className: 'bg-muted text-muted-foreground border-border',
   };
 }
@@ -90,6 +94,7 @@ export default function OrderDetailsModal({ orderId, isOpen, onClose }: OrderDet
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const [showCancelMPConfirm, setShowCancelMPConfirm] = useState(false);
 
+  const { toasts, payment, fulfillment, modal, items: msgItems, cancelledState, summary, mpStatuses } = adminOrderMessages;
 
   useEffect(() => {
     if (isOpen && orderId) fetchOrderDetails();
@@ -111,15 +116,8 @@ export default function OrderDetailsModal({ orderId, isOpen, onClose }: OrderDet
 
   const openWhatsApp = (phone: string) => {
     let cleanNumber = phone.replace(/\D/g, '');
-    
-    if (cleanNumber.startsWith('0')) {
-      cleanNumber = cleanNumber.substring(1);
-    }
-    
-    if (!cleanNumber.startsWith('598')) {
-      cleanNumber = '598' + cleanNumber;
-    }
-    
+    if (cleanNumber.startsWith('0')) cleanNumber = cleanNumber.substring(1);
+    if (!cleanNumber.startsWith('598')) cleanNumber = '598' + cleanNumber;
     window.open(`https://wa.me/${cleanNumber}`, '_blank');
   };
 
@@ -132,15 +130,16 @@ export default function OrderDetailsModal({ orderId, isOpen, onClose }: OrderDet
         body: JSON.stringify({ payment_status: newPaymentStatus }),
       });
       if (response.ok) {
+        toast.success(toasts.paymentUpdateSuccess);
         await fetchOrderDetails();
       } else {
         const err = await response.json().catch(() => ({}));
         console.error('PATCH error:', err);
-        alert(err.error || 'Error al actualizar estado de pago');
+        toast.error(err.error || toasts.paymentUpdateError);
       }
     } catch (err) {
       console.error('Error:', err);
-      alert('Error al actualizar estado de pago');
+      toast.error(toasts.paymentUpdateError);
     } finally {
       setUpdating(false);
     }
@@ -159,23 +158,22 @@ export default function OrderDetailsModal({ orderId, isOpen, onClose }: OrderDet
       });
       
       if (response.ok) {
+        toast.success(toasts.orderCancelSuccess);
         await fetchOrderDetails();
         setShowCancelConfirm(false);
-        alert('Orden cancelada exitosamente');
       } else {
         const err = await response.json().catch(() => ({}));
         console.error('PATCH error:', err);
-        alert(err.error || 'Error al cancelar la orden');
+        toast.error(err.error || toasts.orderCancelError);
       }
     } catch (err) {
       console.error('Error:', err);
-      alert('Error al cancelar la orden');
+      toast.error(toasts.orderCancelError);
     } finally {
       setUpdating(false);
     }
   };
 
-  // ✅ NUEVO: Cancelar pago de MercadoPago
   const handleCancelMercadoPago = async () => {
     setUpdating(true);
     try {
@@ -184,22 +182,22 @@ export default function OrderDetailsModal({ orderId, isOpen, onClose }: OrderDet
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           status: 'cancelled',
-          cancel_mp: true // ✅ Flag específico para MP
+          cancel_mp: true
         }),
       });
       
       if (response.ok) {
+        toast.success(toasts.mpCancelSuccess);
         await fetchOrderDetails();
         setShowCancelMPConfirm(false);
-        alert('Pago de MercadoPago cancelado exitosamente');
       } else {
         const err = await response.json().catch(() => ({}));
         console.error('PATCH error:', err);
-        alert(err.error || 'Error al cancelar el pago de MercadoPago');
+        toast.error(err.error || toasts.mpCancelError);
       }
     } catch (err) {
       console.error('Error:', err);
-      alert('Error al cancelar el pago de MercadoPago');
+      toast.error(toasts.mpCancelError);
     } finally {
       setUpdating(false);
     }
@@ -209,7 +207,6 @@ export default function OrderDetailsModal({ orderId, isOpen, onClose }: OrderDet
     setUpdating(true);
     try {
       const isPickup = !!orderDetails && !orderDetails.shipping_address;
-
       const payload: any = { status: newStatus };
 
       if (!isPickup) {
@@ -226,15 +223,16 @@ export default function OrderDetailsModal({ orderId, isOpen, onClose }: OrderDet
       });
 
       if (response.ok) {
+        toast.success(toasts.orderUpdateSuccess);
         await fetchOrderDetails();
       } else {
         const err = await response.json().catch(() => ({}));
         console.error('PATCH error:', err);
-        alert(err.error || 'Error al actualizar');
+        toast.error(err.error || toasts.orderUpdateError);
       }
     } catch (err) {
       console.error('Error:', err);
-      alert('Error al actualizar');
+      toast.error(toasts.orderUpdateError);
     } finally {
       setUpdating(false);
     }
@@ -242,39 +240,28 @@ export default function OrderDetailsModal({ orderId, isOpen, onClose }: OrderDet
 
   const getPreviousStatus = (status: string) => {
     const isPickup = !orderDetails?.shipping_address;
-    
     if (isPickup) {
-      const pickupSteps: Record<string, string> = { 
-        processing: 'pending', 
-        ready: 'processing', 
-        completed: 'ready' 
-      };
+      const pickupSteps: Record<string, string> = { processing: 'pending', ready: 'processing', completed: 'ready' };
       return pickupSteps[status] || null;
     } else {
-      const shippingSteps: Record<string, string> = { 
-        processing: 'pending', 
-        ready: 'processing', 
-        shipped: 'ready', 
-        completed: 'shipped' 
-      };
+      const shippingSteps: Record<string, string> = { processing: 'pending', ready: 'processing', shipped: 'ready', completed: 'shipped' };
       return shippingSteps[status] || null;
     }
   };
 
-  // ✅ NUEVO: Helper para traducir estados MP
   const getMPStatusDisplay = (mpStatus: string | null) => {
-    if (!mpStatus) return { text: 'N/A', color: 'text-muted-foreground' };
+    if (!mpStatus) return { text: mpStatuses.notAvailable, color: 'text-muted-foreground' };
     
     const statusMap: Record<string, { text: string; color: string }> = {
-      approved: { text: 'Aprobado', color: 'text-success' },
-      pending: { text: 'Pendiente', color: 'text-warning' },
-      authorized: { text: 'Autorizado', color: 'text-blue-600' },
-      in_process: { text: 'En Proceso', color: 'text-accent' },
-      in_mediation: { text: 'En Mediación', color: 'text-orange-600' },
-      rejected: { text: 'Rechazado', color: 'text-error' },
-      cancelled: { text: 'Cancelado', color: 'text-error' },
-      refunded: { text: 'Reembolsado', color: 'text-purple-600' },
-      charged_back: { text: 'Contracargo', color: 'text-red-700' },
+      approved: { text: mpStatuses.approved, color: 'text-success' },
+      pending: { text: mpStatuses.pending, color: 'text-warning' },
+      authorized: { text: mpStatuses.authorized, color: 'text-blue-600' },
+      in_process: { text: mpStatuses.in_process, color: 'text-accent' },
+      in_mediation: { text: mpStatuses.in_mediation, color: 'text-orange-600' },
+      rejected: { text: mpStatuses.rejected, color: 'text-error' },
+      cancelled: { text: mpStatuses.cancelled, color: 'text-error' },
+      refunded: { text: mpStatuses.refunded, color: 'text-purple-600' },
+      charged_back: { text: mpStatuses.charged_back, color: 'text-red-700' },
     };
     
     return statusMap[mpStatus] || { text: mpStatus, color: 'text-muted-foreground' };
@@ -297,13 +284,11 @@ export default function OrderDetailsModal({ orderId, isOpen, onClose }: OrderDet
 
   for (const item of orderItems) {
     if (item.line_type === 'simple' || !item.pack_group_id) continue;
-
     const groupId = item.pack_group_id;
     if (!packGroupsMap.has(groupId)) {
       packGroupsMap.set(groupId, []);
       packGroupOrder.push(groupId);
     }
-
     packGroupsMap.get(groupId)?.push(item);
   }
 
@@ -314,10 +299,8 @@ export default function OrderDetailsModal({ orderId, isOpen, onClose }: OrderDet
         if (lineType === 'pack_component') return 1;
         return 2;
       };
-
       return getRank(a.line_type) - getRank(b.line_type);
     });
-
     return { groupId, items };
   });
 
@@ -340,25 +323,27 @@ export default function OrderDetailsModal({ orderId, isOpen, onClose }: OrderDet
 
           {(isPackPrimary || isPackComponent) && (
             <p className="text-[9px] mt-1 font-black uppercase text-muted-foreground">
-              {isPackPrimary ? 'Línea comercial del pack' : 'Línea interna de composición'}
+              {isPackPrimary ? msgItems.labels.commercialLine : msgItems.labels.internalLine}
             </p>
           )}
 
-          <p className="text-[10px] text-muted-foreground mt-1 uppercase">CANTIDAD: {item.quantity} • UNIT: ${Number(item.unit_price).toLocaleString('es-UY')}</p>
+          <p className="text-[10px] text-muted-foreground mt-1 uppercase">
+            {msgItems.labels.qty}: {item.quantity} • {msgItems.labels.unit}: ${Number(item.unit_price).toLocaleString('es-UY')}
+          </p>
 
           {isPackLine && (
             <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-x-3 gap-y-1 text-[9px] uppercase">
               <p className="text-muted-foreground">
-                <span className="font-black">Pack ID:</span> <span className="font-mono">{shortId(item.pack_id)}</span>
+                <span className="font-black">{msgItems.labels.packId}</span> <span className="font-mono">{shortId(item.pack_id)}</span>
               </p>
               <p className="text-muted-foreground">
-                <span className="font-black">Pack Group:</span> <span className="font-mono">{shortId(item.pack_group_id)}</span>
+                <span className="font-black">{msgItems.labels.packGroup}</span> <span className="font-mono">{shortId(item.pack_group_id)}</span>
               </p>
               <p className="text-muted-foreground">
-                <span className="font-black">Pack Parent Product:</span> <span className="font-mono">{shortId(item.pack_parent_product_id)}</span>
+                <span className="font-black">{msgItems.labels.packParent}</span> <span className="font-mono">{shortId(item.pack_parent_product_id)}</span>
               </p>
               <p className="text-muted-foreground">
-                <span className="font-black">Pack Version:</span>{' '}
+                <span className="font-black">{msgItems.labels.packVersion}</span>{' '}
                 <span className="font-mono">{item.pack_version != null ? item.pack_version : '—'}</span>
               </p>
             </div>
@@ -376,18 +361,18 @@ export default function OrderDetailsModal({ orderId, isOpen, onClose }: OrderDet
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-3 border-b border-border bg-card/50">
           <div className="flex items-center gap-2">
-            <h2 className="text-sm font-black uppercase tracking-tighter text-foreground">Panel de Gestión</h2>
+            <h2 className="text-sm font-black uppercase tracking-tighter text-foreground">{modal.title}</h2>
             {orderDetails && (
               <div className="flex items-center gap-2">
                 <span className="text-[10px] bg-primary text-primary-foreground px-2 py-0.5 rounded font-mono">#{orderDetails.order_number}</span>
                 {isPickup && (
                   <span className="text-[9px] bg-purple-600/20 text-purple-600 px-2 py-0.5 rounded font-black uppercase">
-                    Retiro en Local
+                    {modal.badges.pickup}
                   </span>
                 )}
                 {isCancelled && (
                   <span className="text-[9px] bg-error/20 text-error px-2 py-0.5 rounded font-black uppercase">
-                    Cancelado
+                    {modal.badges.cancelled}
                   </span>
                 )}
               </div>
@@ -405,12 +390,12 @@ export default function OrderDetailsModal({ orderId, isOpen, onClose }: OrderDet
               {/* Columna Izquierda: Operaciones */}
               <div className="lg:col-span-8 space-y-6">
                 
-                {/* ✅ GESTIÓN DE PAGO - TRANSFERENCIAS */}
+                {/* GESTIÓN DE PAGO - TRANSFERENCIAS */}
                 {isBankTransfer && !isCancelled && (
                   <div className="bg-amber-50 dark:bg-amber-950/20 border-2 border-amber-400/30 rounded-2xl p-5 shadow-sm">
                     <div className="flex justify-between items-center mb-4">
                       <h3 className="text-xs font-black text-amber-700 dark:text-amber-400 uppercase flex items-center gap-2">
-                        <Icon name="BanknotesIcon" size={16} /> Gestión de Pago (Transferencia)
+                        <Icon name="BanknotesIcon" size={16} /> {payment.transfer.title}
                       </h3>
                       <span className={`text-[9px] font-black px-2 py-1 rounded ${
                         orderDetails.payment_status === 'completed' 
@@ -419,7 +404,7 @@ export default function OrderDetailsModal({ orderId, isOpen, onClose }: OrderDet
                           ? 'bg-error/20 text-error'
                           : 'bg-warning/20 text-warning'
                       }`}>
-                        {orderDetails.payment_status === 'completed' ? 'PAGADO' : orderDetails.payment_status === 'failed' ? 'FALLIDO' : 'PENDIENTE'}
+                        {orderDetails.payment_status === 'completed' ? payment.statusDisplay.paid : orderDetails.payment_status === 'failed' ? payment.statusDisplay.failed : payment.statusDisplay.pending}
                       </span>
                     </div>
 
@@ -431,7 +416,7 @@ export default function OrderDetailsModal({ orderId, isOpen, onClose }: OrderDet
                           className="flex-1 py-3 bg-success text-white rounded-xl text-xs font-black uppercase hover:scale-[1.02] transition-transform disabled:opacity-50 flex items-center justify-center gap-2"
                         >
                           <Icon name="CheckCircleIcon" size={16} />
-                          Marcar como Pagado
+                          {payment.transfer.markPaid}
                         </button>
                       )}
                       
@@ -442,7 +427,7 @@ export default function OrderDetailsModal({ orderId, isOpen, onClose }: OrderDet
                           className="flex-1 py-3 bg-warning text-white rounded-xl text-xs font-black uppercase hover:scale-[1.02] transition-transform disabled:opacity-50 flex items-center justify-center gap-2"
                         >
                           <Icon name="ClockIcon" size={16} />
-                          Revertir a Pendiente
+                          {payment.transfer.revertPending}
                         </button>
                       )}
                     </div>
@@ -450,18 +435,18 @@ export default function OrderDetailsModal({ orderId, isOpen, onClose }: OrderDet
                     {orderDetails.payment_status !== 'completed' && (
                       <p className="mt-3 text-[10px] text-amber-700 dark:text-amber-400 font-medium flex items-start gap-2">
                         <Icon name="InformationCircleIcon" size={14} className="flex-shrink-0 mt-0.5" />
-                        <span>Confirma el pago una vez verificada la transferencia bancaria.</span>
+                        <span>{payment.transfer.verifyWarning}</span>
                       </p>
                     )}
                   </div>
                 )}
 
-                {/* ✅ NUEVO: INFORMACIÓN Y GESTIÓN DE MERCADOPAGO */}
+                {/* INFORMACIÓN Y GESTIÓN DE MERCADOPAGO */}
                 {isMercadoPago && (
                   <div className="bg-blue-50 dark:bg-blue-950/20 border-2 border-blue-400/30 rounded-2xl p-5 shadow-sm">
                     <div className="flex justify-between items-center mb-4">
                       <h3 className="text-xs font-black text-blue-700 dark:text-blue-400 uppercase flex items-center gap-2">
-                        <Icon name="CreditCardIcon" size={16} /> Información MercadoPago
+                        <Icon name="CreditCardIcon" size={16} /> {payment.mercadoPago.title}
                       </h3>
                       <span className={`text-[9px] font-black px-2 py-1 rounded ${
                         orderDetails.payment_status === 'completed' 
@@ -470,22 +455,21 @@ export default function OrderDetailsModal({ orderId, isOpen, onClose }: OrderDet
                           ? 'bg-error/20 text-error'
                           : 'bg-warning/20 text-warning'
                       }`}>
-                        {orderDetails.payment_status === 'completed' ? 'PAGADO' : orderDetails.payment_status === 'failed' ? 'FALLIDO' : 'PENDIENTE'}
+                        {orderDetails.payment_status === 'completed' ? payment.statusDisplay.paid : orderDetails.payment_status === 'failed' ? payment.statusDisplay.failed : payment.statusDisplay.pending}
                       </span>
                     </div>
 
-                    {/* Datos de MercadoPago */}
                     <div className="space-y-3 mb-4">
                       {orderDetails.payment_id && (
                         <div className="p-3 bg-white dark:bg-gray-900 border border-blue-200 dark:border-blue-800 rounded-lg">
-                          <p className="text-[9px] text-muted-foreground uppercase font-bold mb-1">Payment ID</p>
+                          <p className="text-[9px] text-muted-foreground uppercase font-bold mb-1">{payment.mercadoPago.paymentId}</p>
                           <p className="text-xs font-mono font-black text-blue-600 dark:text-blue-400">{orderDetails.payment_id}</p>
                         </div>
                       )}
 
                       {orderDetails.mp_status && (
                         <div className="p-3 bg-white dark:bg-gray-900 border border-blue-200 dark:border-blue-800 rounded-lg">
-                          <p className="text-[9px] text-muted-foreground uppercase font-bold mb-1">Estado MP</p>
+                          <p className="text-[9px] text-muted-foreground uppercase font-bold mb-1">{payment.mercadoPago.mpStatus}</p>
                           <p className={`text-xs font-black ${getMPStatusDisplay(orderDetails.mp_status).color}`}>
                             {getMPStatusDisplay(orderDetails.mp_status).text}
                           </p>
@@ -494,21 +478,21 @@ export default function OrderDetailsModal({ orderId, isOpen, onClose }: OrderDet
 
                       {orderDetails.mp_status_detail && (
                         <div className="p-3 bg-white dark:bg-gray-900 border border-blue-200 dark:border-blue-800 rounded-lg">
-                          <p className="text-[9px] text-muted-foreground uppercase font-bold mb-1">Detalle MP</p>
+                          <p className="text-[9px] text-muted-foreground uppercase font-bold mb-1">{payment.mercadoPago.mpDetail}</p>
                           <p className="text-xs font-medium text-foreground">{orderDetails.mp_status_detail}</p>
                         </div>
                       )}
 
                       {orderDetails.mp_preference_id && (
                         <div className="p-3 bg-white dark:bg-gray-900 border border-blue-200 dark:border-blue-800 rounded-lg">
-                          <p className="text-[9px] text-muted-foreground uppercase font-bold mb-1">Preference ID</p>
+                          <p className="text-[9px] text-muted-foreground uppercase font-bold mb-1">{payment.mercadoPago.preferenceId}</p>
                           <p className="text-xs font-mono text-foreground break-all">{orderDetails.mp_preference_id}</p>
                         </div>
                       )}
 
                       {orderDetails.mp_init_point && (
                         <div className="p-3 bg-white dark:bg-gray-900 border border-blue-200 dark:border-blue-800 rounded-lg">
-                          <p className="text-[9px] text-muted-foreground uppercase font-bold mb-2">Link de Pago</p>
+                          <p className="text-[9px] text-muted-foreground uppercase font-bold mb-2">{payment.mercadoPago.paymentLink}</p>
                           <a 
                             href={orderDetails.mp_init_point} 
                             target="_blank" 
@@ -522,13 +506,12 @@ export default function OrderDetailsModal({ orderId, isOpen, onClose }: OrderDet
                       )}
                     </div>
 
-                    {/* ✅ Botón para cancelar pago MP pendiente */}
                     {canCancelMercadoPago && !isCancelled && (
                       <div className="pt-4 border-t border-blue-200 dark:border-blue-800">
                         {!showCancelMPConfirm ? (
                           <>
                             <p className="text-[10px] text-blue-700 dark:text-blue-400 mb-3">
-                              Este pago está pendiente en MercadoPago. Puedes cancelarlo si el cliente no completa el pago.
+                              {payment.mercadoPago.pendingWarning}
                             </p>
                             <button 
                               onClick={() => setShowCancelMPConfirm(true)}
@@ -536,13 +519,13 @@ export default function OrderDetailsModal({ orderId, isOpen, onClose }: OrderDet
                               className="w-full py-3 bg-error text-white rounded-xl text-xs font-black uppercase hover:scale-[1.02] transition-transform disabled:opacity-50 flex items-center justify-center gap-2"
                             >
                               <Icon name="XCircleIcon" size={16} />
-                              Cancelar Pago MercadoPago
+                              {payment.mercadoPago.cancelBtn}
                             </button>
                           </>
                         ) : (
                           <>
                             <p className="text-[10px] text-error mb-3 font-bold">
-                              ⚠️ Esto cancelará el pago en MercadoPago y la orden. ¿Continuar?
+                              {payment.mercadoPago.cancelConfirm}
                             </p>
                             <div className="flex gap-2">
                               <button 
@@ -550,7 +533,7 @@ export default function OrderDetailsModal({ orderId, isOpen, onClose }: OrderDet
                                 disabled={updating}
                                 className="flex-1 py-3 bg-muted text-foreground rounded-xl text-xs font-black uppercase hover:scale-[1.02] transition-transform disabled:opacity-50"
                               >
-                                No, volver
+                                {payment.shared.noBack}
                               </button>
                               <button 
                                 onClick={handleCancelMercadoPago}
@@ -558,7 +541,7 @@ export default function OrderDetailsModal({ orderId, isOpen, onClose }: OrderDet
                                 className="flex-1 py-3 bg-error text-white rounded-xl text-xs font-black uppercase hover:scale-[1.02] transition-transform disabled:opacity-50 flex items-center justify-center gap-2"
                               >
                                 <Icon name="CheckIcon" size={16} />
-                                Sí, Cancelar
+                                {payment.shared.yesCancel}
                               </button>
                             </div>
                           </>
@@ -568,19 +551,19 @@ export default function OrderDetailsModal({ orderId, isOpen, onClose }: OrderDet
                   </div>
                 )}
 
-                {/* ✅ CANCELACIÓN DE TRANSFERENCIAS */}
+                {/* CANCELACIÓN DE TRANSFERENCIAS */}
                 {canCancelBankTransfer && (
                   <div className="bg-red-50 dark:bg-red-950/20 border-2 border-red-400/30 rounded-2xl p-5 shadow-sm">
                     <div className="flex justify-between items-center mb-4">
                       <h3 className="text-xs font-black text-red-700 dark:text-red-400 uppercase flex items-center gap-2">
-                        <Icon name="ExclamationTriangleIcon" size={16} /> Cancelar Orden
+                        <Icon name="ExclamationTriangleIcon" size={16} /> {payment.cancelOrder.title}
                       </h3>
                     </div>
 
                     {!showCancelConfirm ? (
                       <>
                         <p className="text-[10px] text-red-700 dark:text-red-400 mb-3">
-                          Esta acción cancelará la orden y marcará el pago como fallido. Solo disponible para transferencias bancarias.
+                          {payment.cancelOrder.warning}
                         </p>
                         <button 
                           onClick={() => setShowCancelConfirm(true)}
@@ -588,13 +571,13 @@ export default function OrderDetailsModal({ orderId, isOpen, onClose }: OrderDet
                           className="w-full py-3 bg-error text-white rounded-xl text-xs font-black uppercase hover:scale-[1.02] transition-transform disabled:opacity-50 flex items-center justify-center gap-2"
                         >
                           <Icon name="XCircleIcon" size={16} />
-                          Cancelar Esta Orden
+                          {payment.cancelOrder.cancelBtn}
                         </button>
                       </>
                     ) : (
                       <>
                         <p className="text-[10px] text-red-700 dark:text-red-400 mb-3 font-bold">
-                          ⚠️ ¿Estás seguro? Esta acción no se puede deshacer.
+                          {payment.cancelOrder.confirmWarning}
                         </p>
                         <div className="flex gap-2">
                           <button 
@@ -602,7 +585,7 @@ export default function OrderDetailsModal({ orderId, isOpen, onClose }: OrderDet
                             disabled={updating}
                             className="flex-1 py-3 bg-muted text-foreground rounded-xl text-xs font-black uppercase hover:scale-[1.02] transition-transform disabled:opacity-50"
                           >
-                            No, volver
+                            {payment.shared.noBack}
                           </button>
                           <button 
                             onClick={handleCancelOrder}
@@ -610,7 +593,7 @@ export default function OrderDetailsModal({ orderId, isOpen, onClose }: OrderDet
                             className="flex-1 py-3 bg-error text-white rounded-xl text-xs font-black uppercase hover:scale-[1.02] transition-transform disabled:opacity-50 flex items-center justify-center gap-2"
                           >
                             <Icon name="CheckIcon" size={16} />
-                            Sí, Cancelar
+                            {payment.shared.yesCancel}
                           </button>
                         </div>
                       </>
@@ -624,7 +607,7 @@ export default function OrderDetailsModal({ orderId, isOpen, onClose }: OrderDet
                     <div className="flex justify-between items-center mb-5">
                       <h3 className="text-xs font-black text-primary uppercase flex items-center gap-2">
                         <Icon name="ClipboardDocumentCheckIcon" size={16} /> 
-                        {isPickup ? 'Flujo de Retiro' : 'Flujo de Envío'}
+                        {isPickup ? fulfillment.pickupTitle : fulfillment.shippingTitle}
                       </h3>
                       {getPreviousStatus(orderDetails.order_status) && (
                         <button 
@@ -632,7 +615,7 @@ export default function OrderDetailsModal({ orderId, isOpen, onClose }: OrderDet
                           disabled={updating}
                           className="text-[9px] font-bold text-muted-foreground hover:text-error uppercase flex items-center gap-1 disabled:opacity-50"
                         >
-                          <Icon name="ArrowUturnLeftIcon" size={10} /> Volver a {getPreviousStatus(orderDetails.order_status)}
+                          <Icon name="ArrowUturnLeftIcon" size={10} /> {fulfillment.backTo} {getPreviousStatus(orderDetails.order_status)}
                         </button>
                       )}
                     </div>
@@ -644,7 +627,7 @@ export default function OrderDetailsModal({ orderId, isOpen, onClose }: OrderDet
                           disabled={updating}
                           className="flex-1 py-3 bg-accent text-white rounded-xl text-xs font-black uppercase hover:scale-[1.02] transition-transform disabled:opacity-50"
                         >
-                          Procesar Pedido
+                          {fulfillment.processOrder}
                         </button>
                       )}
                       
@@ -654,7 +637,7 @@ export default function OrderDetailsModal({ orderId, isOpen, onClose }: OrderDet
                           disabled={updating}
                           className="flex-1 py-3 bg-purple-600 text-white rounded-xl text-xs font-black uppercase hover:scale-[1.02] transition-transform disabled:opacity-50"
                         >
-                          Listo para {isPickup ? 'Retiro' : 'Envío'}
+                          {isPickup ? fulfillment.readyPickup : fulfillment.readyShipping}
                         </button>
                       )}
                       
@@ -666,14 +649,14 @@ export default function OrderDetailsModal({ orderId, isOpen, onClose }: OrderDet
                               disabled={updating}
                               className="flex-1 py-3 bg-success text-white rounded-xl text-xs font-black uppercase hover:scale-[1.02] transition-transform disabled:opacity-50"
                             >
-                              Confirmar Retiro
+                              {fulfillment.confirmPickup}
                             </button>
                           ) : (
                             <div className="flex flex-1 gap-2 min-w-[300px]">
                               <input 
                                 type="text" 
                                 className="flex-1 p-3 border-2 border-muted rounded-xl text-xs bg-background focus:border-primary outline-none text-foreground" 
-                                placeholder="Nro Tracking (UES, Mirtrans...)" 
+                                placeholder={fulfillment.trackingPlaceholder} 
                                 value={trackingInput} 
                                 onChange={(e) => setTrackingInput(e.target.value)} 
                               />
@@ -682,7 +665,7 @@ export default function OrderDetailsModal({ orderId, isOpen, onClose }: OrderDet
                                 disabled={!trackingInput || updating} 
                                 className="px-6 py-3 bg-blue-600 text-white rounded-xl text-xs font-black uppercase disabled:opacity-50 hover:scale-[1.02] transition-transform"
                               >
-                                Despachar
+                                {fulfillment.dispatch}
                               </button>
                             </div>
                           )}
@@ -695,13 +678,13 @@ export default function OrderDetailsModal({ orderId, isOpen, onClose }: OrderDet
                           disabled={updating}
                           className="flex-1 py-3 bg-success text-white rounded-xl text-xs font-black uppercase hover:scale-[1.02] transition-transform disabled:opacity-50"
                         >
-                          Confirmar Entrega
+                          {fulfillment.confirmDelivery}
                         </button>
                       )}
                     </div>
 
                     <div className="mt-4 pt-4 border-t border-border">
-                      <p className="text-[9px] text-muted-foreground uppercase font-bold mb-2">Flujo actual:</p>
+                      <p className="text-[9px] text-muted-foreground uppercase font-bold mb-2">{fulfillment.currentFlow}</p>
                       <div className="flex items-center gap-2 text-[9px] font-mono">
                         {isPickup ? (
                           <>
@@ -735,23 +718,23 @@ export default function OrderDetailsModal({ orderId, isOpen, onClose }: OrderDet
                 {isCancelled && (
                   <div className="bg-error/10 border-2 border-error/30 rounded-2xl p-8 text-center">
                     <Icon name="XCircleIcon" size={48} className="text-error mx-auto mb-4" />
-                    <h3 className="text-lg font-black text-error mb-2">Orden Cancelada</h3>
+                    <h3 className="text-lg font-black text-error mb-2">{cancelledState.title}</h3>
                     <p className="text-sm text-muted-foreground">
-                      Esta orden ha sido cancelada y no se puede procesar.
+                      {cancelledState.desc}
                     </p>
                   </div>
                 )}
 
                 {/* PRODUCTOS */}
                 <div className="bg-card rounded-2xl border border-border overflow-hidden">
-                  <div className="px-4 py-2 bg-muted/20 border-b border-border text-[10px] font-black uppercase text-foreground">Artículos del Pedido</div>
+                  <div className="px-4 py-2 bg-muted/20 border-b border-border text-[10px] font-black uppercase text-foreground">{msgItems.title}</div>
                   <div className="divide-y divide-border">
                     {simpleItems.map((item) => renderOrderItem(item))}
 
                     {orderedPackGroups.map(({ groupId, items }) => (
                       <div key={groupId} className="border-t border-border/70">
                         <div className="px-4 py-2 bg-muted/10 text-[9px] font-black uppercase tracking-wide text-muted-foreground">
-                          PACK GROUP {shortId(groupId)}
+                          {msgItems.packGroup} {shortId(groupId)}
                         </div>
                         <div className="divide-y divide-border">
                           {items.map((item) => renderOrderItem(item))}
@@ -766,11 +749,11 @@ export default function OrderDetailsModal({ orderId, isOpen, onClose }: OrderDet
               <div className="lg:col-span-4 space-y-6">
                 <div className="bg-card rounded-2xl border border-border p-5 space-y-4">
                   <div className="flex justify-between items-baseline border-b border-border pb-4">
-                    <span className="text-[10px] font-black uppercase text-muted-foreground">Total Pedido</span>
+                    <span className="text-[10px] font-black uppercase text-muted-foreground">{summary.total}</span>
                     <span className="text-2xl font-black text-primary">${Number(orderDetails.total).toLocaleString('es-UY')}</span>
                   </div>
                   <div className="space-y-2">
-                    <p className="text-[9px] font-black text-muted-foreground uppercase">Estado del Pago</p>
+                    <p className="text-[9px] font-black text-muted-foreground uppercase">{summary.paymentStatus}</p>
                     <div className={`p-2 rounded-lg border flex items-center justify-between ${
                       orderDetails.payment_status === 'completed' 
                         ? 'border-success/20 bg-success/5 text-success' 
@@ -779,7 +762,7 @@ export default function OrderDetailsModal({ orderId, isOpen, onClose }: OrderDet
                         : 'border-warning/20 bg-warning/5 text-warning'
                     }`}>
                       <span className="text-[10px] font-black uppercase">
-                        {orderDetails.payment_status === 'completed' ? 'Pagado' : orderDetails.payment_status === 'failed' ? 'Fallido' : 'Pendiente'}
+                        {orderDetails.payment_status === 'completed' ? payment.statusDisplay.capitalized.paid : orderDetails.payment_status === 'failed' ? payment.statusDisplay.capitalized.failed : payment.statusDisplay.capitalized.pending}
                       </span>
                       <Icon name={
                         orderDetails.payment_status === 'completed' 
@@ -794,7 +777,7 @@ export default function OrderDetailsModal({ orderId, isOpen, onClose }: OrderDet
 
                 <div className="bg-card rounded-2xl border border-border p-5 space-y-4 text-foreground">
                   <section>
-                    <h4 className="text-[10px] font-black text-muted-foreground uppercase mb-2">Comprador</h4>
+                    <h4 className="text-[10px] font-black text-muted-foreground uppercase mb-2">{summary.buyer}</h4>
                     <p className="text-xs font-black leading-tight">{orderDetails.customer_name}</p>
                     <div className="flex items-center gap-2 mt-3 p-2 bg-muted/30 rounded-lg border border-border">
                       <Icon name="PhoneIcon" size={14} className="text-primary" />
@@ -803,13 +786,13 @@ export default function OrderDetailsModal({ orderId, isOpen, onClose }: OrderDet
                   </section>
                   <section className="pt-4 border-t border-border">
                     <h4 className="text-[10px] font-black text-muted-foreground uppercase mb-2">
-                      {isPickup ? 'Retiro en Local' : 'Envío'}
+                      {isPickup ? summary.pickupLabel : summary.shippingLabel}
                     </h4>
                     {isPickup ? (
                       <div className="p-3 bg-purple-500/10 border border-purple-500/20 rounded-lg">
                         <p className="text-[10px] font-black text-purple-600 dark:text-purple-400 uppercase flex items-center gap-2">
                           <Icon name="BuildingStorefrontIcon" size={14} />
-                          El cliente retira en local
+                          {summary.pickupDesc}
                         </p>
                       </div>
                     ) : (
@@ -818,7 +801,7 @@ export default function OrderDetailsModal({ orderId, isOpen, onClose }: OrderDet
                         <p className="text-[10px] text-muted-foreground uppercase mt-1">{orderDetails.shipping_city}, {orderDetails.shipping_department}</p>
                         {orderDetails.tracking_number && (
                           <div className="mt-3 p-2 bg-blue-500/10 border border-blue-500/20 rounded-lg">
-                            <p className="text-[9px] text-muted-foreground uppercase font-bold mb-1">Tracking</p>
+                            <p className="text-[9px] text-muted-foreground uppercase font-bold mb-1">{summary.tracking}</p>
                             <p className="text-xs font-mono font-black text-blue-600 dark:text-blue-400">{orderDetails.tracking_number}</p>
                           </div>
                         )}
@@ -833,13 +816,13 @@ export default function OrderDetailsModal({ orderId, isOpen, onClose }: OrderDet
 
         {/* Footer */}
         <div className="p-4 border-t border-border bg-card/80 flex justify-between items-center">
-          <button onClick={onClose} className="px-5 py-2 text-[10px] font-black uppercase border border-border rounded-xl hover:bg-muted transition-colors text-foreground">Cerrar</button>
+          <button onClick={onClose} className="px-5 py-2 text-[10px] font-black uppercase border border-border rounded-xl hover:bg-muted transition-colors text-foreground">{modal.close}</button>
           {orderDetails && (
             <button 
               onClick={() => openWhatsApp(orderDetails.customer_phone)}
               className="px-6 py-2 bg-[#25D366] text-white text-[10px] font-black uppercase rounded-xl flex items-center gap-2 shadow-lg shadow-green-500/20 hover:scale-105 transition-transform"
             >
-              <Icon name="ChatBubbleLeftRightIcon" size={16} /> WhatsApp Cliente
+              <Icon name="ChatBubbleLeftRightIcon" size={16} /> {modal.whatsapp}
             </button>
           )}
         </div>

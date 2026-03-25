@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 // @ts-ignore
 import { getSupabaseAdmin } from '@/lib/supabaseAdmin';
+// IMPORTAMOS EL DICCIONARIO
+import { apiErrorMessages } from '@/messages/apiErrorMessages';
 
 // IMPORTANTE: Forzamos dinámico para que no cachee las credenciales
 export const dynamic = 'force-dynamic';
@@ -19,7 +21,6 @@ async function mpCreatePreference(accessToken: string, preference: any, idempote
   const data = await resp.json().catch(() => ({}));
   
   if (!resp.ok) {
-    // Logueamos el error exacto de MercadoPago para debugging
     console.error("❌ MP API Error:", JSON.stringify(data));
     throw new Error(`MP preference error: ${resp.status} - ${data.message || JSON.stringify(data)}`);
   }
@@ -28,24 +29,23 @@ async function mpCreatePreference(accessToken: string, preference: any, idempote
 }
 
 export async function POST(request: Request) {
+  const msgs = apiErrorMessages.mpPreference;
+
   try {
     const supabase = getSupabaseAdmin();
     const accessToken = process.env.MP_ACCESS_TOKEN;
     
-    // --- CORRECCIÓN CRÍTICA AQUÍ ---
-    // Aseguramos que siteUrl nunca sea undefined.
-    // Prioridad: 1. Variable Pública, 2. Variable Privada, 3. Hardcode Localhost (para que no falle en tu máquina)
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || process.env.SITE_URL || 'http://localhost:4028';
 
     if (!accessToken) {
       console.error("Falta MP_ACCESS_TOKEN");
-      return NextResponse.json({ error: 'Missing MP_ACCESS_TOKEN env var' }, { status: 500 });
+      return NextResponse.json({ error: msgs.missingToken }, { status: 500 });
     }
 
     const body = await request.json();
     const { orderId } = body || {};
 
-    if (!orderId) return NextResponse.json({ error: 'Missing orderId' }, { status: 400 });
+    if (!orderId) return NextResponse.json({ error: msgs.missingOrderId }, { status: 400 });
 
     // 1. Cargar Orden
     const { data: order, error: oErr } = await supabase
@@ -56,7 +56,7 @@ export async function POST(request: Request) {
 
     if (oErr || !order) {
       console.error("Orden no encontrada:", oErr);
-      return NextResponse.json({ error: 'Order not found' }, { status: 404 });
+      return NextResponse.json({ error: msgs.orderNotFound }, { status: 404 });
     }
 
     // 2. Cargar Items
@@ -65,8 +65,8 @@ export async function POST(request: Request) {
       .select('line_type, product_name, product_model, quantity, unit_price')
       .eq('order_id', orderId);
 
-    if (iErr) return NextResponse.json({ error: 'Failed to load order items', details: iErr.message }, { status: 500 });
-    if (!orderItems || orderItems.length === 0) return NextResponse.json({ error: 'Order has no items' }, { status: 400 });
+    if (iErr) return NextResponse.json({ error: msgs.itemsLoadFailed, details: iErr.message }, { status: 500 });
+    if (!orderItems || orderItems.length === 0) return NextResponse.json({ error: msgs.noItems }, { status: 400 });
 
     // Mapeo de items comerciales únicamente (Etapa 2A)
     const commercialItems = (orderItems || []).filter((it: any) => {
@@ -75,7 +75,7 @@ export async function POST(request: Request) {
     });
 
     if (commercialItems.length === 0) {
-      return NextResponse.json({ error: 'Order has no commercial items for Mercado Pago' }, { status: 400 });
+      return NextResponse.json({ error: msgs.noCommercialItems }, { status: 400 });
     }
 
     const mpItems = commercialItems.map((it: any) => ({
@@ -89,7 +89,7 @@ export async function POST(request: Request) {
     const shippingCost = Number(order.shipping_cost || 0);
     if (shippingCost > 0) {
       mpItems.push({
-        title: 'Costo de envío',
+        title: msgs.shippingItemTitle,
         quantity: 1,
         unit_price: shippingCost,
         currency_id: 'UYU',
@@ -97,12 +97,11 @@ export async function POST(request: Request) {
     }
 
     // 3. Crear Preferencia
-    // Aquí usamos la variable siteUrl que aseguramos arriba
     const preference = {
       items: mpItems,
       payer: {
-        email: order.customer_email || 'test_user_123@test.com', // MP requiere email válido
-        name: order.customer_name || 'Cliente',
+        email: order.customer_email || msgs.defaultClientEmail, 
+        name: order.customer_name || msgs.defaultClientName,
       },
       external_reference: orderId,
       notification_url: `${siteUrl}/api/mp-webhook`, 
@@ -116,7 +115,7 @@ export async function POST(request: Request) {
         order_id: orderId,
         order_number: order.order_number,
       },
-      statement_descriptor: "POV STORE UY"
+      statement_descriptor: msgs.statementDescriptor
     };
 
     console.log("Generando preferencia MP con URL base:", siteUrl);
@@ -144,6 +143,6 @@ export async function POST(request: Request) {
 
   } catch (e: any) {
     console.error("Server Error en MP Preference:", e);
-    return NextResponse.json({ error: 'Unexpected error', details: e.message }, { status: 500 });
+    return NextResponse.json({ error: msgs.unexpected, details: e.message }, { status: 500 });
   }
 }

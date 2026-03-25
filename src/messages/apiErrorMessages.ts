@@ -36,5 +36,26 @@ export const apiErrorMessages = {
     orderCreationFailed: 'Ocurrió un error al registrar tu pedido. Por favor, intentá nuevamente.',
     orderItemsCreationFailed: 'Ocurrió un error al guardar los productos de tu pedido.',
     unexpected: 'Ocurrió un error inesperado al procesar tu solicitud. Por favor, intentá más tarde.',
+  },
+  // 👇 NUEVA SECCIÓN PARA LA GENERACIÓN DEL LINK DE PAGO 👇
+  mpPreference: {
+    missingToken: 'Falta la configuración de MercadoPago (MP_ACCESS_TOKEN).',
+    missingOrderId: 'Falta el identificador de la orden.',
+    orderNotFound: 'No se encontró la orden solicitada.',
+    itemsLoadFailed: 'Error al cargar los artículos de la orden.',
+    noItems: 'La orden no tiene artículos.',
+    noCommercialItems: 'La orden no contiene artículos válidos para cobrar con MercadoPago.',
+    unexpected: 'Error inesperado al generar el link de pago.',
+    // Textos internos que se envían a MercadoPago
+    shippingItemTitle: 'Costo de envío',
+    defaultClientName: 'Cliente',
+    defaultClientEmail: 'test_user_123@test.com',
+    statementDescriptor: 'POV STORE UY'
+  },
+  // 👇 NUEVA SECCIÓN PARA EL WEBHOOK (Comunicación silenciosa con MP) 👇
+  mpWebhook: {
+    missingToken: 'Falta la configuración de MercadoPago (MP_ACCESS_TOKEN).',
+    invalidTransition: (current: string, target: string) => `Transición de estado inválida: de '${current}' a '${target}'`,
+    stockApplyFailed: (reason: string) => `Error al aplicar stock: ${reason}`
   }
 };

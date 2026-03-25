@@ -1,11 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabaseAdmin'; 
 import { applyOrderStockOnce } from '../../../../../lib/stock/applyOrderStockOnce';
+// IMPORTAMOS EL NUEVO DICCIONARIO
+import { adminOrderApiMessages } from '@/messages/adminOrderApiMessages';
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const msgs = adminOrderApiMessages.get;
+  
   try {
     const supabase = getSupabaseAdmin();
     const { id: orderIdentifier } = await params; 
@@ -19,7 +23,7 @@ export async function GET(
     if (orderError || !order) {
       console.error('Orden no encontrada:', orderIdentifier);
       return NextResponse.json(
-        { error: 'La orden no existe en la base de datos' },
+        { error: msgs.notFound },
         { status: 404 }
       );
     }
@@ -38,7 +42,7 @@ export async function GET(
   } catch (error) {
     console.error('Error crítico en API:', error);
     return NextResponse.json(
-      { error: 'Error interno del servidor' },
+      { error: msgs.serverError },
       { status: 500 }
     );
   }
@@ -48,6 +52,8 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const msgs = adminOrderApiMessages.patch;
+
   try {
     const supabase = getSupabaseAdmin();
     const { id: orderIdentifier } = await params; 
@@ -58,8 +64,8 @@ export async function PATCH(
       status, 
       tracking_number, 
       payment_status,
-      cancel_payment, // Para transferencias
-      cancel_mp // ✅ NUEVO: Para cancelar pagos MercadoPago
+      cancel_payment, 
+      cancel_mp 
     } = body;
 
     // ✅ Obtener la orden actual para validaciones
@@ -71,7 +77,7 @@ export async function PATCH(
 
     if (fetchError || !currentOrder) {
       return NextResponse.json(
-        { error: 'Orden no encontrada' },
+        { error: msgs.notFound },
         { status: 404 }
       );
     }
@@ -88,11 +94,10 @@ export async function PATCH(
 
     // ✅ VALIDACIÓN: Estado de pedido
     if (status !== undefined) {
-      // Validar estados permitidos
       const allowedStatuses = ['pending', 'processing', 'ready', 'shipped', 'completed', 'cancelled'];
       if (!allowedStatuses.includes(status)) {
         return NextResponse.json(
-          { error: `Estado inválido: ${status}` },
+          { error: msgs.invalidStatus(status) },
           { status: 400 }
         );
       }
@@ -100,7 +105,7 @@ export async function PATCH(
       // ✅ VALIDACIÓN: Si es retiro, no permitir estado "shipped"
       if (isPickup && status === 'shipped') {
         return NextResponse.json(
-          { error: 'Los pedidos de retiro en local no pueden pasar a estado "shipped"' },
+          { error: msgs.pickupShippedError },
           { status: 400 }
         );
       }
@@ -108,7 +113,7 @@ export async function PATCH(
       // ✅ VALIDACIÓN: Si es envío y se intenta "shipped" sin tracking
       if (!isPickup && status === 'shipped' && !tracking_number && !currentOrder.tracking_number) {
         return NextResponse.json(
-          { error: 'Se requiere número de tracking para despachar un envío' },
+          { error: msgs.shippingRequiresTracking },
           { status: 400 }
         );
       }
@@ -132,12 +137,9 @@ export async function PATCH(
         // ✅ CASO 1: Si NO hay payment_id, el usuario nunca pagó (abandonó la orden)
         if (!currentOrder.payment_id) {
           console.log('⚠️ No hay payment_id - Usuario abandonó sin pagar. Solo cancelando en DB...');
-          
-          // Solo actualizar nuestra DB (no hay nada que cancelar en MercadoPago)
           updateData.payment_status = 'failed';
           updateData.mp_status = 'cancelled';
           updateData.mp_status_detail = 'abandoned_by_user';
-          
           console.log('✅ Orden cancelada en DB (sin interacción con MP)');
         } 
         // ✅ CASO 2: Si HAY payment_id, intentar cancelar en MercadoPago
@@ -149,9 +151,8 @@ export async function PATCH(
             
             if (!mpAccessToken) {
               console.error('❌ No se encontró MP_ACCESS_TOKEN en variables de entorno');
-              console.error('❌ Variables disponibles:', Object.keys(process.env).filter(k => k.includes('MP') || k.includes('MERCADO')));
               return NextResponse.json(
-                { error: 'Configuración de MercadoPago no disponible. Verifica las variables de entorno.' },
+                { error: msgs.mpConfigMissing },
                 { status: 500 }
               );
             }
@@ -182,12 +183,11 @@ export async function PATCH(
               console.error('   Status:', cancelResponse.status);
               console.error('   Data:', JSON.stringify(errorData, null, 2));
               
-              // Intentar obtener más detalles del error
               const errorMessage = errorData.message || errorData.error || 'Error desconocido';
               
               return NextResponse.json(
                 { 
-                  error: `Error al cancelar en MercadoPago: ${errorMessage}`,
+                  error: msgs.mpCancelError(errorMessage),
                   details: errorData,
                   status_code: cancelResponse.status
                 },
@@ -210,10 +210,9 @@ export async function PATCH(
             console.error('❌ Error crítico al cancelar pago MercadoPago:');
             console.error('   Tipo:', mpError.name);
             console.error('   Mensaje:', mpError.message);
-            console.error('   Stack:', mpError.stack);
             return NextResponse.json(
               { 
-                error: 'Error al comunicarse con MercadoPago',
+                error: msgs.mpCommunicationError,
                 details: mpError.message
               },
               { status: 500 }
@@ -230,10 +229,9 @@ export async function PATCH(
       tracking_number === undefined ? undefined : String(tracking_number).trim();
 
     if (normalizedTracking !== undefined && normalizedTracking !== '') {
-      // Solo validar si hay contenido real (no string vacío)
       if (isPickup) {
         return NextResponse.json(
-          { error: 'No se puede asignar tracking a un pedido de retiro en local' },
+          { error: msgs.pickupTrackingError },
           { status: 400 }
         );
       }
@@ -242,11 +240,10 @@ export async function PATCH(
 
     // ✅ Estado de pago (manual)
     if (payment_status !== undefined) {
-      // Validar estados permitidos
       const allowedPaymentStatuses = ['pending', 'completed', 'failed'];
       if (!allowedPaymentStatuses.includes(payment_status)) {
         return NextResponse.json(
-          { error: `Estado de pago inválido: ${payment_status}` },
+          { error: msgs.invalidPaymentStatus(payment_status) },
           { status: 400 }
         );
       }
@@ -254,7 +251,7 @@ export async function PATCH(
       if (payment_status === 'completed') {
         if (!isBankTransfer) {
           return NextResponse.json(
-            { error: 'La confirmación manual de pago aplica solo a transferencias bancarias' },
+            { error: msgs.manualConfirmBankOnly },
             { status: 409 }
           );
         }
@@ -262,7 +259,7 @@ export async function PATCH(
         if (!['pending', 'completed'].includes(currentOrder.payment_status)) {
           return NextResponse.json(
             {
-              error: `Transición inválida: no se puede confirmar pago desde payment_status='${currentOrder.payment_status}'`,
+              error: msgs.invalidPaymentTransition(currentOrder.payment_status),
             },
             { status: 409 }
           );
@@ -296,7 +293,7 @@ export async function PATCH(
 
       if (!stockResult.ok) {
         return NextResponse.json(
-          { error: 'Error al aplicar descuento de stock', details: stockResult.reason },
+          { error: msgs.stockApplyError, details: stockResult.reason },
           { status: 500 }
         );
       }
@@ -312,7 +309,7 @@ export async function PATCH(
   } catch (error) {
     console.error('Error crítico en PATCH:', error);
     return NextResponse.json(
-      { error: 'Error al actualizar' },
+      { error: msgs.serverError },
       { status: 500 }
     );
   }

@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabaseAdmin';
 import { applyOrderStockOnce } from '../../../lib/stock/applyOrderStockOnce';
+// IMPORTAMOS EL DICCIONARIO
+import { apiErrorMessages } from '@/messages/apiErrorMessages';
 
 export const dynamic = 'force-dynamic';
 
@@ -31,9 +33,11 @@ function mapMpToDbStatuses(mpStatus: string) {
 }
 
 export async function POST(request: Request) {
+  const msgs = apiErrorMessages.mpWebhook;
+
   try {
     const accessToken = process.env.MP_ACCESS_TOKEN;
-    if (!accessToken) return NextResponse.json({ error: 'Missing MP_ACCESS_TOKEN' }, { status: 500 });
+    if (!accessToken) return NextResponse.json({ error: msgs.missingToken }, { status: 500 });
 
     const supabase = getSupabaseAdmin();
     const url = new URL(request.url);
@@ -73,7 +77,7 @@ export async function POST(request: Request) {
       return NextResponse.json(
         {
           ok: false,
-          error: `Invalid webhook transition from payment_status='${existingOrder.payment_status}' to '${payment_status}'`,
+          error: msgs.invalidTransition(existingOrder.payment_status, payment_status),
         },
         { status: 409 }
       );
@@ -110,7 +114,7 @@ export async function POST(request: Request) {
 
       if (!stockResult.ok) {
         return NextResponse.json(
-          { ok: false, error: `stock_apply_failed:${stockResult.reason}` },
+          { ok: false, error: msgs.stockApplyFailed(stockResult.reason) },
           { status: 500 }
         );
       }
