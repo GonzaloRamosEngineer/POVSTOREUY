@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server';
 // @ts-ignore
 import { getSupabaseAdmin } from '@/lib/supabaseAdmin';
+import { verifyOrderLookupToken } from '@/lib/orders/orderLookupToken';
 
-// IMPORTANTE: Esto evita que Next.js cachee la respuesta. 
+// IMPORTANTE: Esto evita que Next.js cachee la respuesta.
 // Queremos datos frescos siempre que consultamos una orden.
 export const dynamic = 'force-dynamic';
 
@@ -10,9 +11,18 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const orderId = searchParams.get('orderId');
+    const token = searchParams.get('token');
 
-    if (!orderId) {
-      return NextResponse.json({ error: 'Missing orderId' }, { status: 400 });
+    const lookupSecret = process.env.ORDER_LOOKUP_SECRET;
+    if (!lookupSecret) {
+      console.error('Falta ORDER_LOOKUP_SECRET');
+      return NextResponse.json({ error: 'Server misconfigured' }, { status: 500 });
+    }
+
+    const tokenValid = verifyOrderLookupToken({ orderId, token, secret: lookupSecret });
+    if (!tokenValid) {
+      // 404 genérico (no diferenciamos token-mismatch de order-not-found para no filtrar existencia).
+      return NextResponse.json({ error: 'Order not found' }, { status: 404 });
     }
 
     const supabase = getSupabaseAdmin();

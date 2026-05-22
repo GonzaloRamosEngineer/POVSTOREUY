@@ -119,6 +119,8 @@ Reglas (siguiendo doc oficial MP):
 
 Tests del route mockean `MP_WEBHOOK_SECRET` y firman las requests con el helper `signManifest`. Ver [src/app/api/mp-webhook/route.test.ts](src/app/api/mp-webhook/route.test.ts) — incluye 2 tests negativos (sin signature → 401, signature tampered → 401).
 
+**Verificado en producción (2026-05-22):** smoke test contra `https://povstore.uy/api/mp-webhook` pasó 4/4 casos: sin firma → 401 `missing_signature`, firma adulterada → 401 `invalid`, ts 10 min viejo → 401 `expired`, firma válida → 200. La env var `MP_WEBHOOK_SECRET` en Vercel matchea con la del dashboard MP (modo de prueba).
+
 ### Home `ProductCard` (UI)
 [src/app/homepage/components/ProductCard.tsx](src/app/homepage/components/ProductCard.tsx) (solo usado en [HomepageInteractive.tsx](src/app/homepage/components/HomepageInteractive.tsx)):
 - Contenedor de imagen: `aspect-square` (NO `h-80`). Las fotos de kits son 1024×1024; el contenedor debe ser 1:1 para no recortar.
@@ -132,7 +134,29 @@ Tests del route mockean `MP_WEBHOOK_SECRET` y firman las requests con el helper 
 
 ---
 
-## Regla operativa
+## Próximos pasos recomendados (orden sugerido)
+
+Estado al 2026-05-22: de los 4 issues 🔴 del audit original, **2 cerrados** (admin orders auth + MP webhook HMAC). Quedan 2 críticos + 4 de severidad alta. Orden recomendado:
+
+1. **🔴 `/api/order-details` (IDOR de PII)** — *Esfuerzo: ~30 min. Impacto: alto.*
+   Mismo patrón que el bug ya resuelto en orders admin. Hoy `GET /api/order-details?orderId=<uuid>` devuelve PII completa con solo conocer el UUID. Fix: exigir email + order_number en body (o token firmado/HMAC del orderId al crear la orden). Los call sites del cliente que lo usan ([src/app/order-confirmation/](src/app/order-confirmation/) presumiblemente) van a necesitar ajuste paralelo, como hicimos con `OrderDetailsModal`.
+
+2. **🟠 Rate-limit en endpoints públicos** — *Esfuerzo: ~1.5 h. Impacto: alto.*
+   `POST /api/create-order`, `POST /api/newsletter/subscribe`, `POST /api/mp-preference` están abiertos sin throttle. Recomendado: `@upstash/ratelimit` + `@upstash/redis` (free tier alcanza), wrapper middleware-style. Como bonus, captcha (hCaptcha o Turnstile) en el newsletter.
+
+3. **🟠 `package.json` → `"start": "next start"`** — *Esfuerzo: ~2 min. Impacto: medio.*
+   Trivial: cambiar `"start": "next dev -p 4028"` por `"start": "next start"` y mover el dev a `"dev": "next dev -p 4028"` (ya está). Cierra la trampa de "alguien corre npm start en prod y arranca el dev server".
+
+4. **🔴 `.env` commiteada / rotación de credenciales** — *Esfuerzo: ~1 h. Impacto: alto pero destructivo.*
+   Tres sub-pasos: (a) rotar las credenciales reales en Supabase + MercadoPago dashboard, (b) actualizar `.env` local y env vars en Vercel con los nuevos valores, (c) purgar el `.env` del historial con `git filter-repo` y `git push --force` (coordinar con cualquier otro dev que tenga la rama). El `.env.example` ya está commiteado como plantilla. Hacer cuando estés sin presión — `--force` push es irreversible para colaboradores.
+
+5. **🟠 Endurecer TypeScript** — *Esfuerzo: ~2-4 h. Impacto: medio.*
+   Quitar `ignoreBuildErrors` y `ignoreDuringBuilds` en `next.config.mjs`, poner `strict: true` en `tsconfig.json`, arreglar los errores que aparezcan (esperables: muchos `any` implícitos, algunos `@ts-ignore` que esconden bugs reales). Sin prisa pero acumula deuda silenciosa.
+
+6. **🟠 Limpieza de código muerto** — *Esfuerzo: ~10 min. Impacto: bajo, pero higiene.*
+   Borrar [api_/](api_/), `*.backup`, `estructura.txt`. Cero riesgo. Buen first-commit cuando se quiera demostrar que el repo es activo.
+
+**Nota:** los componentes-dios (`ProductForm.tsx` 1965 LOC, etc.) y la falta de tests E2E son deuda mayor pero no urgente. Se atacan cuando se necesite tocar esas zonas — refactor incremental, no big-bang.
 
 **No modificar archivos sin aprobación explícita del usuario.**
 

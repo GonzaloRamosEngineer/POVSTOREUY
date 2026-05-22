@@ -90,6 +90,7 @@ const OrderConfirmationInteractive: React.FC = () => {
   const router = useRouter();
 
   const orderId = searchParams.get('orderId');
+  const token = searchParams.get('token');
   const urlStatus = searchParams.get('status');
 
   const [loading, setLoading] = useState(true);
@@ -114,10 +115,13 @@ const OrderConfirmationInteractive: React.FC = () => {
           return;
         }
 
-        const res = await fetch(`/api/order-details?orderId=${encodeURIComponent(orderId)}`, {
-          method: 'GET',
-          headers: { 'Content-Type': 'application/json' },
-        });
+        const res = await fetch(
+          `/api/order-details?orderId=${encodeURIComponent(orderId)}&token=${encodeURIComponent(token ?? '')}`,
+          {
+            method: 'GET',
+            headers: { 'Content-Type': 'application/json' },
+          }
+        );
 
         const data = (await res.json().catch(() => null)) as ApiResponse | null;
 
@@ -140,7 +144,7 @@ const OrderConfirmationInteractive: React.FC = () => {
     return () => {
       alive = false;
     };
-  }, [orderId, confirmation.errors]);
+  }, [orderId, token, confirmation.errors]);
 
   const ui = useMemo(() => {
     if (!order) return null;

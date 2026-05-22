@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 // @ts-ignore
 import { getSupabaseAdmin } from '@/lib/supabaseAdmin';
+import { signOrderLookupToken } from '@/lib/orders/orderLookupToken';
 // IMPORTAMOS EL DICCIONARIO
 import { apiErrorMessages } from '@/messages/apiErrorMessages';
 
@@ -40,6 +41,12 @@ export async function POST(request: Request) {
     if (!accessToken) {
       console.error("Falta MP_ACCESS_TOKEN");
       return NextResponse.json({ error: msgs.missingToken }, { status: 500 });
+    }
+
+    const lookupSecret = process.env.ORDER_LOOKUP_SECRET;
+    if (!lookupSecret) {
+      console.error('Falta ORDER_LOOKUP_SECRET');
+      return NextResponse.json({ error: 'Server misconfigured: ORDER_LOOKUP_SECRET' }, { status: 500 });
     }
 
     const body = await request.json();
@@ -96,19 +103,21 @@ export async function POST(request: Request) {
       });
     }
 
+    const lookupToken = signOrderLookupToken(orderId, lookupSecret);
+
     // 3. Crear Preferencia
     const preference = {
       items: mpItems,
       payer: {
-        email: order.customer_email || msgs.defaultClientEmail, 
+        email: order.customer_email || msgs.defaultClientEmail,
         name: order.customer_name || msgs.defaultClientName,
       },
       external_reference: orderId,
-      notification_url: `${siteUrl}/api/mp-webhook`, 
+      notification_url: `${siteUrl}/api/mp-webhook`,
       back_urls: {
-        success: `${siteUrl}/order-confirmation?orderId=${orderId}&status=success`,
-        pending: `${siteUrl}/order-confirmation?orderId=${orderId}&status=pending`,
-        failure: `${siteUrl}/order-confirmation?orderId=${orderId}&status=failure`,
+        success: `${siteUrl}/order-confirmation?orderId=${orderId}&token=${lookupToken}&status=success`,
+        pending: `${siteUrl}/order-confirmation?orderId=${orderId}&token=${lookupToken}&status=pending`,
+        failure: `${siteUrl}/order-confirmation?orderId=${orderId}&token=${lookupToken}&status=failure`,
       },
       auto_return: 'approved',
       metadata: {
