@@ -1,0 +1,67 @@
+// src/messages/adminOrdersListMessages.ts
+
+export const adminOrdersListMessages = {
+  auth: {
+    missingToken: 'Falta token de autenticación',
+    invalidToken: 'Token inválido o expirado',
+    adminRequired: 'Permisos de administrador requeridos',
+  },
+  validation: {
+    invalidStatus: (s: string) => `Estado de orden inválido: ${s}`,
+    invalidPaymentMethod: (s: string) => `Método de pago inválido: ${s}`,
+    invalidPaymentStatus: (s: string) => `Estado de pago inválido: ${s}`,
+    invalidDate: (field: string) => `Fecha inválida en parámetro ${field}`,
+    invalidNumber: (field: string) => `Número inválido en parámetro ${field}`,
+    invalidSort: 'Parámetro sort inválido',
+    invalidRange: 'El rango "from" no puede ser posterior a "to"',
+  },
+  responses: {
+    serverError: 'Error al obtener el historial de órdenes',
+  },
+  ui: {
+    sectionTitle: 'Historial de órdenes',
+    sectionDescription: 'Filtrá y buscá en todo el histórico.',
+    refresh: 'Actualizar',
+    refreshing: 'Actualizando...',
+    empty: 'No hay órdenes que coincidan con los filtros.',
+    loading: 'Cargando...',
+    apply: 'Aplicar',
+    clear: 'Limpiar filtros',
+    showFilters: 'Mostrar filtros',
+    hideFilters: 'Ocultar filtros',
+    summary: {
+      count: (n: number) => `${n} ${n === 1 ? 'orden' : 'órdenes'}`,
+      total: (s: string) => `Total: ${s}`,
+      aov: (s: string) => `AOV: ${s}`,
+    },
+    filters: {
+      search: 'Buscar (#orden, email, nombre, teléfono, tracking)',
+      datePreset: 'Período',
+      from: 'Desde',
+      to: 'Hasta',
+      status: 'Estado',
+      paymentMethod: 'Método de pago',
+      paymentStatus: 'Estado de pago',
+      department: 'Departamento',
+      minTotal: 'Monto mín.',
+      maxTotal: 'Monto máx.',
+      excludeTest: 'Excluir pruebas/QA',
+      onlyStale: (n: number) => `Solo "pendientes" hace +${n} días`,
+      datePresets: {
+        today: 'Hoy',
+        last7: 'Últimos 7 días',
+        last30: 'Últimos 30 días',
+        last90: 'Últimos 90 días',
+        thisYear: 'Este año',
+        all: 'Todo',
+        custom: 'Custom',
+      } as const,
+    },
+    pagination: {
+      prev: 'Anterior',
+      next: 'Siguiente',
+      page: (cur: number, total: number) => `Página ${cur} de ${total || 1}`,
+    },
+    fetchError: 'No se pudo cargar el historial. Reintentá.',
+  },
+};

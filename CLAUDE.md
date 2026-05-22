@@ -1,6 +1,6 @@
 # CLAUDE.md — POV Store Uruguay
 
-Contexto persistente para sesiones futuras. Due Diligence Técnico inicial: 2026-05-21. Última actualización: 2026-05-22.
+Contexto persistente para sesiones futuras. Due Diligence Técnico inicial: 2026-05-21. Última actualización: 2026-05-23 (post historial filtrable de órdenes).
 
 ---
 
@@ -18,12 +18,95 @@ E-commerce de cámaras POV 4K para el mercado uruguayo. Vende productos simples 
 
 **Estructura clave:**
 - [src/app/api/](src/app/api/) — Route handlers (create-order, mp-preference, mp-webhook, admin/*, newsletter/*, order-details)
+- [src/app/api/admin/orders/route.ts](src/app/api/admin/orders/route.ts) — GET con filtros del historial (paginado + summary con AOV real)
 - [src/lib/supabaseAdmin.ts](src/lib/supabaseAdmin.ts) — singleton service-role client (server-only)
 - [src/lib/supabaseClient.js](src/lib/supabaseClient.js) — singleton browser client (anon)
+- [src/lib/api/adminFetch.ts](src/lib/api/adminFetch.ts) — wrapper canónico para llamadas client-side a `/api/admin/*` (inyecta Bearer + `AdminFetchError`)
 - [src/lib/packs/packContractValidator.ts](src/lib/packs/packContractValidator.ts) — validación estructural de packs
 - [src/lib/stock/applyOrderStockOnce.ts](src/lib/stock/applyOrderStockOnce.ts) — wrapper sobre RPC transaccional
+- [src/config/admin.ts](src/config/admin.ts) — fuente de verdad para thresholds, page size, staleDays y patrones de email test/QA
 - [src/messages/](src/messages/) — diccionarios de mensajes centralizados (no hardcodear strings de error)
-- [migrations/](migrations/) — SQL versionado de esquema y RPCs
+- [migrations/](migrations/) — SQL versionado de esquema y RPCs (no autoritativo — schema canónico vive en Supabase)
+
+---
+
+## Esquema de base de datos (resumen)
+
+Schema Postgres en Supabase. DDL completo verificable en Supabase Studio o vía `pg_dump --schema-only`. **El schema canónico vive en DB**; los archivos en `migrations/` son evolutivos, no autoritativos.
+
+### Tablas core (commerce)
+
+| Tabla | Notas clave |
+|---|---|
+| `orders` | PK uuid. `order_number` UNIQUE legible (POV-XXXXXX). FK opcional a `user_profiles` (checkout es guest por default — `user_id` queda null). Idempotencia: `idempotency_key` UNIQUE parcial + `idempotency_payload_hash`. Stock-once: `stock_applied_at`. Shipping denormalizado (snapshot al momento del pedido). MP fields: `mp_preference_id`, `mp_init_point`, `mp_status`, `mp_status_detail`, `payment_id`. |
+| `order_items` | FK a `orders`. `line_type` ENUM-CHECK `{'simple','pack_primary','pack_component'}` + CHECK condicional de nulabilidad (ver [migrations/20260313](migrations/20260313_stage2a_order_items_pack_lines.sql)). `pack_group_id`, `pack_id`, `pack_parent_product_id`, `pack_version` (≥1 cuando no NULL). |
+| `products` | Catálogo. `is_active` para soft-delete (no se hace DELETE). `packs jsonb` para combos. `addon_ids uuid[]` para accesorios cruzados. `tech_specs`, `features`, `story_content`, `faq_content`, `colors` todos `jsonb`. `gallery text[]`. `cash_price`/`card_price` separados de `price`. `slug` UNIQUE. `show_on_home`, `is_outlet`, `is_accessory` flags. |
+| `cart_items` | Carrito server-side. `user_id` opcional + `session_id text` para guests. FK a `products`. |
+| `inventory_logs` | Audit trail de cambios de stock: `change_type`, `quantity_change`, `previous_stock`, `new_stock`, `reason`, `created_by`. ⚠ **Sin verificar si se escribe en cada `applyOrderStockOnce`** — la RPC actual ([migrations/20260317](migrations/20260317_stage3_3a_stock_once_rpc.sql)) NO inserta en `inventory_logs`. Posible deuda / feature huérfana. |
+
+### Tablas usuarios
+
+| Tabla | Notas |
+|---|---|
+| `user_profiles` | PK FK a `auth.users(id)` (Supabase Auth). `role` ENUM. **Sólo admin y customer**; toda orden hoy es guest (sin user_id). |
+| `customer_addresses` | Libreta de direcciones. FK a `user_profiles`. ⚠ **No vista en uso activo** — `orders` denormaliza el shipping. Probablemente reservada para feature futura de "mis direcciones". |
+
+### Tablas auxiliares
+
+| Tabla | Notas |
+|---|---|
+| `product_reviews` | Reseñas. `customer_name_manual` + `customer_avatar_url` permiten reseñas curadas (sin user_id). `review_images_gallery text[]`. `is_verified_purchase`. |
+| `newsletter_subscribers` | Email + `is_active` (soft unsubscribe). `unsubscribed_at`. |
+
+### Custom ENUMs (Postgres)
+
+Todos son `USER-DEFINED` types. **No usar `text` en columnas que apunten a estos ENUMs** — el cast `::enum_name` es obligatorio en inserts/updates.
+
+| ENUM | Valores conocidos (inferidos del código) |
+|---|---|
+| `order_status` | `pending`, `processing`, `ready`, `shipped`, `completed`, `cancelled` (lista en [admin/orders/[id]/route.ts](src/app/api/admin/orders/[id]/route.ts)) |
+| `payment_status` | `pending`, `completed`, `failed`, `refunded` |
+| `payment_method` | `mercadopago`, `bank_transfer` |
+| `stock_status` | `in_stock`, default. Otros valores TBD — verificar en DB. |
+| `user_role` | `customer`, `admin` |
+| `department` | 19 departamentos de Uruguay (hardcoded en `URUGUAY_DEPARTMENTS` en [create-order/route.ts](src/app/api/create-order/route.ts) — debería derivarse del ENUM). |
+
+### Foreign keys principales
+
+- `cart_items.product_id` → `products.id`
+- `cart_items.user_id` → `user_profiles.id` (nullable)
+- `order_items.order_id` → `orders.id`
+- `order_items.product_id` → `products.id` (nullable — referencia opcional)
+- `orders.user_id` → `user_profiles.id` (nullable — guest checkout)
+- `user_profiles.id` → `auth.users.id` (integración con Supabase Auth)
+- `customer_addresses.user_id` → `user_profiles.id`
+- `inventory_logs.product_id` → `products.id`
+- `inventory_logs.created_by` → `user_profiles.id` (nullable)
+- `product_reviews.product_id` → `products.id`
+- `product_reviews.user_id` → `user_profiles.id` (nullable — review curada)
+
+### CHECK constraints en DB (no duplicar en código de validación)
+
+- `products.price >= 0`, `products.stock_count >= 0`, `products.rating BETWEEN 0 AND 5`, `products.review_count >= 0`
+- `order_items.quantity > 0`, `unit_price >= 0`, `total_price >= 0`
+- `order_items.line_type` IN closed set + nulabilidad condicional por `line_type`
+- `order_items.pack_version >= 1` cuando no NULL
+- `cart_items.quantity > 0`
+- `product_reviews.rating BETWEEN 1 AND 5`
+
+### Índices y constraints relevantes
+
+- `orders.order_number` UNIQUE
+- `orders.idempotency_key` UNIQUE INDEX parcial (`WHERE idempotency_key IS NOT NULL`)
+- `products.slug` UNIQUE
+- `user_profiles.email` UNIQUE
+- `newsletter_subscribers.email` UNIQUE
+
+### Observaciones para futuras sesiones
+
+- Si vas a agregar un valor a un ENUM, hay que hacerlo vía `ALTER TYPE ... ADD VALUE` (no se puede en transacción para todos los Postgres versions). Crear migration explícito.
+- Si querés implementar la feature "mis direcciones", `customer_addresses` ya existe y está lista.
+- Si querés audit trail real de stock, completar la escritura a `inventory_logs` en `apply_order_stock_once` (hoy ese RPC no la usa).
 
 ---
 
@@ -32,7 +115,6 @@ E-commerce de cámaras POV 4K para el mercado uruguayo. Vende productos simples 
 | Sev | Issue | Archivo |
 |---|---|---|
 | 🔴 Crítica | `.env` con credenciales reales commiteada al repo. Rotar todo y purgar del historial. Existe [.env.example](.env.example) como plantilla canónica desde 2026-05-22. | [.env](.env) |
-| 🔴 Crítica | `/api/order-details` expone PII completa con sólo `?orderId=<uuid>` (UUID no es secreto). | [src/app/api/order-details/route.ts](src/app/api/order-details/route.ts) |
 | 🟠 Alta | `typescript.ignoreBuildErrors: true` y `eslint.ignoreDuringBuilds: true`. | [next.config.mjs](next.config.mjs) |
 | 🟠 Alta | `tsconfig.strict: false` + 106 usos de `: any` + 4 `@ts-ignore` en `src/`. | [tsconfig.json](tsconfig.json) |
 | 🟠 Alta | Sin rate-limit ni captcha en `/api/create-order`, `/api/newsletter/subscribe`, `/api/mp-preference`. | — |
@@ -51,8 +133,12 @@ E-commerce de cámaras POV 4K para el mercado uruguayo. Vende productos simples 
   - [src/app/product-details/components/ProductDetailsInteractive.tsx](src/app/product-details/components/ProductDetailsInteractive.tsx) — 718 líneas
 - **Mezcla `.js`/`.ts`** en [src/lib/](src/lib/) — tipar todo.
 - **Race condition en stock**: el chequeo en [src/app/api/create-order/route.ts](src/app/api/create-order/route.ts) NO es transaccional con la RPC `apply_order_stock_once` ([migrations/20260317_stage3_3a_stock_once_rpc.sql](migrations/20260317_stage3_3a_stock_once_rpc.sql)). La RPC usa `GREATEST(0, …)` y silenciosamente permite oversold. Debería `RAISE EXCEPTION` cuando `stock_count < qty`.
-- **Estados libres** (`order_status`, `payment_status`) como `text` sin ENUM ni CHECK en DB.
+- ~~**Estados libres** (`order_status`, `payment_status`) como `text` sin ENUM ni CHECK en DB.~~ **CORRECCIÓN 2026-05-23:** los ENUMs sí existen en DB (revisión del schema). Ver sección "Esquema de base de datos". La deuda real acá es **mantener sincronizadas** las listas de valores permitidos del código (en `route.ts`, `OrderDetailsModal.tsx`, etc.) con los valores reales del ENUM — riesgo de divergencia silenciosa si alguien agrega un valor en DB sin actualizar el TypeScript.
 - **Lógica de negocio hardcodeada** en route: shipping (`subtotal >= 2000 ? 0 : 300`), `URUGUAY_DEPARTMENTS`.
+- **`URUGUAY_DEPARTMENTS` triplicado entre código y DB.** Existe como `Set` hardcodeado en [src/app/api/create-order/route.ts](src/app/api/create-order/route.ts), como array hardcodeado en [src/app/admin-dashboard/components/OrderFilters.tsx](src/app/admin-dashboard/components/OrderFilters.tsx) (filtro del historial, sumado 2026-05-23) Y como ENUM `department` en Postgres. Si alguien agrega un valor a uno solo, se rompe silenciosamente. Solución: derivar la lista del ENUM (lectura de `pg_enum` o `information_schema.columns`) o usar Supabase types autogenerados. Mientras tanto: si tocás uno, tocá los tres.
+- **Features huérfanas en DB.** Dos tablas existen en schema pero no se usan en flujos activos:
+  - `inventory_logs` — diseñada como audit trail de stock (`previous_stock`, `new_stock`, `change_type`, `reason`, `created_by`). La RPC `apply_order_stock_once` NO escribe en ella. O se completa el patrón (insert por cada cambio) o se borra la tabla. Hoy es ruido.
+  - `customer_addresses` — libreta de direcciones para usuarios logueados. El checkout es 100% guest y `orders` denormaliza el shipping. Reservada para feature futura de "mis direcciones" o muerta de origen — confirmar intención antes de planificar trabajo encima.
 - **61 `console.log`/`console.error`** sin logger estructurado ni Sentry.
 - **Tests sólo en API + validator.** No hay E2E del flujo de checkout.
 - **`stockCount` puede mostrarse negativo en `ProductCard`** (visto en home: `ÚLTIMAS -2`). Falta `Math.max(0, …)` en la fuente del dato o en el render. Síntoma de que el oversold de la RPC (`GREATEST(0, …)`) no es la única ruta — alguien está restando stock sin clamp.
@@ -73,9 +159,28 @@ Pasos:
 3. Consultar `user_profiles.role === 'admin'`.
 4. Devolver `401`/`403` con mensajes del diccionario del endpoint (cada uno tiene su sub-sección `auth`).
 
-**Lado cliente:** todo `fetch` a `/api/admin/*` debe mandar `Authorization: Bearer ${session.access_token}`, obtenido con `supabase.auth.getSession()`. Ver `ProductForm.tsx`, `InventoryPageInteractive.tsx` y `OrderDetailsModal.tsx` como referencias.
+**Lado cliente:** preferí [src/lib/api/adminFetch.ts](src/lib/api/adminFetch.ts) (ver sección dedicada abajo). Las llamadas con `fetch` manual + `getAuthHeader()` que sobreviven en `ProductForm.tsx`, `InventoryPageInteractive.tsx` y `OrderDetailsModal.tsx` son legacy a migrar.
 
-**Tests:** mockear `supabase.auth.getUser` + `from('user_profiles')` con el rol deseado. Ver [src/app/api/admin/orders/[id]/route.test.ts](src/app/api/admin/orders/[id]/route.test.ts) — incluye tests negativos (401 sin token, 403 con role no admin).
+**Tests:** mockear `supabase.auth.getUser` + `from('user_profiles')` con el rol deseado. Ver [src/app/api/admin/orders/[id]/route.test.ts](src/app/api/admin/orders/[id]/route.test.ts) y [src/app/api/admin/orders/route.test.ts](src/app/api/admin/orders/route.test.ts) — incluyen tests negativos (401 sin token, 403 con role no admin).
+
+### `adminFetch` (cliente HTTP para admin)
+Toda llamada client-side a `/api/admin/*` debe usar [src/lib/api/adminFetch.ts](src/lib/api/adminFetch.ts). Inyecta `Authorization: Bearer ${session.access_token}` automáticamente y lanza `AdminFetchError` (con `.status` y `.body`) si la respuesta no es 2xx. Ya en uso en `OrderHistorySection`. **Pendiente migrar**: `OrderDetailsModal.tsx`, `ProductForm.tsx`, `InventoryPageInteractive.tsx` siguen con `fetch` manual + `getAuthHeader()`. Migración incremental, no en bloque (riesgo bajo, beneficio: centraliza retry/refresh de token).
+
+### Detección de órdenes test/QA
+[src/config/admin.ts](src/config/admin.ts) tiene dos listas sincronizadas: `TEST_EMAIL_PATTERNS` (regex, uso client-side con `isTestEmail()`) y `TEST_EMAIL_ILIKE_PATTERNS` (ILIKE para Supabase, uso server-side en `/api/admin/orders` con `exclude_test=true`). Si aparece un patrón nuevo de email de prueba, sumarlo a **ambas** listas, no hardcodear en componentes ni en el route.
+
+### Historial de órdenes con filtros
+[src/app/admin-dashboard/components/OrderHistorySection.tsx](src/app/admin-dashboard/components/OrderHistorySection.tsx) orquesta filtros + URL sync (con `URLSearchParams` + `router.replace`, sin scroll, sin agregar al history) + paginación + resumen. Filtros soportados por [src/app/api/admin/orders/route.ts](src/app/api/admin/orders/route.ts): `q, status, payment_method, payment_status, department, from, to, min_total, max_total, exclude_test, stale_days, sort, page, limit`. El `summary` (revenue, AOV, paid_count) se calcula con una **segunda query sobre TODOS los matches del filtro**, no solo la página actual — sino sería una métrica engañosa.
+
+**Sección colapsable.** La sección viene cerrada por default — sólo se renderiza el header. Al expandir se setea `history_open=1` en URL y recién ahí se dispara el fetch. Esto evita un GET al endpoint en cada carga del dashboard cuando el admin sólo viene a ver el snapshot de 30 días.
+
+**`excludeTest` tiene default `true` con semántica de URL invertida.** Es intencional: el admin quiere ver datos reales por default. La URL guarda `exclude_test=false` **sólo** cuando el usuario destildó el toggle (override). Si no aparece en la URL → se asume `true`. No "arregles" esto invirtiéndolo a la convención normal de "ausente = false" sin pedir.
+
+Si agregás un filtro nuevo:
+1. Sumarlo al endpoint con validación + actualizar tests.
+2. Sumarlo al `OrderFilterState` en `OrderFilters.tsx`.
+3. Sumarlo a `filtersToParams` (URL sync) y `filtersToApiQuery` (request) en `OrderHistorySection.tsx`.
+4. Si es una constante (lista de departamentos, etc.), considerarlo para `src/config/admin.ts` antes de hardcodear.
 
 ### Idempotencia de órdenes
 Patrón ya implementado en [src/app/api/create-order/route.ts](src/app/api/create-order/route.ts):
@@ -121,6 +226,26 @@ Tests del route mockean `MP_WEBHOOK_SECRET` y firman las requests con el helper 
 
 **Verificado en producción (2026-05-22):** smoke test contra `https://povstore.uy/api/mp-webhook` pasó 4/4 casos: sin firma → 401 `missing_signature`, firma adulterada → 401 `invalid`, ts 10 min viejo → 401 `expired`, firma válida → 200. La env var `MP_WEBHOOK_SECRET` en Vercel matchea con la del dashboard MP (modo de prueba).
 
+### Order lookup token (protección de `/api/order-details`)
+[src/app/api/order-details/route.ts](src/app/api/order-details/route.ts) exige `?orderId=<uuid>&token=<hmac>` para devolver PII de una orden. Token inválido o ausente → `404 "Order not found"` (mismo mensaje que orden-no-existe, **para no filtrar existencia**). Lógica en [src/lib/orders/orderLookupToken.ts](src/lib/orders/orderLookupToken.ts).
+
+Flujo:
+- [src/app/api/mp-preference/route.ts](src/app/api/mp-preference/route.ts) firma `HMAC-SHA256(ORDER_LOOKUP_SECRET, orderId).slice(0,32)` y lo incluye en los 3 `back_urls` (`success`/`pending`/`failure`) que pasa a MP.
+- MP redirige al cliente con `?orderId=...&token=...` en el URL.
+- [src/app/order-confirmation/components/OrderConfirmationInteractive.tsx](src/app/order-confirmation/components/OrderConfirmationInteractive.tsx) lee `token` del URL y lo pasa al fetch.
+- `/api/order-details` verifica con `timingSafeEqual` antes de tocar DB.
+
+**Limitaciones conscientes:**
+- Si el link se comparte (screenshot, WhatsApp, etc.), quien lo reciba puede ver la orden. No protege contra ese caso — para eso habría que sumar una cookie httpOnly al crear la orden (opción C del análisis, descartada por costo/beneficio).
+- El flujo `bank_transfer` NO usa esta ruta — va directo a WhatsApp tras crear la orden. Si en el futuro se quisiera landing propio para transferencias, hay que sumar otra ruta o reusar este pattern.
+- Token sin expiración. Si querés invalidar links viejos, agregar `ts` al manifest (variante "opción E").
+
+**Env var requerida:** `ORDER_LOOKUP_SECRET` (32 bytes hex, server-only). Generar con `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`. Si falta → `mp-preference` y `order-details` devuelven `500 "Server misconfigured"`.
+
+Tests: [src/lib/orders/orderLookupToken.test.ts](src/lib/orders/orderLookupToken.test.ts) — 8 casos (round-trip válido, null/empty, length mismatch, tampered, secret distinto, token cruzado entre orderIds).
+
+**Verificado en producción (2026-05-23):** smoke test contra `https://povstore.uy/api/order-details` con un orderId real (POV-889886) — 3/3 casos: sin token → 404, token inválido → 404, token válido → 200 con la orden completa.
+
 ### Home `ProductCard` (UI)
 [src/app/homepage/components/ProductCard.tsx](src/app/homepage/components/ProductCard.tsx) (solo usado en [HomepageInteractive.tsx](src/app/homepage/components/HomepageInteractive.tsx)):
 - Contenedor de imagen: `aspect-square` (NO `h-80`). Las fotos de kits son 1024×1024; el contenedor debe ser 1:1 para no recortar.
@@ -136,27 +261,37 @@ Tests del route mockean `MP_WEBHOOK_SECRET` y firman las requests con el helper 
 
 ## Próximos pasos recomendados (orden sugerido)
 
-Estado al 2026-05-22: de los 4 issues 🔴 del audit original, **2 cerrados** (admin orders auth + MP webhook HMAC). Quedan 2 críticos + 4 de severidad alta. Orden recomendado:
+Estado al 2026-05-23: de los 4 issues 🔴 del audit original, **3 cerrados** (admin orders auth + MP webhook HMAC + order-details IDOR — todos verificados en prod). Queda 1 crítico + 4 de severidad alta. Orden sugerido:
 
-1. **🔴 `/api/order-details` (IDOR de PII)** — *Esfuerzo: ~30 min. Impacto: alto.*
-   Mismo patrón que el bug ya resuelto en orders admin. Hoy `GET /api/order-details?orderId=<uuid>` devuelve PII completa con solo conocer el UUID. Fix: exigir email + order_number en body (o token firmado/HMAC del orderId al crear la orden). Los call sites del cliente que lo usan ([src/app/order-confirmation/](src/app/order-confirmation/) presumiblemente) van a necesitar ajuste paralelo, como hicimos con `OrderDetailsModal`.
+1. **🟠 `package.json` → `"start": "next start"`** — *Esfuerzo: ~2 min. Impacto: medio.*
+   Trivial: cambiar `"start": "next dev -p 4028"` por `"start": "next start"` y mover el dev a `"dev": "next dev -p 4028"` (ya existe). Cierra la trampa de "alguien corre npm start en prod y arranca el dev server".
 
-2. **🟠 Rate-limit en endpoints públicos** — *Esfuerzo: ~1.5 h. Impacto: alto.*
+2. **🟠 Limpieza de código muerto** — *Esfuerzo: ~10 min. Impacto: bajo, pero higiene.*
+   Borrar [api_/](api_/), `*.backup`, `estructura.txt`. Cero riesgo de regresión (ya verificado que `api_/` no se importa desde nadie). Buen first-commit para demostrar que el repo es activo.
+
+3. **🟠 Rate-limit en endpoints públicos** — *Esfuerzo: ~1.5 h. Impacto: alto.*
    `POST /api/create-order`, `POST /api/newsletter/subscribe`, `POST /api/mp-preference` están abiertos sin throttle. Recomendado: `@upstash/ratelimit` + `@upstash/redis` (free tier alcanza), wrapper middleware-style. Como bonus, captcha (hCaptcha o Turnstile) en el newsletter.
 
-3. **🟠 `package.json` → `"start": "next start"`** — *Esfuerzo: ~2 min. Impacto: medio.*
-   Trivial: cambiar `"start": "next dev -p 4028"` por `"start": "next start"` y mover el dev a `"dev": "next dev -p 4028"` (ya está). Cierra la trampa de "alguien corre npm start en prod y arranca el dev server".
-
 4. **🔴 `.env` commiteada / rotación de credenciales** — *Esfuerzo: ~1 h. Impacto: alto pero destructivo.*
-   Tres sub-pasos: (a) rotar las credenciales reales en Supabase + MercadoPago dashboard, (b) actualizar `.env` local y env vars en Vercel con los nuevos valores, (c) purgar el `.env` del historial con `git filter-repo` y `git push --force` (coordinar con cualquier otro dev que tenga la rama). El `.env.example` ya está commiteado como plantilla. Hacer cuando estés sin presión — `--force` push es irreversible para colaboradores.
+   Único 🔴 que queda. Tres sub-pasos: (a) rotar las credenciales reales en Supabase + MercadoPago dashboard + regenerar `ORDER_LOOKUP_SECRET`, (b) actualizar `.env` local y env vars en Vercel, (c) purgar el `.env` del historial con `git filter-repo` y `git push --force` (coordinar con cualquier otro dev que tenga la rama). El `.env.example` ya está commiteado como plantilla. Hacer cuando estés sin presión — `--force` push es irreversible para colaboradores.
 
 5. **🟠 Endurecer TypeScript** — *Esfuerzo: ~2-4 h. Impacto: medio.*
    Quitar `ignoreBuildErrors` y `ignoreDuringBuilds` en `next.config.mjs`, poner `strict: true` en `tsconfig.json`, arreglar los errores que aparezcan (esperables: muchos `any` implícitos, algunos `@ts-ignore` que esconden bugs reales). Sin prisa pero acumula deuda silenciosa.
 
-6. **🟠 Limpieza de código muerto** — *Esfuerzo: ~10 min. Impacto: bajo, pero higiene.*
-   Borrar [api_/](api_/), `*.backup`, `estructura.txt`. Cero riesgo. Buen first-commit cuando se quiera demostrar que el repo es activo.
+6. **🟡 Migrar `OrderDetailsModal.tsx`, `ProductForm.tsx`, `InventoryPageInteractive.tsx` a `adminFetch`** — *Esfuerzo: ~1 h. Impacto: bajo, pero elimina deuda.*
+   Centraliza retry/refresh de token y manejo de errores. Reemplazar `fetch` manual + `getAuthHeader()` por `adminFetch<T>()`. Riesgo de regresión bajo (la firma de respuesta no cambia). Hacer un componente por vez.
+
+7. **🟡 Quick-action "marcar pagado" inline + export CSV** — *Esfuerzo: ~3-4 h. Impacto: alto operacional.*
+   Diferido de la PR de historial filtrable (2026-05-23). Quick-action: botón check verde en cada fila de `OrdersTable` que llama `PATCH /api/admin/orders/[id]` con `payment_status=completed` sin abrir el modal — reduce ~80% de clics en el flujo diario de transferencias. Export CSV: botón en `OrderHistorySection` que descarga el resultado del filtro actual (ya tenemos el endpoint, solo falta endpoint nuevo `/api/admin/orders/export` o un toggle `format=csv`).
 
 **Nota:** los componentes-dios (`ProductForm.tsx` 1965 LOC, etc.) y la falta de tests E2E son deuda mayor pero no urgente. Se atacan cuando se necesite tocar esas zonas — refactor incremental, no big-bang.
+
+**Logros recientes** (referencia para futuras sesiones):
+- 2026-05-21: audit inicial.
+- 2026-05-22: cerrado admin orders auth (commit + deploy verificado en prod).
+- 2026-05-22: cerrado MP webhook HMAC (commit + deploy + smoke test 4/4 contra prod).
+- 2026-05-23: cerrado order-details IDOR (commit + deploy + smoke test 3/3 contra prod, incluyendo happy path con orden real).
+- 2026-05-23: historial filtrable de órdenes (`GET /api/admin/orders` + `OrderHistorySection` con URL sync, paginación y summary real). Tests 15/15. Resuelve los review items "sin filtros de órdenes", "AOV ausente" y "conversion rate fake" (este último parcial: el card viejo del dashboard sigue mostrando la métrica fake). Sentó la base de `adminFetch` y `src/config/admin.ts` para reuso futuro.
 
 **No modificar archivos sin aprobación explícita del usuario.**
 

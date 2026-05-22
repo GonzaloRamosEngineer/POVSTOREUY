@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import MetricCard from './MetricCard';
 import OrdersTable from './OrdersTable';
+import OrderHistorySection from './OrderHistorySection';
 import InventoryAlerts from './InventoryAlerts';
 import RevenueChart from './RevenueChart';
 import PaymentMonitoring from './PaymentMonitoring';
@@ -496,6 +497,9 @@ export default function AdminDashboardInteractive() {
         </div>
         <OrdersTable orders={orders as any} onRefresh={refreshOnlyOrders} />
       </div>
+
+      {/* Historial filtrable (todo el histórico) */}
+      <OrderHistorySection />
 
       {/* Inventario y Pagos */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
