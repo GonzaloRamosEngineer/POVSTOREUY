@@ -1,10 +1,11 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Icon from '@/components/ui/AppIcon';
 // IMPORTAMOS EL TOAST Y NUESTRO DICCIONARIO
 import { toast } from 'react-hot-toast';
 import { adminOrderMessages } from '@/messages/adminOrderMessages';
+import { getSupabaseBrowserClient } from '@/lib/supabaseClient';
 
 interface OrderItem {
   id: string;
@@ -96,6 +97,14 @@ export default function OrderDetailsModal({ orderId, isOpen, onClose }: OrderDet
 
   const { toasts, payment, fulfillment, modal, items: msgItems, cancelledState, summary, mpStatuses } = adminOrderMessages;
 
+  const supabase = useMemo(() => getSupabaseBrowserClient(), []);
+
+  async function getAuthHeader(): Promise<Record<string, string>> {
+    const { data } = await supabase.auth.getSession();
+    const token = data.session?.access_token;
+    return token ? { Authorization: `Bearer ${token}` } : {};
+  }
+
   useEffect(() => {
     if (isOpen && orderId) fetchOrderDetails();
   }, [isOpen, orderId]);
@@ -103,7 +112,10 @@ export default function OrderDetailsModal({ orderId, isOpen, onClose }: OrderDet
   const fetchOrderDetails = async () => {
     setLoading(true);
     try {
-      const response = await fetch(`/api/admin/orders/${orderId}`);
+      const authHeader = await getAuthHeader();
+      const response = await fetch(`/api/admin/orders/${orderId}`, {
+        headers: { ...authHeader },
+      });
       const data = await response.json();
       setOrderDetails(data);
       setTrackingInput(data.tracking_number || '');
@@ -124,9 +136,10 @@ export default function OrderDetailsModal({ orderId, isOpen, onClose }: OrderDet
   const handleUpdatePaymentStatus = async (newPaymentStatus: string) => {
     setUpdating(true);
     try {
+      const authHeader = await getAuthHeader();
       const response = await fetch(`/api/admin/orders/${orderId}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...authHeader },
         body: JSON.stringify({ payment_status: newPaymentStatus }),
       });
       if (response.ok) {
@@ -148,10 +161,11 @@ export default function OrderDetailsModal({ orderId, isOpen, onClose }: OrderDet
   const handleCancelOrder = async () => {
     setUpdating(true);
     try {
+      const authHeader = await getAuthHeader();
       const response = await fetch(`/api/admin/orders/${orderId}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
+        headers: { 'Content-Type': 'application/json', ...authHeader },
+        body: JSON.stringify({
           status: 'cancelled',
           cancel_payment: true
         }),
@@ -177,10 +191,11 @@ export default function OrderDetailsModal({ orderId, isOpen, onClose }: OrderDet
   const handleCancelMercadoPago = async () => {
     setUpdating(true);
     try {
+      const authHeader = await getAuthHeader();
       const response = await fetch(`/api/admin/orders/${orderId}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
+        headers: { 'Content-Type': 'application/json', ...authHeader },
+        body: JSON.stringify({
           status: 'cancelled',
           cancel_mp: true
         }),
@@ -216,9 +231,10 @@ export default function OrderDetailsModal({ orderId, isOpen, onClose }: OrderDet
         }
       }
 
+      const authHeader = await getAuthHeader();
       const response = await fetch(`/api/admin/orders/${orderId}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...authHeader },
         body: JSON.stringify(payload),
       });
 

@@ -1,18 +1,53 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSupabaseAdmin } from '@/lib/supabaseAdmin'; 
+import { getSupabaseAdmin } from '@/lib/supabaseAdmin';
 import { applyOrderStockOnce } from '../../../../../lib/stock/applyOrderStockOnce';
 // IMPORTAMOS EL NUEVO DICCIONARIO
 import { adminOrderApiMessages } from '@/messages/adminOrderApiMessages';
+
+function json(status: number, body: any) {
+  return NextResponse.json(body, { status });
+}
+
+function getBearerToken(req: Request) {
+  const h = req.headers.get('authorization') || '';
+  if (!h.toLowerCase().startsWith('bearer ')) return null;
+  return h.slice(7).trim();
+}
+
+async function requireAdmin(req: Request) {
+  const { auth: authMsgs } = adminOrderApiMessages;
+  const token = getBearerToken(req);
+  if (!token) return { ok: false as const, res: json(401, { error: authMsgs.missingToken }) };
+
+  const supabase = getSupabaseAdmin();
+  const { data: userData, error: uErr } = await supabase.auth.getUser(token);
+  const user = userData?.user;
+  if (uErr || !user) return { ok: false as const, res: json(401, { error: authMsgs.invalidToken }) };
+
+  const { data: profile, error: pErr } = await supabase
+    .from('user_profiles')
+    .select('role')
+    .eq('id', user.id)
+    .single();
+
+  if (pErr || !profile || profile.role !== 'admin') {
+    return { ok: false as const, res: json(403, { error: authMsgs.adminRequired }) };
+  }
+
+  return { ok: true as const, supabase };
+}
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const msgs = adminOrderApiMessages.get;
-  
+
   try {
-    const supabase = getSupabaseAdmin();
-    const { id: orderIdentifier } = await params; 
+    const auth = await requireAdmin(request);
+    if (!auth.ok) return auth.res;
+    const supabase = auth.supabase;
+    const { id: orderIdentifier } = await params;
 
     const { data: order, error: orderError } = await supabase
       .from('orders')
@@ -55,8 +90,10 @@ export async function PATCH(
   const msgs = adminOrderApiMessages.patch;
 
   try {
-    const supabase = getSupabaseAdmin();
-    const { id: orderIdentifier } = await params; 
+    const auth = await requireAdmin(request);
+    if (!auth.ok) return auth.res;
+    const supabase = auth.supabase;
+    const { id: orderIdentifier } = await params;
     const body = await request.json();
     
     // ✅ Extraer todos los campos posibles del body

@@ -1,4 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { createHmac } from 'crypto';
+
+const WEBHOOK_SECRET = 'test-webhook-secret';
 
 let currentSupabase: any = null;
 let currentPayment: any = null;
@@ -67,9 +70,28 @@ function makeSupabaseMock(initialOrder: OrderRow) {
   return { supabase, state };
 }
 
-function buildWebhookRequest(paymentId: string) {
+function signManifest(dataId: string, requestId: string, tsSeconds: number) {
+  const normalized = /^[a-z0-9]+$/i.test(dataId) ? dataId.toLowerCase() : dataId;
+  const manifest = `id:${normalized};request-id:${requestId};ts:${tsSeconds};`;
+  return createHmac('sha256', WEBHOOK_SECRET).update(manifest).digest('hex');
+}
+
+function buildWebhookRequest(
+  paymentId: string,
+  opts?: { skipSignature?: boolean; tamper?: boolean; tsOverride?: number }
+) {
+  const requestId = 'req-uuid-test';
+  const ts = opts?.tsOverride ?? Math.floor(Date.now() / 1000);
+  const headers: Record<string, string> = {};
+  if (!opts?.skipSignature) {
+    const v1 = signManifest(paymentId, requestId, ts);
+    const finalV1 = opts?.tamper ? v1.slice(0, -2) + (v1.endsWith('aa') ? 'bb' : 'aa') : v1;
+    headers['x-signature'] = `ts=${ts},v1=${finalV1}`;
+    headers['x-request-id'] = requestId;
+  }
   return new Request(`http://localhost/api/mp-webhook?topic=payment&id=${paymentId}`, {
     method: 'POST',
+    headers,
   });
 }
 
@@ -78,6 +100,7 @@ describe('mp-webhook stage 3.3A corrected', () => {
     currentSupabase = null;
     currentPayment = null;
     process.env.MP_ACCESS_TOKEN = 'test-token';
+    process.env.MP_WEBHOOK_SECRET = WEBHOOK_SECRET;
 
     vi.stubGlobal(
       'fetch',
@@ -172,5 +195,39 @@ describe('mp-webhook stage 3.3A corrected', () => {
 
     expect(res.status).toBe(409);
     expect(state.rpcCalls).toBe(0);
+  });
+
+  it('rejects request without x-signature header with 401', async () => {
+    const { supabase, state } = makeSupabaseMock({
+      id: 'order-1',
+      payment_status: 'pending',
+      order_status: 'pending',
+      stock_applied_at: null,
+    });
+    currentSupabase = supabase;
+    currentPayment = { status: 'approved', status_detail: 'accredited', external_reference: 'order-1', metadata: {} };
+
+    const res: any = await POST(buildWebhookRequest('pay-1', { skipSignature: true }));
+
+    expect(res.status).toBe(401);
+    expect(state.rpcCalls).toBe(0);
+    expect(state.orderUpdates.length).toBe(0);
+  });
+
+  it('rejects request with tampered v1 signature with 401', async () => {
+    const { supabase, state } = makeSupabaseMock({
+      id: 'order-1',
+      payment_status: 'pending',
+      order_status: 'pending',
+      stock_applied_at: null,
+    });
+    currentSupabase = supabase;
+    currentPayment = { status: 'approved', status_detail: 'accredited', external_reference: 'order-1', metadata: {} };
+
+    const res: any = await POST(buildWebhookRequest('pay-1', { tamper: true }));
+
+    expect(res.status).toBe(401);
+    expect(state.rpcCalls).toBe(0);
+    expect(state.orderUpdates.length).toBe(0);
   });
 });

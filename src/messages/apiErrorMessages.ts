@@ -55,6 +55,8 @@ export const apiErrorMessages = {
   // 👇 NUEVA SECCIÓN PARA EL WEBHOOK (Comunicación silenciosa con MP) 👇
   mpWebhook: {
     missingToken: 'Falta la configuración de MercadoPago (MP_ACCESS_TOKEN).',
+    missingWebhookSecret: 'Falta la configuración del webhook de MercadoPago (MP_WEBHOOK_SECRET).',
+    invalidSignature: (reason: string) => `Firma de webhook inválida: ${reason}`,
     invalidTransition: (current: string, target: string) => `Transición de estado inválida: de '${current}' a '${target}'`,
     stockApplyFailed: (reason: string) => `Error al aplicar stock: ${reason}`
   }

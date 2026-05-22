@@ -61,19 +61,19 @@ const ProductCard = ({
 
   const badgeClasses =
     badgeVariant === 'green'
-      ? 'bg-green-500 text-black'
+      ? 'bg-emerald-500/10 text-emerald-300 ring-1 ring-emerald-500/30'
       : badgeVariant === 'orange'
-      ? 'bg-orange-500 text-white'
+      ? 'bg-amber-500/10 text-amber-300 ring-1 ring-amber-500/30'
       : badgeVariant === 'blue'
-      ? 'bg-blue-500 text-white'
+      ? 'bg-sky-500/10 text-sky-300 ring-1 ring-sky-500/30'
       : badgeText.toUpperCase() === 'ENVÍO GRATIS'
-      ? 'bg-[#1ED760] text-black'
-      : 'bg-white text-black';
+      ? 'bg-emerald-500/10 text-emerald-300 ring-1 ring-emerald-500/30'
+      : 'bg-neutral-800 text-neutral-200 ring-1 ring-neutral-700';
 
   if (!isHydrated) {
     return (
       <div className="bg-neutral-900 rounded-2xl overflow-hidden border border-neutral-800 shadow-xl">
-        <div className="relative h-80 bg-neutral-800 overflow-hidden">
+        <div className="relative aspect-square bg-neutral-800 overflow-hidden">
           <AppImage
             src={image}
             alt={alt}
@@ -108,7 +108,7 @@ const ProductCard = ({
       {/* IMAGE */}
       <Link
         href={productUrl}
-        className="block relative h-80 bg-neutral-800 overflow-hidden cursor-pointer"
+        className="block relative aspect-square bg-neutral-800 overflow-hidden cursor-pointer"
       >
         <AppImage
           src={image}
@@ -118,31 +118,6 @@ const ProductCard = ({
 
         {/* Hover Overlay */}
         <div className="absolute inset-0 bg-black/20 group-hover:bg-black/40 transition-colors duration-300" />
-
-        {/* BADGES */}
-        <div className="absolute top-4 left-4 flex flex-col gap-2 z-10">
-          {badgeText && (
-            <span
-              className={`px-3 py-1 text-xs font-bold rounded-lg shadow-lg uppercase tracking-wider ${badgeClasses}`}
-            >
-              {badgeText}
-            </span>
-          )}
-
-          {discount > 0 && (
-            <span className="px-3 py-1 bg-red-600 text-white text-xs font-bold rounded-lg shadow-lg uppercase tracking-wider">
-              -{discount}% OFF
-            </span>
-          )}
-        </div>
-
-        {/* STOCK */}
-        {isLowStock && (
-          <div className="absolute bottom-4 right-4 px-3 py-1.5 bg-red-600/90 backdrop-blur-sm text-white text-[10px] font-bold rounded-full flex items-center gap-1.5 shadow-lg animate-pulse z-10">
-            <Icon name="ExclamationTriangleIcon" size={14} variant="solid" />
-            <span>ÚLTIMAS {stockCount}</span>
-          </div>
-        )}
 
         {/* HOVER ICON */}
         <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-10">
@@ -154,6 +129,26 @@ const ProductCard = ({
 
       {/* CONTENT */}
       <div className="relative p-6 space-y-5 bg-neutral-900">
+        {/* CHIPS ROW (metadata comercial fuera de la imagen) */}
+        {(badgeText || isLowStock) && (
+          <div className="flex flex-wrap items-center gap-2">
+            {badgeText && (
+              <span
+                className={`inline-flex items-center px-2.5 py-1 text-[10px] font-bold rounded-full uppercase tracking-wider ${badgeClasses}`}
+              >
+                {badgeText}
+              </span>
+            )}
+
+            {isLowStock && (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 text-[10px] font-bold rounded-full uppercase tracking-wider bg-red-500/10 text-red-300 ring-1 ring-red-500/30">
+                <Icon name="ExclamationTriangleIcon" size={12} variant="solid" />
+                <span>Últimas {stockCount}</span>
+              </span>
+            )}
+          </div>
+        )}
+
         <Link href={productUrl} className="block">
           <h3 className="text-2xl md:text-3xl font-heading font-bold text-white group-hover:text-red-500 transition-colors duration-300 cursor-pointer leading-tight">
             {name}
@@ -161,7 +156,7 @@ const ProductCard = ({
         </Link>
 
         {/* PRICE */}
-        <div className="flex items-baseline gap-3">
+        <div className="flex flex-wrap items-baseline gap-3">
           <span className="text-3xl font-mono font-bold text-red-500 drop-shadow-[0_0_8px_rgba(220,38,38,0.3)]">
             ${price.toLocaleString('es-UY')}
           </span>
@@ -169,6 +164,12 @@ const ProductCard = ({
           {originalPrice && (
             <span className="text-sm font-mono text-neutral-500 line-through decoration-neutral-600">
               ${originalPrice.toLocaleString('es-UY')}
+            </span>
+          )}
+
+          {discount > 0 && (
+            <span className="inline-flex items-center px-2 py-0.5 text-xs font-bold rounded-md bg-red-600 text-white">
+              −{discount}%
             </span>
           )}
         </div>

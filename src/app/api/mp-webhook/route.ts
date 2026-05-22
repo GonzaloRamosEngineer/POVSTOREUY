@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabaseAdmin';
 import { applyOrderStockOnce } from '../../../lib/stock/applyOrderStockOnce';
+import { verifyMpWebhookSignature } from '@/lib/mp/verifyWebhookSignature';
 // IMPORTAMOS EL DICCIONARIO
 import { apiErrorMessages } from '@/messages/apiErrorMessages';
 
@@ -39,10 +40,32 @@ export async function POST(request: Request) {
     const accessToken = process.env.MP_ACCESS_TOKEN;
     if (!accessToken) return NextResponse.json({ error: msgs.missingToken }, { status: 500 });
 
-    const supabase = getSupabaseAdmin();
+    const webhookSecret = process.env.MP_WEBHOOK_SECRET;
+    if (!webhookSecret) {
+      console.error('MP_WEBHOOK_SECRET missing');
+      return NextResponse.json({ error: msgs.missingWebhookSecret }, { status: 500 });
+    }
+
     const url = new URL(request.url);
     const searchParams = url.searchParams;
     const id = searchParams.get('id') || searchParams.get('data.id');
+
+    const verification = verifyMpWebhookSignature({
+      signatureHeader: request.headers.get('x-signature'),
+      requestIdHeader: request.headers.get('x-request-id'),
+      dataId: id,
+      secret: webhookSecret,
+    });
+
+    if (!verification.ok) {
+      console.warn('MP webhook signature rejected:', verification.reason);
+      return NextResponse.json(
+        { error: msgs.invalidSignature(verification.reason) },
+        { status: 401 }
+      );
+    }
+
+    const supabase = getSupabaseAdmin();
 
     if (!id) {
       console.warn('Webhook without ID');

@@ -1,6 +1,11 @@
 // src/messages/adminOrderApiMessages.ts
 
 export const adminOrderApiMessages = {
+  auth: {
+    missingToken: 'Falta token de autenticación',
+    invalidToken: 'Token inválido o expirado',
+    adminRequired: 'Permisos de administrador requeridos',
+  },
   get: {
     notFound: 'La orden no existe en la base de datos',
     serverError: 'Error interno del servidor',
