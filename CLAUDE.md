@@ -1,6 +1,6 @@
 # CLAUDE.md — POV Store Uruguay
 
-Contexto persistente para sesiones futuras. Due Diligence Técnico inicial: 2026-05-21. Última actualización: 2026-05-23 (post historial filtrable de órdenes).
+Contexto persistente para sesiones futuras. Due Diligence Técnico inicial: 2026-05-21. Última actualización: 2026-05-23 (audit externo PF-XX en 7/10 cerrados; quedan PF-05 P0, PF-08 P1 parcial, PF-09 P2).
 
 ---
 
@@ -141,15 +141,12 @@ Follow-ups opcionales:
 
 Total estimado para cerrar los 3 abiertos: **~6-7 horas de trabajo**. Tras ese sprint, el audit queda 10/10 cerrado.
 
-**Nota sobre alcance:** los issues 🔴 `.env` commiteada y 🟠 rate-limit ausente listados en "Issues críticos de seguridad PENDIENTES" **no** están en esta tabla — el audit externo no los cubrió. Son prioridad propia (ver "Próximos pasos recomendados" pasos 3 y 4).
+**Nota sobre alcance:** los issues 🔴 `.env` commiteada y 🟠 rate-limit ausente **no** están en esta tabla — el audit externo no los cubrió. Son prioridad propia (ver "Próximos pasos recomendados" pasos 1 y 2).
 
 ---
 
 ## Deuda técnica relevante
 
-- **Código muerto / duplicado:**
-  - [api_/](api_/) — carpeta paralela con `create-order.js`, `mp-webhook.js`, etc. de la era Vercel Functions. Duplica lógica del App Router. Borrar.
-  - [src/app/support/page.tsx.backup](src/app/support/page.tsx.backup), [src/app/product-details/page.backup.txt](src/app/product-details/page.backup.txt), `estructura.txt` (168K dump). Borrar.
 - **Componentes-dios:**
   - [src/app/admin-dashboard/inventory/components/ProductForm.tsx](src/app/admin-dashboard/inventory/components/ProductForm.tsx) — 1965 líneas
   - [src/app/admin-dashboard/components/OrderDetailsModal.tsx](src/app/admin-dashboard/components/OrderDetailsModal.tsx) — 831 líneas
@@ -162,7 +159,7 @@ Total estimado para cerrar los 3 abiertos: **~6-7 horas de trabajo**. Tras ese s
 - **Features huérfanas en DB.** Dos tablas existen en schema pero no se usan en flujos activos:
   - `inventory_logs` — diseñada como audit trail de stock (`previous_stock`, `new_stock`, `change_type`, `reason`, `created_by`). La RPC `apply_order_stock_once` NO escribe en ella. O se completa el patrón (insert por cada cambio) o se borra la tabla. Hoy es ruido.
   - `customer_addresses` — libreta de direcciones para usuarios logueados. El checkout es 100% guest y `orders` denormaliza el shipping. Reservada para feature futura de "mis direcciones" o muerta de origen — confirmar intención antes de planificar trabajo encima.
-- **61 `console.log`/`console.error`** sin logger estructurado ni Sentry.
+- **`console.log`/`console.error` sin logger estructurado.** Resuelto **parcialmente 2026-05-23 (PF-04)**: `mp-webhook` ya usa [src/lib/logging/webhookLogger.ts](src/lib/logging/webhookLogger.ts) con output JSON. Resto del repo (~50 ocurrencias entre routes admin, MP preference, create-order, componentes) sigue con `console.*` plano. Cuando se sume Sentry/Logtail, esos `console.*` quedan capturados automáticamente al nivel error pero sin contexto estructurado (paymentId, orderId, etc.). Si se va a invertir en observabilidad, reemplazar `console.*` por un logger general (`appLogger` parallelo al `webhookLogger`) es el paso correcto.
 - **Tests sólo en API + validator.** No hay E2E del flujo de checkout.
 - ~~**🔴 Modelo de stock de packs incoherente.**~~ **RESUELTO 2026-05-23** — ver sección "Stock de packs es DERIVADO" en Convenciones (incluye SQL one-shot para limpieza del JSONB zombie pendiente, no bloqueante).
 - **`products.stock_count` puede desfasarse de la suma de variantes** (detectado 2026-05-23: MicroSD tenía variante Negro=9 pero `stock_count=8`). El form re-sincroniza `stock_count = sum(variants.stock)` solo cuando se edita una variante en el form ([ProductForm.tsx:753](src/app/admin-dashboard/inventory/components/ProductForm.tsx#L753)). Si la data vino por SQL/migración o se editó sin re-guardar, queda desfasado. **Impacto:** el cálculo de stock de kits es conservador (usa `stock_count`), así que no oversold-ea, pero puede sub-estimar disponibilidad. SQL de sync one-shot para correr en Supabase Studio cuando convenga:
@@ -279,20 +276,24 @@ Reglas (siguiendo doc oficial MP):
 - `ts` del header `x-signature` está en **segundos** Unix. Ventana anti-replay: ±5 minutos (configurable vía `toleranceMs`).
 - Comparación `crypto.timingSafeEqual`. Si los largos difieren → rechazo directo sin throw.
 
-**Política de status codes (PF-04, post-2026-05-23):**
+**Política de status codes (vigente, cerrada en PF-04):**
 - Firma inválida o ts fuera de ventana → `401`. MP no debe reintentar.
 - Errores **no recuperables** (id missing, orderId missing en payment, orden no existe en DB) → `200` con `reason` explícito en body. Reintentar no cambia el resultado.
 - Errores **transitorios nuestros** (DB update failed, excepción no manejada) → `500`. MP reintenta automáticamente.
 - Stock apply failed → `500`. MP reintenta y el camino de recovery (`mustRecoverStock`) ataca el stock pendiente.
-- **No usar más `console.log/warn/error` directamente** — usar `logWebhookEvent` de [src/lib/logging/webhookLogger.ts](src/lib/logging/webhookLogger.ts) para que los logs sean JSON estructurado.
+- **No usar `console.log/warn/error` directamente** en este route — usar `logWebhookEvent` de [src/lib/logging/webhookLogger.ts](src/lib/logging/webhookLogger.ts) para que los logs sean JSON estructurado.
 
 **Env vars requeridas** (server-only, sin prefijo `NEXT_PUBLIC_`):
 - `MP_ACCESS_TOKEN` — credencial de la app, usada para `GET /v1/payments/:id`.
 - `MP_WEBHOOK_SECRET` — clave secreta del webhook. **Distinta** del access token. Dashboard → Tus integraciones → la app → Webhooks → "Revelar clave secreta". Hay una por entorno (test/prod).
 
-Tests del route mockean `MP_WEBHOOK_SECRET` y firman las requests con el helper `signManifest`. Ver [src/app/api/mp-webhook/route.test.ts](src/app/api/mp-webhook/route.test.ts) — incluye 2 tests negativos (sin signature → 401, signature tampered → 401).
+Tests del route mockean `MP_WEBHOOK_SECRET` y firman las requests con el helper `signManifest`. Ver [src/app/api/mp-webhook/route.test.ts](src/app/api/mp-webhook/route.test.ts) — incluye 5 tests negativos: sin signature → 401, signature tampered → 401, order-not-found → 200 con `reason`, DB update error → 500, excepción no manejada → 500.
 
-**Verificado en producción (2026-05-22):** smoke test contra `https://povstore.uy/api/mp-webhook` pasó 4/4 casos: sin firma → 401 `missing_signature`, firma adulterada → 401 `invalid`, ts 10 min viejo → 401 `expired`, firma válida → 200. La env var `MP_WEBHOOK_SECRET` en Vercel matchea con la del dashboard MP (modo de prueba).
+**Verificado en producción:**
+- **2026-05-22** (cierre PF-03, firma HMAC): smoke 4/4 — sin firma → 401 `missing_signature`, firma adulterada → 401 `invalid`, ts 10 min viejo → 401 `expired`, firma válida → 200.
+- **2026-05-23** (cierre PF-04, status codes + logger): smoke 4/4 — `missing_signature`, ts futuro → `expired`, ts pasado → `expired`, ts actual + hash inválido → `invalid`. Vercel Logs confirma JSON estructurado emitido por `webhookLogger`.
+
+La env var `MP_WEBHOOK_SECRET` en Vercel matchea con la del dashboard MP (modo de prueba).
 
 ### Order lookup token (protección de `/api/order-details`)
 [src/app/api/order-details/route.ts](src/app/api/order-details/route.ts) exige `?orderId=<uuid>&token=<hmac>` para devolver PII de una orden. Token inválido o ausente → `404 "Order not found"` (mismo mensaje que orden-no-existe, **para no filtrar existencia**). Lógica en [src/lib/orders/orderLookupToken.ts](src/lib/orders/orderLookupToken.ts).
@@ -362,7 +363,7 @@ Esta lista cubre las tareas **fuera** de la tabla PF-XX (audit externo) — son 
 - 2026-05-23: historial filtrable de órdenes (`GET /api/admin/orders` + `OrderHistorySection` con URL sync, paginación y summary real). Tests 15/15. Resuelve los review items "sin filtros de órdenes", "AOV ausente" y "conversion rate fake" (este último parcial: el card viejo del dashboard sigue mostrando la métrica fake). Sentó la base de `adminFetch` y `src/config/admin.ts` para reuso futuro.
 - 2026-05-23: refactor de stock de packs a modelo **derivado** (eliminado `pack.stock` editable). Nueva helper `src/lib/packs/computePackStock.ts` con 12 tests. Cierra el bug histórico de "ÚLTIMAS -2" y la deuda 🔴 de "modelo de stock incoherente". `min={0}` agregado a inputs de stock de variante y stock_count general en ProductForm. Endpoint `/api/admin/products` con `sanitizePacksForPersistence()` como defensa en profundidad. Cards de home con chip "AGOTADO" + CTA deshabilitado cuando stock = 0.
 - 2026-05-23: cleanup CLAUDE.md (deduplicación de Issues críticos / Próximos pasos / Deuda técnica, cross-refs entre PF-XX y bugs relacionados, file pointers preservados). De 383 → 370 líneas con densidad informativa mayor.
-- 2026-05-23: **Próximos pasos #1 y #2 cerrados**: `package.json` → `"start": "next start"` (cierra trampa de `npm start` arrancando dev server) + limpieza de código muerto (`api_/`, `estructura.txt`, `src/app/support/page.tsx.backup`, `src/app/product-details/page.backup.txt`). Cero imports a `api_/` verificados antes de borrar.
+- 2026-05-23: cleanup de repo: `package.json` → `"start": "next start"` (cierra trampa de `npm start` arrancando dev server por error) + borrado de código muerto (`api_/` con 5 archivos legacy de Vercel Functions, `estructura.txt` 168K dump, 2 `.backup` files). Cero imports a `api_/` verificados antes de borrar.
 - 2026-05-23: cerrado **PF-10** (test frágil i18n). Assertion en `route.test.ts:547` referenciaba string en inglés cuando la respuesta era en español. Fix: importar `apiErrorMessages.createOrder.idempotencyConflict` del diccionario canónico — el test ahora sigue válido aunque el copy cambie. Suite full 76/76.
 - 2026-05-23: cerrado **PF-07** (`mp-preference` sin guard de estado). Guard agregado post-load de orden en `mp-preference/route.ts`: rechaza `409` para `payment_status ∈ {completed, refunded}` o `order_status === 'cancelled'`. Permite `failed` para retries. 3 mensajes nuevos en `apiErrorMessages.mpPreference`. Suite 76/76. Tests específicos del guard pendientes como follow-up opcional. Smoke test 2/2 contra prod (POV-889886 completed + POV-356707 cancelled).
 - 2026-05-23: cerrado **PF-06** (drift de precios UI/backend). Modelo **hibrid**: cliente opcionalmente envía `expectedTotal` + `strictPricing`. Default (`strictPricing!==true`) → modo informativo: orden se crea, response incluye `priceDrift: { expected, computed, diff }`. `strictPricing===true` → modo enterprise: `409` + breakdown, orden no se crea. 100% backwards compat (front actual sigue funcionando sin cambios). Mensaje `priceDriftRejected` agregado al diccionario. 4 tests nuevos. Suite 80/80. Front pendiente de wirear el flag.
