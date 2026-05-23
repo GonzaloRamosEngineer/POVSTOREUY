@@ -121,23 +121,24 @@ Audit externo recibido 2026-05-23. 10 puntos catalogados PF-01 a PF-10. Esta tab
 | PF-04 | P1 | Webhook "traga" errores y responde `ok:true` | ❌ Abierto | [mp-webhook/route.ts:91-94, 124-127, 151-154](src/app/api/mp-webhook/route.ts) — 4 ramas devuelven `ok:true` sin alerting. Solución: logger estructurado + dead-letter o `500` explícito para que MP reintente. |
 | PF-05 | P0 | `create-order` no transaccional (orders + items separados) | ❌ Abierto | Insert split entre [create-order/route.ts:458-481](src/app/api/create-order/route.ts#L458-L481) (orders) y [línea 518](src/app/api/create-order/route.ts#L518) (items). Si falla items → orden huérfana. Solución: RPC `create_order_transactional` con commit atómico. |
 | PF-06 | P1 | Drift de precios UI vs backend | ⚠️ Parcial | Server recalcula con `getMethodPrice` (correcto a nivel integridad), pero no devuelve diff explícito al cliente. Solución: incluir `price_drift: true` + breakdown en respuesta cuando el total ≠ esperado. |
-| PF-07 | P1 | `mp-preference` no valida estado de orden | ❌ Abierto | [mp-preference/route.ts:58-67](src/app/api/mp-preference/route.ts#L58-L67) no chequea `payment_status`/`order_status` antes de crear preference. Solución: guard al inicio (rechazar si `payment_status='completed'` o `order_status='cancelled'`). Esfuerzo: ~15 min. |
+| PF-07 | P1 | `mp-preference` no valida estado de orden | ✅ Cerrado 2026-05-23 | Guard agregado en [mp-preference/route.ts:69-80](src/app/api/mp-preference/route.ts#L69-L80) post-load de orden. Rechaza `409` si `payment_status ∈ {completed, refunded}` o `order_status === 'cancelled'`. Permite `failed` (retry intencional). Mensajes en `apiErrorMessages.mpPreference.orderAlreadyPaid/orderCancelled/orderRefunded`. Suite 76/76. Tests específicos del guard: pendientes (~30 min, no bloqueantes). |
 | PF-08 | P1 | Sin compensación de stock al revertir `payment_status` | ⚠️ Parcial | [admin/orders/[id]/route.ts:279-307](src/app/api/admin/orders/%5Bid%5D/route.ts#L279-L307) restringe transiciones y aplica stock en `completed`, pero al revertir `completed → pending/failed` no devuelve stock. Solución: RPC `revert_order_stock_once` simétrica + llamarla desde admin PATCH. |
 | PF-09 | P2 | Detección pickup vía `!shipping_address` | ❌ Abierto | Patrón hardcodeado en 6 lugares ([admin/orders/[id]/route.ts:123](src/app/api/admin/orders/%5Bid%5D/route.ts#L123), [OrdersTable.tsx:76](src/app/admin-dashboard/components/OrdersTable.tsx#L76), [OrderHistoryTable.tsx:111](src/app/admin-dashboard/components/OrderHistoryTable.tsx#L111), [OrderDetailsModal.tsx](src/app/admin-dashboard/components/OrderDetailsModal.tsx), [OrderConfirmationInteractive.tsx:159](src/app/order-confirmation/components/OrderConfirmationInteractive.tsx#L159)). Solución: columna explícita `delivery_method` enum en `orders` + migration de backfill. |
 | PF-10 | P2 | Test frágil por texto literal i18n | ✅ Cerrado 2026-05-23 | Confirmado: assertion en [route.test.ts:547](src/app/api/create-order/route.test.ts#L547) esperaba `'Idempotency key already used'` (inglés) pero el mensaje real era `apiErrorMessages.createOrder.idempotencyConflict` (español). Fix: assertion ahora referencia la constante del diccionario, así si el copy cambia el test sigue válido. Suite 76/76. |
 
-**Estado consolidado al 2026-05-23:** 4/10 cerrados (los tres P0 de auth/firma + PF-10). Quedan 2 P0 abiertos (PF-04, PF-05), 3 P1 (PF-06 parcial, PF-07, PF-08 parcial), 1 P2 (PF-09).
+**Estado consolidado al 2026-05-23:** 5/10 cerrados (los tres P0 de auth/firma + PF-10 + PF-07). Quedan 2 P0 abiertos (PF-04, PF-05), 2 P1 (PF-06 parcial, PF-08 parcial), 1 P2 (PF-09).
 
 **Orden sugerido de cierre** (severidad + ratio impacto/esfuerzo, ortogonal a "Próximos pasos recomendados"):
 
-1. **PF-07** (~15 min, alto impacto): un `if` al inicio de `mp-preference`. Quick win.
-2. **PF-05** (~3-4 h): RPC transaccional. Cierra el P0 más grave que queda.
-3. **PF-04** (~2 h): logger estructurado + dejar de tragar errores en webhook.
-4. **PF-08** (~2 h): RPC de reversión simétrica + llamada desde admin PATCH.
-5. **PF-09** (~1 h): migration + reemplazar las 6 ocurrencias.
-6. **PF-06** (~30 min): flag `price_drift` en respuesta de `create-order`.
+1. **PF-05** (~3-4 h): RPC transaccional. Cierra el P0 más grave que queda.
+2. **PF-04** (~2 h): logger estructurado + dejar de tragar errores en webhook.
+3. **PF-08** (~2 h): RPC de reversión simétrica + llamada desde admin PATCH.
+4. **PF-09** (~1 h): migration + reemplazar las 6 ocurrencias.
+5. **PF-06** (~30 min): flag `price_drift` en respuesta de `create-order`.
 
-Total estimado para cerrar los 6 abiertos: **~9-10 horas de trabajo**. Tras ese sprint, el audit queda 10/10 cerrado.
+Follow-up opcional: **tests del guard PF-07** (~30 min) — crear `mp-preference/route.test.ts` con 3 casos (completed → 409, cancelled → 409, pending → 200 normal). Mockear `getSupabaseAdmin` + `mpCreatePreference`.
+
+Total estimado para cerrar los 5 abiertos: **~9 horas de trabajo**. Tras ese sprint, el audit queda 10/10 cerrado.
 
 **Nota sobre alcance:** los issues 🔴 `.env` commiteada y 🟠 rate-limit ausente listados en "Issues críticos de seguridad PENDIENTES" **no** están en esta tabla — el audit externo no los cubrió. Son prioridad propia (ver "Próximos pasos recomendados" pasos 3 y 4).
 
@@ -356,6 +357,7 @@ Esta lista cubre las tareas **fuera** de la tabla PF-XX (audit externo) — son 
 - 2026-05-23: cleanup CLAUDE.md (deduplicación de Issues críticos / Próximos pasos / Deuda técnica, cross-refs entre PF-XX y bugs relacionados, file pointers preservados). De 383 → 370 líneas con densidad informativa mayor.
 - 2026-05-23: **Próximos pasos #1 y #2 cerrados**: `package.json` → `"start": "next start"` (cierra trampa de `npm start` arrancando dev server) + limpieza de código muerto (`api_/`, `estructura.txt`, `src/app/support/page.tsx.backup`, `src/app/product-details/page.backup.txt`). Cero imports a `api_/` verificados antes de borrar.
 - 2026-05-23: cerrado **PF-10** (test frágil i18n). Assertion en `route.test.ts:547` referenciaba string en inglés cuando la respuesta era en español. Fix: importar `apiErrorMessages.createOrder.idempotencyConflict` del diccionario canónico — el test ahora sigue válido aunque el copy cambie. Suite full 76/76.
+- 2026-05-23: cerrado **PF-07** (`mp-preference` sin guard de estado). Guard agregado post-load de orden en `mp-preference/route.ts`: rechaza `409` para `payment_status ∈ {completed, refunded}` o `order_status === 'cancelled'`. Permite `failed` para retries. 3 mensajes nuevos en `apiErrorMessages.mpPreference`. Suite 76/76. Tests específicos del guard pendientes como follow-up opcional.
 
 **No modificar archivos sin aprobación explícita del usuario.**
 

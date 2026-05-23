@@ -57,13 +57,25 @@ export async function POST(request: Request) {
     // 1. Cargar Orden
     const { data: order, error: oErr } = await supabase
       .from('orders')
-      .select('id, order_number, customer_email, customer_name, payment_method, payment_status, total, shipping_cost, mp_preference_id')
+      .select('id, order_number, customer_email, customer_name, payment_method, payment_status, order_status, total, shipping_cost, mp_preference_id')
       .eq('id', orderId)
       .single();
 
     if (oErr || !order) {
       console.error("Orden no encontrada:", oErr);
       return NextResponse.json({ error: msgs.orderNotFound }, { status: 404 });
+    }
+
+    // 1b. Guard de estado (PF-07): no generar preference sobre órdenes ya pagadas/canceladas/refunded.
+    // Permitir solo payment_status pendiente o failed (retry intencional) y order_status no cancelado.
+    if (order.payment_status === 'completed') {
+      return NextResponse.json({ error: msgs.orderAlreadyPaid }, { status: 409 });
+    }
+    if (order.payment_status === 'refunded') {
+      return NextResponse.json({ error: msgs.orderRefunded }, { status: 409 });
+    }
+    if (order.order_status === 'cancelled') {
+      return NextResponse.json({ error: msgs.orderCancelled }, { status: 409 });
     }
 
     // 2. Cargar Items
