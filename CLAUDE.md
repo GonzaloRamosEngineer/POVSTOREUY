@@ -105,20 +105,42 @@ Todos son `USER-DEFINED` types. **No usar `text` en columnas que apunten a estos
 ### Observaciones para futuras sesiones
 
 - Si vas a agregar un valor a un ENUM, hay que hacerlo vía `ALTER TYPE ... ADD VALUE` (no se puede en transacción para todos los Postgres versions). Crear migration explícito.
-- Si querés implementar la feature "mis direcciones", `customer_addresses` ya existe y está lista.
-- Si querés audit trail real de stock, completar la escritura a `inventory_logs` en `apply_order_stock_once` (hoy ese RPC no la usa).
+- Sobre `inventory_logs` y `customer_addresses` (tablas huérfanas marcadas con ⚠ arriba): ver "Features huérfanas en DB" en Deuda técnica para el estado y la decisión pendiente.
 
 ---
 
-## Issues críticos de seguridad PENDIENTES
+## Audit PF-XX — estado de cierre
 
-| Sev | Issue | Archivo |
-|---|---|---|
-| 🔴 Crítica | `.env` con credenciales reales commiteada al repo. Rotar todo y purgar del historial. Existe [.env.example](.env.example) como plantilla canónica desde 2026-05-22. | [.env](.env) |
-| 🟠 Alta | `typescript.ignoreBuildErrors: true` y `eslint.ignoreDuringBuilds: true`. | [next.config.mjs](next.config.mjs) |
-| 🟠 Alta | `tsconfig.strict: false` + 106 usos de `: any` + 4 `@ts-ignore` en `src/`. | [tsconfig.json](tsconfig.json) |
-| 🟠 Alta | Sin rate-limit ni captcha en `/api/create-order`, `/api/newsletter/subscribe`, `/api/mp-preference`. | — |
-| 🟠 Alta | `package.json` → `"start": "next dev -p 4028"` (corre dev server si alguien hace `npm start`). | [package.json](package.json) |
+Audit externo recibido 2026-05-23. 10 puntos catalogados PF-01 a PF-10. Esta tabla es la **fuente única de verdad** del estado de cada uno. Al cerrar uno: actualizar fecha + evidencia + commit ref.
+
+| ID | Sev | Descripción | Estado | Evidencia / Pendiente |
+|---|---|---|---|---|
+| PF-01 | P0 | `order-details` expone PII por `orderId` sin auth | ✅ Cerrado 2026-05-23 | HMAC token en [src/lib/orders/orderLookupToken.ts](src/lib/orders/orderLookupToken.ts) + verificación en [order-details/route.ts:22-26](src/app/api/order-details/route.ts#L22-L26). Smoke 3/3 en prod. |
+| PF-02 | P0 | Admin GET/PATCH sin control auth en handler | ✅ Cerrado 2026-05-22 | `requireAdmin` en [admin/orders/[id]/route.ts:17-38](src/app/api/admin/orders/%5Bid%5D/route.ts#L17-L38). Replicado en `/api/admin/orders` y `/api/admin/products`. |
+| PF-03 | P0 | Webhook sin verificación de firma/origen | ✅ Cerrado 2026-05-22 | `verifyMpWebhookSignature` en [src/lib/mp/verifyWebhookSignature.ts](src/lib/mp/verifyWebhookSignature.ts) + check en [mp-webhook/route.ts:53-66](src/app/api/mp-webhook/route.ts#L53-L66). Smoke 4/4 en prod. |
+| PF-04 | P1 | Webhook "traga" errores y responde `ok:true` | ❌ Abierto | [mp-webhook/route.ts:91-94, 124-127, 151-154](src/app/api/mp-webhook/route.ts) — 4 ramas devuelven `ok:true` sin alerting. Solución: logger estructurado + dead-letter o `500` explícito para que MP reintente. |
+| PF-05 | P0 | `create-order` no transaccional (orders + items separados) | ❌ Abierto | Insert split entre [create-order/route.ts:458-481](src/app/api/create-order/route.ts#L458-L481) (orders) y [línea 518](src/app/api/create-order/route.ts#L518) (items). Si falla items → orden huérfana. Solución: RPC `create_order_transactional` con commit atómico. |
+| PF-06 | P1 | Drift de precios UI vs backend | ⚠️ Parcial | Server recalcula con `getMethodPrice` (correcto a nivel integridad), pero no devuelve diff explícito al cliente. Solución: incluir `price_drift: true` + breakdown en respuesta cuando el total ≠ esperado. |
+| PF-07 | P1 | `mp-preference` no valida estado de orden | ❌ Abierto | [mp-preference/route.ts:58-67](src/app/api/mp-preference/route.ts#L58-L67) no chequea `payment_status`/`order_status` antes de crear preference. Solución: guard al inicio (rechazar si `payment_status='completed'` o `order_status='cancelled'`). Esfuerzo: ~15 min. |
+| PF-08 | P1 | Sin compensación de stock al revertir `payment_status` | ⚠️ Parcial | [admin/orders/[id]/route.ts:279-307](src/app/api/admin/orders/%5Bid%5D/route.ts#L279-L307) restringe transiciones y aplica stock en `completed`, pero al revertir `completed → pending/failed` no devuelve stock. Solución: RPC `revert_order_stock_once` simétrica + llamarla desde admin PATCH. |
+| PF-09 | P2 | Detección pickup vía `!shipping_address` | ❌ Abierto | Patrón hardcodeado en 6 lugares ([admin/orders/[id]/route.ts:123](src/app/api/admin/orders/%5Bid%5D/route.ts#L123), [OrdersTable.tsx:76](src/app/admin-dashboard/components/OrdersTable.tsx#L76), [OrderHistoryTable.tsx:111](src/app/admin-dashboard/components/OrderHistoryTable.tsx#L111), [OrderDetailsModal.tsx](src/app/admin-dashboard/components/OrderDetailsModal.tsx), [OrderConfirmationInteractive.tsx:159](src/app/order-confirmation/components/OrderConfirmationInteractive.tsx#L159)). Solución: columna explícita `delivery_method` enum en `orders` + migration de backfill. |
+| PF-10 | P2 | Test frágil por texto literal i18n | ❓ Verificar | Posible match con "1 test pre-existente fallando" registrado en Deuda técnica ([create-order/route.test.ts](src/app/api/create-order/route.test.ts), caso "same idempotency_key + different logical payload returns 409"). Abrir el test y confirmar si el mismatch es i18n o lógico. |
+
+**Estado consolidado al 2026-05-23:** 3/10 cerrados (los tres P0 de auth/firma). Quedan 2 P0 abiertos (PF-04, PF-05), 3 P1 (PF-06 parcial, PF-07, PF-08 parcial), 2 P2 (PF-09, PF-10).
+
+**Orden sugerido de cierre** (severidad + ratio impacto/esfuerzo, ortogonal a "Próximos pasos recomendados"):
+
+1. **PF-07** (~15 min, alto impacto): un `if` al inicio de `mp-preference`. Quick win.
+2. **PF-05** (~3-4 h): RPC transaccional. Cierra el P0 más grave que queda.
+3. **PF-04** (~2 h): logger estructurado + dejar de tragar errores en webhook.
+4. **PF-08** (~2 h): RPC de reversión simétrica + llamada desde admin PATCH.
+5. **PF-10** (~15 min): leer el test, confirmar si es i18n y arreglar string.
+6. **PF-09** (~1 h): migration + reemplazar las 6 ocurrencias.
+7. **PF-06** (~30 min): flag `price_drift` en respuesta de `create-order`.
+
+Total estimado para cerrar los 7 abiertos: **~9-10 horas de trabajo**. Tras ese sprint, el audit queda 10/10 cerrado.
+
+**Nota sobre alcance:** los issues 🔴 `.env` commiteada y 🟠 rate-limit ausente listados en "Issues críticos de seguridad PENDIENTES" **no** están en esta tabla — el audit externo no los cubrió. Son prioridad propia (ver "Próximos pasos recomendados" pasos 3 y 4).
 
 ---
 
@@ -132,17 +154,17 @@ Todos son `USER-DEFINED` types. **No usar `text` en columnas que apunten a estos
   - [src/app/admin-dashboard/components/OrderDetailsModal.tsx](src/app/admin-dashboard/components/OrderDetailsModal.tsx) — 831 líneas
   - [src/app/product-details/components/ProductDetailsInteractive.tsx](src/app/product-details/components/ProductDetailsInteractive.tsx) — 718 líneas
 - **Mezcla `.js`/`.ts`** en [src/lib/](src/lib/) — tipar todo.
-- **Race condition en stock**: el chequeo en [src/app/api/create-order/route.ts](src/app/api/create-order/route.ts) NO es transaccional con la RPC `apply_order_stock_once` ([migrations/20260317_stage3_3a_stock_once_rpc.sql](migrations/20260317_stage3_3a_stock_once_rpc.sql)). La RPC usa `GREATEST(0, …)` y silenciosamente permite oversold. Debería `RAISE EXCEPTION` cuando `stock_count < qty`.
+- **Race condition en stock**: el chequeo en [src/app/api/create-order/route.ts](src/app/api/create-order/route.ts) NO es transaccional con la RPC `apply_order_stock_once` ([migrations/20260317_stage3_3a_stock_once_rpc.sql](migrations/20260317_stage3_3a_stock_once_rpc.sql)). La RPC usa `GREATEST(0, …)` y silenciosamente permite oversold. Debería `RAISE EXCEPTION` cuando `stock_count < qty`. **Relacionado con PF-05** (atomicidad de create-order), pero es un bug distinto — PF-05 ataca orden+items, esto ataca el descuento de stock. Idealmente la solución de PF-05 (RPC `create_order_transactional`) incorpora también este RAISE EXCEPTION.
 - ~~**Estados libres** (`order_status`, `payment_status`) como `text` sin ENUM ni CHECK en DB.~~ **CORRECCIÓN 2026-05-23:** los ENUMs sí existen en DB (revisión del schema). Ver sección "Esquema de base de datos". La deuda real acá es **mantener sincronizadas** las listas de valores permitidos del código (en `route.ts`, `OrderDetailsModal.tsx`, etc.) con los valores reales del ENUM — riesgo de divergencia silenciosa si alguien agrega un valor en DB sin actualizar el TypeScript.
-- **Lógica de negocio hardcodeada** en route: shipping (`subtotal >= 2000 ? 0 : 300`), `URUGUAY_DEPARTMENTS`.
+- **Lógica de negocio hardcodeada en route:** shipping `subtotal >= 2000 ? 0 : 300` en [src/app/api/create-order/route.ts](src/app/api/create-order/route.ts). Debería vivir en config / tabla `tenant_settings`.
 - **`URUGUAY_DEPARTMENTS` triplicado entre código y DB.** Existe como `Set` hardcodeado en [src/app/api/create-order/route.ts](src/app/api/create-order/route.ts), como array hardcodeado en [src/app/admin-dashboard/components/OrderFilters.tsx](src/app/admin-dashboard/components/OrderFilters.tsx) (filtro del historial, sumado 2026-05-23) Y como ENUM `department` en Postgres. Si alguien agrega un valor a uno solo, se rompe silenciosamente. Solución: derivar la lista del ENUM (lectura de `pg_enum` o `information_schema.columns`) o usar Supabase types autogenerados. Mientras tanto: si tocás uno, tocá los tres.
 - **Features huérfanas en DB.** Dos tablas existen en schema pero no se usan en flujos activos:
   - `inventory_logs` — diseñada como audit trail de stock (`previous_stock`, `new_stock`, `change_type`, `reason`, `created_by`). La RPC `apply_order_stock_once` NO escribe en ella. O se completa el patrón (insert por cada cambio) o se borra la tabla. Hoy es ruido.
   - `customer_addresses` — libreta de direcciones para usuarios logueados. El checkout es 100% guest y `orders` denormaliza el shipping. Reservada para feature futura de "mis direcciones" o muerta de origen — confirmar intención antes de planificar trabajo encima.
 - **61 `console.log`/`console.error`** sin logger estructurado ni Sentry.
 - **Tests sólo en API + validator.** No hay E2E del flujo de checkout.
-- ~~**🔴 Modelo de stock de packs incoherente.**~~ **RESUELTO 2026-05-23** — ver sección "Stock de packs es DERIVADO" en Convenciones. Pendiente: limpieza one-shot del JSONB para sacar los `stock` zombie (-2, -1) que quedaron persistidos; no es bloqueante porque el nuevo código los ignora.
-- **1 test pre-existente fallando** en `src/app/api/create-order/route.test.ts` (caso "same idempotency_key + different logical payload returns 409"). No introducido en sesiones recientes; pertenece a su propia investigación.
+- ~~**🔴 Modelo de stock de packs incoherente.**~~ **RESUELTO 2026-05-23** — ver sección "Stock de packs es DERIVADO" en Convenciones (incluye SQL one-shot para limpieza del JSONB zombie pendiente, no bloqueante).
+- **1 test pre-existente fallando** en [src/app/api/create-order/route.test.ts](src/app/api/create-order/route.test.ts) (caso "same idempotency_key + different logical payload returns 409"). Ver tracking en **PF-10** (tabla Audit PF-XX).
 - **`products.stock_count` puede desfasarse de la suma de variantes** (detectado 2026-05-23: MicroSD tenía variante Negro=9 pero `stock_count=8`). El form re-sincroniza `stock_count = sum(variants.stock)` solo cuando se edita una variante en el form ([ProductForm.tsx:753](src/app/admin-dashboard/inventory/components/ProductForm.tsx#L753)). Si la data vino por SQL/migración o se editó sin re-guardar, queda desfasado. **Impacto:** el cálculo de stock de kits es conservador (usa `stock_count`), así que no oversold-ea, pero puede sub-estimar disponibilidad. SQL de sync one-shot para correr en Supabase Studio cuando convenga:
   ```sql
   UPDATE products SET stock_count = (
@@ -166,7 +188,7 @@ Pasos:
 3. Consultar `user_profiles.role === 'admin'`.
 4. Devolver `401`/`403` con mensajes del diccionario del endpoint (cada uno tiene su sub-sección `auth`).
 
-**Lado cliente:** preferí [src/lib/api/adminFetch.ts](src/lib/api/adminFetch.ts) (ver sección dedicada abajo). Las llamadas con `fetch` manual + `getAuthHeader()` que sobreviven en `ProductForm.tsx`, `InventoryPageInteractive.tsx` y `OrderDetailsModal.tsx` son legacy a migrar.
+**Lado cliente:** preferí [src/lib/api/adminFetch.ts](src/lib/api/adminFetch.ts) (ver sección dedicada abajo para uso + pendientes de migración).
 
 **Tests:** mockear `supabase.auth.getUser` + `from('user_profiles')` con el rol deseado. Ver [src/app/api/admin/orders/[id]/route.test.ts](src/app/api/admin/orders/[id]/route.test.ts) y [src/app/api/admin/orders/route.test.ts](src/app/api/admin/orders/route.test.ts) — incluyen tests negativos (401 sin token, 403 con role no admin).
 
@@ -301,41 +323,40 @@ Tests: [src/lib/orders/orderLookupToken.test.ts](src/lib/orders/orderLookupToken
 
 ## Próximos pasos recomendados (orden sugerido)
 
-Estado al 2026-05-23: de los 4 issues 🔴 del audit original, **3 cerrados** (admin orders auth + MP webhook HMAC + order-details IDOR — todos verificados en prod). Queda 1 crítico + 4 de severidad alta. Orden sugerido:
+Esta lista cubre las tareas **fuera** de la tabla PF-XX (audit externo) — son prioridades propias del proyecto. Para estado del audit externo ver sección "Audit PF-XX". Orden sugerido por ratio impacto/esfuerzo:
 
-1. **🟠 `package.json` → `"start": "next start"`** — *Esfuerzo: ~2 min. Impacto: medio.*
-   Trivial: cambiar `"start": "next dev -p 4028"` por `"start": "next start"` y mover el dev a `"dev": "next dev -p 4028"` (ya existe). Cierra la trampa de "alguien corre npm start en prod y arranca el dev server".
-
-2. **🟠 Limpieza de código muerto** — *Esfuerzo: ~10 min. Impacto: bajo, pero higiene.*
-   Borrar [api_/](api_/), `*.backup`, `estructura.txt`. Cero riesgo de regresión (ya verificado que `api_/` no se importa desde nadie). Buen first-commit para demostrar que el repo es activo.
-
-3. **🟠 Rate-limit en endpoints públicos** — *Esfuerzo: ~1.5 h. Impacto: alto.*
+1. **🟠 Rate-limit en endpoints públicos** — *Esfuerzo: ~1.5 h. Impacto: alto.*
    `POST /api/create-order`, `POST /api/newsletter/subscribe`, `POST /api/mp-preference` están abiertos sin throttle. Recomendado: `@upstash/ratelimit` + `@upstash/redis` (free tier alcanza), wrapper middleware-style. Como bonus, captcha (hCaptcha o Turnstile) en el newsletter.
 
-4. **🔴 `.env` commiteada / rotación de credenciales** — *Esfuerzo: ~1 h. Impacto: alto pero destructivo.*
+2. **🔴 `.env` commiteada / rotación de credenciales** — *Esfuerzo: ~1 h. Impacto: alto pero destructivo.*
    Único 🔴 que queda. Tres sub-pasos: (a) rotar las credenciales reales en Supabase + MercadoPago dashboard + regenerar `ORDER_LOOKUP_SECRET`, (b) actualizar `.env` local y env vars en Vercel, (c) purgar el `.env` del historial con `git filter-repo` y `git push --force` (coordinar con cualquier otro dev que tenga la rama). El `.env.example` ya está commiteado como plantilla. Hacer cuando estés sin presión — `--force` push es irreversible para colaboradores.
 
-5. **🟠 Endurecer TypeScript** — *Esfuerzo: ~2-4 h. Impacto: medio.*
-   Quitar `ignoreBuildErrors` y `ignoreDuringBuilds` en `next.config.mjs`, poner `strict: true` en `tsconfig.json`, arreglar los errores que aparezcan (esperables: muchos `any` implícitos, algunos `@ts-ignore` que esconden bugs reales). Sin prisa pero acumula deuda silenciosa.
+3. **🟠 Endurecer TypeScript** — *Esfuerzo: ~2-4 h. Impacto: medio.*
+   Quitar `ignoreBuildErrors` y `ignoreDuringBuilds` en [next.config.mjs](next.config.mjs), poner `strict: true` en [tsconfig.json](tsconfig.json), arreglar los errores que aparezcan (esperables: 106 usos de `: any` + 4 `@ts-ignore` en `src/`, algunos esconden bugs reales). Sin prisa pero acumula deuda silenciosa.
 
-6. **🟡 Migrar `OrderDetailsModal.tsx`, `ProductForm.tsx`, `InventoryPageInteractive.tsx` a `adminFetch`** — *Esfuerzo: ~1 h. Impacto: bajo, pero elimina deuda.*
+4. **🟡 Migrar `OrderDetailsModal.tsx`, `ProductForm.tsx`, `InventoryPageInteractive.tsx` a `adminFetch`** — *Esfuerzo: ~1 h. Impacto: bajo, pero elimina deuda.*
    Centraliza retry/refresh de token y manejo de errores. Reemplazar `fetch` manual + `getAuthHeader()` por `adminFetch<T>()`. Riesgo de regresión bajo (la firma de respuesta no cambia). Hacer un componente por vez.
 
-7. **🟡 Quick-action "marcar pagado" inline + export CSV** — *Esfuerzo: ~3-4 h. Impacto: alto operacional.*
+5. **🟡 Quick-action "marcar pagado" inline + export CSV** — *Esfuerzo: ~3-4 h. Impacto: alto operacional.*
    Diferido de la PR de historial filtrable (2026-05-23). Quick-action: botón check verde en cada fila de `OrdersTable` que llama `PATCH /api/admin/orders/[id]` con `payment_status=completed` sin abrir el modal — reduce ~80% de clics en el flujo diario de transferencias. Export CSV: botón en `OrderHistorySection` que descarga el resultado del filtro actual (ya tenemos el endpoint, solo falta endpoint nuevo `/api/admin/orders/export` o un toggle `format=csv`).
 
-8. **🟡 Limpieza one-shot del JSONB `packs[].stock` zombie** — *Esfuerzo: ~5 min en Supabase Studio.*
+6. **🟡 Limpieza one-shot del JSONB `packs[].stock` zombie** — *Esfuerzo: ~5 min en Supabase Studio.*
    El refactor de stock derivado dejó el campo `stock` ignorado pero todavía persistido en el JSONB con valores históricos (incluso negativos). El código nuevo los ignora, así que NO es bloqueante. SQL de limpieza listo en la sección "Stock de packs es DERIVADO" de Convenciones. Correr con backup previo cuando convenga.
+
+7. **🟡 Sync one-shot `products.stock_count` vs suma de variantes** — *Esfuerzo: ~5 min en Supabase Studio.*
+   Detectado 2026-05-23: posibles desfasajes (caso MicroSD: variante Negro=9 pero `stock_count=8`). Impacto: el cálculo de stock de kits es conservador (sub-estima, no oversold-ea). SQL listo en sección "Deuda técnica" — bullet `products.stock_count puede desfasarse`. Correr con backup previo.
 
 **Nota:** los componentes-dios (`ProductForm.tsx` 1965 LOC, etc.) y la falta de tests E2E son deuda mayor pero no urgente. Se atacan cuando se necesite tocar esas zonas — refactor incremental, no big-bang.
 
 **Logros recientes** (referencia para futuras sesiones):
 - 2026-05-21: audit inicial.
-- 2026-05-22: cerrado admin orders auth (commit + deploy verificado en prod).
-- 2026-05-22: cerrado MP webhook HMAC (commit + deploy + smoke test 4/4 contra prod).
-- 2026-05-23: cerrado order-details IDOR (commit + deploy + smoke test 3/3 contra prod, incluyendo happy path con orden real).
+- 2026-05-22: cerrado admin orders auth (= **PF-02**) (commit + deploy verificado en prod).
+- 2026-05-22: cerrado MP webhook HMAC (= **PF-03**) (commit + deploy + smoke test 4/4 contra prod).
+- 2026-05-23: cerrado order-details IDOR (= **PF-01**) (commit + deploy + smoke test 3/3 contra prod, incluyendo happy path con orden real).
 - 2026-05-23: historial filtrable de órdenes (`GET /api/admin/orders` + `OrderHistorySection` con URL sync, paginación y summary real). Tests 15/15. Resuelve los review items "sin filtros de órdenes", "AOV ausente" y "conversion rate fake" (este último parcial: el card viejo del dashboard sigue mostrando la métrica fake). Sentó la base de `adminFetch` y `src/config/admin.ts` para reuso futuro.
 - 2026-05-23: refactor de stock de packs a modelo **derivado** (eliminado `pack.stock` editable). Nueva helper `src/lib/packs/computePackStock.ts` con 12 tests. Cierra el bug histórico de "ÚLTIMAS -2" y la deuda 🔴 de "modelo de stock incoherente". `min={0}` agregado a inputs de stock de variante y stock_count general en ProductForm. Endpoint `/api/admin/products` con `sanitizePacksForPersistence()` como defensa en profundidad. Cards de home con chip "AGOTADO" + CTA deshabilitado cuando stock = 0.
+- 2026-05-23: cleanup CLAUDE.md (deduplicación de Issues críticos / Próximos pasos / Deuda técnica, cross-refs entre PF-XX y bugs relacionados, file pointers preservados). De 383 → 370 líneas con densidad informativa mayor.
+- 2026-05-23: **Próximos pasos #1 y #2 cerrados**: `package.json` → `"start": "next start"` (cierra trampa de `npm start` arrancando dev server) + limpieza de código muerto (`api_/`, `estructura.txt`, `src/app/support/page.tsx.backup`, `src/app/product-details/page.backup.txt`). Cero imports a `api_/` verificados antes de borrar.
 
 **No modificar archivos sin aprobación explícita del usuario.**
 
