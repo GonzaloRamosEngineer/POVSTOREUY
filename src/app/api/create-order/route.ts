@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { createHash, randomUUID } from 'crypto';
 import { getSupabaseAdmin } from '@/lib/supabaseAdmin';
+import { applyRateLimit, getClientIp } from '@/lib/rateLimit/apply';
+import { getCreateOrderLimiters } from '@/lib/rateLimit/limiters';
 // IMPORTAMOS EL NUEVO DICCIONARIO
 import { apiErrorMessages } from '@/messages/apiErrorMessages';
 
@@ -186,6 +188,10 @@ export async function POST(request: Request) {
   const msgs = apiErrorMessages.createOrder;
 
   try {
+    const { perMinute, perHour } = getCreateOrderLimiters();
+    const { blockedResponse } = await applyRateLimit(getClientIp(request), [perMinute, perHour]);
+    if (blockedResponse) return blockedResponse;
+
     const supabase = getSupabaseAdmin();
     const body = await request.json();
     const { customerInfo, items, paymentMethod, deliveryMethod, idempotency_key, expectedTotal, strictPricing } = body;

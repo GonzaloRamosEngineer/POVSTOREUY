@@ -1,6 +1,9 @@
 // src/messages/apiErrorMessages.ts
 
 export const apiErrorMessages = {
+  common: {
+    rateLimited: 'Demasiadas solicitudes desde tu conexión. Esperá unos minutos y volvé a intentar.',
+  },
   createOrder: {
     // Errores de Validación (Helpers)
     validation: {

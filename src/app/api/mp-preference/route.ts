@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 // @ts-ignore
 import { getSupabaseAdmin } from '@/lib/supabaseAdmin';
 import { signOrderLookupToken } from '@/lib/orders/orderLookupToken';
+import { applyRateLimit, getClientIp } from '@/lib/rateLimit/apply';
+import { getMpPreferenceLimiter } from '@/lib/rateLimit/limiters';
 // IMPORTAMOS EL DICCIONARIO
 import { apiErrorMessages } from '@/messages/apiErrorMessages';
 
@@ -33,6 +35,9 @@ export async function POST(request: Request) {
   const msgs = apiErrorMessages.mpPreference;
 
   try {
+    const { blockedResponse } = await applyRateLimit(getClientIp(request), [getMpPreferenceLimiter()]);
+    if (blockedResponse) return blockedResponse;
+
     const supabase = getSupabaseAdmin();
     const accessToken = process.env.MP_ACCESS_TOKEN;
     
