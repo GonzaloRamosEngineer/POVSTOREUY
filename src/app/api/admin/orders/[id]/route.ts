@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabaseAdmin';
 import { applyOrderStockOnce } from '../../../../../lib/stock/applyOrderStockOnce';
+import { revertOrderStockOnce } from '../../../../../lib/stock/revertOrderStockOnce';
 // IMPORTAMOS EL NUEVO DICCIONARIO
 import { adminOrderApiMessages } from '@/messages/adminOrderApiMessages';
 
@@ -337,6 +338,39 @@ export async function PATCH(
 
       if (stockResult.no_op) {
         return NextResponse.json({ ...data, no_op: true, stock_reason: stockResult.reason });
+      }
+    }
+
+    // PF-08: Compensación simétrica. Si la orden tenía stock aplicado y el PATCH
+    // la "des-completa", restituir stock vía RPC simétrica.
+    // Trigger es la transición real, no la action del admin — cubre los 4 caminos:
+    // (1) admin baja payment_status manualmente, (2) cancel_payment en bank_transfer,
+    // (3) cancel_mp en MercadoPago, (4) cualquier otro flujo que setee
+    // updateData.payment_status a algo != 'completed'.
+    const finalPaymentStatus = updateData.payment_status ?? currentOrder.payment_status;
+    const wasCompletedAndApplied =
+      currentOrder.payment_status === 'completed' && currentOrder.stock_applied_at !== null;
+    const transitioningOut = finalPaymentStatus !== 'completed';
+
+    if (wasCompletedAndApplied && transitioningOut) {
+      const revertResult = await revertOrderStockOnce({
+        supabase,
+        orderId: currentOrder.id,
+      });
+
+      if (!revertResult.ok) {
+        return NextResponse.json(
+          { error: msgs.stockRevertError, details: revertResult.reason },
+          { status: 500 }
+        );
+      }
+
+      if (revertResult.no_op) {
+        return NextResponse.json({
+          ...data,
+          no_op_revert: true,
+          stock_revert_reason: revertResult.reason,
+        });
       }
     }
 
