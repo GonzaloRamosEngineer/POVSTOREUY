@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabaseAdmin';
 import { applyOrderStockOnce } from '../../../lib/stock/applyOrderStockOnce';
 import { verifyMpWebhookSignature } from '@/lib/mp/verifyWebhookSignature';
+import { logWebhookEvent } from '@/lib/logging/webhookLogger';
 // IMPORTAMOS EL DICCIONARIO
 import { apiErrorMessages } from '@/messages/apiErrorMessages';
 
@@ -42,7 +43,7 @@ export async function POST(request: Request) {
 
     const webhookSecret = process.env.MP_WEBHOOK_SECRET;
     if (!webhookSecret) {
-      console.error('MP_WEBHOOK_SECRET missing');
+      logWebhookEvent('error', 'MP_WEBHOOK_SECRET missing');
       return NextResponse.json({ error: msgs.missingWebhookSecret }, { status: 500 });
     }
 
@@ -58,7 +59,7 @@ export async function POST(request: Request) {
     });
 
     if (!verification.ok) {
-      console.warn('MP webhook signature rejected:', verification.reason);
+      logWebhookEvent('warn', 'signature rejected', { reason: verification.reason });
       return NextResponse.json(
         { error: msgs.invalidSignature(verification.reason) },
         { status: 401 }
@@ -68,16 +69,18 @@ export async function POST(request: Request) {
     const supabase = getSupabaseAdmin();
 
     if (!id) {
-      console.warn('Webhook without ID');
-      return NextResponse.json({ ok: true });
+      // Firma válida pero sin id — MP no debería reintentar (payload malformado).
+      logWebhookEvent('warn', 'webhook without payment id');
+      return NextResponse.json({ ok: true, reason: 'missing_id' });
     }
 
     const payment = await mpGetPayment(accessToken, id);
     const orderId = payment.external_reference || payment.metadata?.order_id || payment.metadata?.orderId;
 
     if (!orderId) {
-      console.warn('Payment without orderId:', id);
-      return NextResponse.json({ ok: true, received: true });
+      // Payment sin external_reference — no podemos mapear a orden, MP no debería reintentar.
+      logWebhookEvent('warn', 'payment without orderId', { paymentId: String(id), mpStatus: payment.status });
+      return NextResponse.json({ ok: true, reason: 'missing_order_id', received: true });
     }
 
     const { payment_status, order_status } = mapMpToDbStatuses(payment.status);
@@ -89,8 +92,13 @@ export async function POST(request: Request) {
       .single();
 
     if (getErr || !existingOrder) {
-      console.warn('Order not found:', orderId);
-      return NextResponse.json({ ok: true });
+      // Orden referenciada por el payment no existe en nuestra DB — reintentar no la va a crear.
+      logWebhookEvent('warn', 'order not found in DB', {
+        paymentId: String(id),
+        orderId,
+        errorMessage: getErr?.message,
+      });
+      return NextResponse.json({ ok: true, reason: 'order_not_found' });
     }
 
     const targetIsCompleted = payment_status === 'completed';
@@ -122,8 +130,17 @@ export async function POST(request: Request) {
         .eq('id', orderId);
 
       if (upErr) {
-        console.error('Failed updating order:', upErr);
-        return NextResponse.json({ ok: true });
+        // Fallo transitorio nuestro (DB no disponible, lock, etc.) — devolvemos 500 para que MP reintente.
+        logWebhookEvent('error', 'failed updating order', {
+          paymentId: String(id),
+          orderId,
+          mpStatus: payment.status,
+          errorMessage: upErr.message,
+        });
+        return NextResponse.json(
+          { ok: false, error: msgs.dbUpdateFailed },
+          { status: 500 }
+        );
       }
     } else if (!mustRecoverStock) {
       return NextResponse.json({ ok: true, no_op: true, reason: 'same_payment_status' });
@@ -136,6 +153,11 @@ export async function POST(request: Request) {
       });
 
       if (!stockResult.ok) {
+        logWebhookEvent('error', 'stock apply failed', {
+          paymentId: String(id),
+          orderId,
+          reason: stockResult.reason,
+        });
         return NextResponse.json(
           { ok: false, error: msgs.stockApplyFailed(stockResult.reason) },
           { status: 500 }
@@ -149,7 +171,14 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ ok: true });
   } catch (e: any) {
-    console.error('Webhook Error:', e);
-    return NextResponse.json({ ok: true });
+    // Excepción no manejada — algo se rompió de nuestro lado. Devolvemos 500 para que MP reintente.
+    logWebhookEvent('error', 'unhandled exception', {
+      errorName: e?.name,
+      errorMessage: e?.message,
+    });
+    return NextResponse.json(
+      { ok: false, error: msgs.unhandledException },
+      { status: 500 }
+    );
   }
 }

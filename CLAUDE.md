@@ -118,7 +118,7 @@ Audit externo recibido 2026-05-23. 10 puntos catalogados PF-01 a PF-10. Esta tab
 | PF-01 | P0 | `order-details` expone PII por `orderId` sin auth | ✅ Cerrado 2026-05-23 | HMAC token en [src/lib/orders/orderLookupToken.ts](src/lib/orders/orderLookupToken.ts) + verificación en [order-details/route.ts:22-26](src/app/api/order-details/route.ts#L22-L26). Smoke 3/3 en prod. |
 | PF-02 | P0 | Admin GET/PATCH sin control auth en handler | ✅ Cerrado 2026-05-22 | `requireAdmin` en [admin/orders/[id]/route.ts:17-38](src/app/api/admin/orders/%5Bid%5D/route.ts#L17-L38). Replicado en `/api/admin/orders` y `/api/admin/products`. |
 | PF-03 | P0 | Webhook sin verificación de firma/origen | ✅ Cerrado 2026-05-22 | `verifyMpWebhookSignature` en [src/lib/mp/verifyWebhookSignature.ts](src/lib/mp/verifyWebhookSignature.ts) + check en [mp-webhook/route.ts:53-66](src/app/api/mp-webhook/route.ts#L53-L66). Smoke 4/4 en prod. |
-| PF-04 | P1 | Webhook "traga" errores y responde `ok:true` | ❌ Abierto | [mp-webhook/route.ts:91-94, 124-127, 151-154](src/app/api/mp-webhook/route.ts) — 4 ramas devuelven `ok:true` sin alerting. Solución: logger estructurado + dead-letter o `500` explícito para que MP reintente. |
+| PF-04 | P1 | Webhook "traga" errores y responde `ok:true` | ✅ Cerrado 2026-05-23 | Logger estructurado nuevo en [src/lib/logging/webhookLogger.ts](src/lib/logging/webhookLogger.ts) (JSON output, sin deps). [mp-webhook/route.ts](src/app/api/mp-webhook/route.ts) refactorizado: errores transitorios (DB update failed, excepción no manejada) ahora devuelven `500` para que MP reintente; errores no recuperables (id missing, orderId missing, order_not_found) siguen `200` pero con `reason` explícito en body + log warn estructurado. 2 mensajes nuevos en `apiErrorMessages.mpWebhook` (`dbUpdateFailed`, `unhandledException`). 3 tests nuevos: order-not-found → 200, update-error → 500, exception → 500. Suite 83/83. |
 | PF-05 | P0 | `create-order` no transaccional (orders + items separados) | ❌ Abierto | Insert split entre [create-order/route.ts:458-481](src/app/api/create-order/route.ts#L458-L481) (orders) y [línea 518](src/app/api/create-order/route.ts#L518) (items). Si falla items → orden huérfana. Solución: RPC `create_order_transactional` con commit atómico. |
 | PF-06 | P1 | Drift de precios UI vs backend | ✅ Cerrado 2026-05-23 | Modelo **hibrid** en [create-order/route.ts:451-466](src/app/api/create-order/route.ts#L451-L466). El cliente envía opcionalmente `expectedTotal` + `strictPricing`. Server detecta drift cuando `expectedTotal` provisto y \|diff\| > 0.01. **Modo informativo** (default, `strictPricing!==true`): orden se crea, response incluye `priceDrift: { expected, computed, diff }`. **Modo enterprise** (`strictPricing===true`): `409` + `priceDrift` en body, **NO** se crea orden. Backwards compatible 100% — front actual sigue funcionando. 4 tests nuevos (suite 80/80). Mensaje en `apiErrorMessages.createOrder.priceDriftRejected`. Frontend pendiente: wirear el flag en order-confirmation (informativo) o agregar modal de confirmación (strict). |
 | PF-07 | P1 | `mp-preference` no valida estado de orden | ✅ Cerrado 2026-05-23 | Guard agregado en [mp-preference/route.ts:69-80](src/app/api/mp-preference/route.ts#L69-L80) post-load de orden. Rechaza `409` si `payment_status ∈ {completed, refunded}` o `order_status === 'cancelled'`. Permite `failed` (retry intencional). Mensajes en `apiErrorMessages.mpPreference.orderAlreadyPaid/orderCancelled/orderRefunded`. Suite 76/76. **Verificado en prod 2026-05-23**: smoke 2/2 contra `https://povstore.uy/api/mp-preference` con POV-889886 (completed) → `409 "ya está pagada"` y POV-356707 (cancelled) → `409 "está cancelada"`. Rama `refunded` no tiene data en prod para testear (sin órdenes refunded), cubierta por código. Tests específicos del guard: pendientes (~30 min, no bloqueantes). |
@@ -126,20 +126,20 @@ Audit externo recibido 2026-05-23. 10 puntos catalogados PF-01 a PF-10. Esta tab
 | PF-09 | P2 | Detección pickup vía `!shipping_address` | ❌ Abierto | Patrón hardcodeado en 6 lugares ([admin/orders/[id]/route.ts:123](src/app/api/admin/orders/%5Bid%5D/route.ts#L123), [OrdersTable.tsx:76](src/app/admin-dashboard/components/OrdersTable.tsx#L76), [OrderHistoryTable.tsx:111](src/app/admin-dashboard/components/OrderHistoryTable.tsx#L111), [OrderDetailsModal.tsx](src/app/admin-dashboard/components/OrderDetailsModal.tsx), [OrderConfirmationInteractive.tsx:159](src/app/order-confirmation/components/OrderConfirmationInteractive.tsx#L159)). Solución: columna explícita `delivery_method` enum en `orders` + migration de backfill. |
 | PF-10 | P2 | Test frágil por texto literal i18n | ✅ Cerrado 2026-05-23 | Confirmado: assertion en [route.test.ts:547](src/app/api/create-order/route.test.ts#L547) esperaba `'Idempotency key already used'` (inglés) pero el mensaje real era `apiErrorMessages.createOrder.idempotencyConflict` (español). Fix: assertion ahora referencia la constante del diccionario, así si el copy cambia el test sigue válido. Suite 76/76. |
 
-**Estado consolidado al 2026-05-23:** 6/10 cerrados (los tres P0 de auth/firma + PF-10 + PF-07 + PF-06). Quedan 2 P0 abiertos (PF-04, PF-05), 1 P1 (PF-08 parcial), 1 P2 (PF-09).
+**Estado consolidado al 2026-05-23:** 7/10 cerrados (los tres P0 de auth/firma + PF-10 + PF-07 + PF-06 + PF-04). Quedan 1 P0 abierto (PF-05), 1 P1 (PF-08 parcial), 1 P2 (PF-09).
 
 **Orden sugerido de cierre** (severidad + ratio impacto/esfuerzo, ortogonal a "Próximos pasos recomendados"):
 
 1. **PF-05** (~3-4 h): RPC transaccional. Cierra el P0 más grave que queda.
-2. **PF-04** (~2 h): logger estructurado + dejar de tragar errores en webhook.
-3. **PF-08** (~2 h): RPC de reversión simétrica + llamada desde admin PATCH.
-4. **PF-09** (~1 h): migration + reemplazar las 6 ocurrencias.
+2. **PF-08** (~2 h): RPC de reversión simétrica + llamada desde admin PATCH.
+3. **PF-09** (~1 h): migration + reemplazar las 6 ocurrencias.
 
 Follow-ups opcionales:
 - **Tests del guard PF-07** (~30 min) — crear `mp-preference/route.test.ts` con 3 casos (completed → 409, cancelled → 409, pending → 200 normal).
 - **Wirear `priceDrift` en frontend** (~1-2 h) — `order-confirmation` muestra el flag informativo, o `CheckoutInteractive` envía `expectedTotal` desde el carrito y maneja `409` con modal de confirmación si se activa `strictPricing`.
+- **Sentry/Logtail integration** (~1 h) — reemplazar `console.log/warn/error` del `webhookLogger` por el client del proveedor elegido. La interfaz `logWebhookEvent` queda igual.
 
-Total estimado para cerrar los 4 abiertos: **~8-9 horas de trabajo**. Tras ese sprint, el audit queda 10/10 cerrado.
+Total estimado para cerrar los 3 abiertos: **~6-7 horas de trabajo**. Tras ese sprint, el audit queda 10/10 cerrado.
 
 **Nota sobre alcance:** los issues 🔴 `.env` commiteada y 🟠 rate-limit ausente listados en "Issues críticos de seguridad PENDIENTES" **no** están en esta tabla — el audit externo no los cubrió. Son prioridad propia (ver "Próximos pasos recomendados" pasos 3 y 4).
 
@@ -278,7 +278,13 @@ Reglas (siguiendo doc oficial MP):
 - Manifest: `id:<data.id>;request-id:<x-request-id>;ts:<ts>;` (con `;` final). `data.id` se lowercasea si es alfanumérico.
 - `ts` del header `x-signature` está en **segundos** Unix. Ventana anti-replay: ±5 minutos (configurable vía `toleranceMs`).
 - Comparación `crypto.timingSafeEqual`. Si los largos difieren → rechazo directo sin throw.
-- Falla → `401`. (Resto del handler mantiene `200` en errores no críticos para no provocar reintentos masivos de MP.)
+
+**Política de status codes (PF-04, post-2026-05-23):**
+- Firma inválida o ts fuera de ventana → `401`. MP no debe reintentar.
+- Errores **no recuperables** (id missing, orderId missing en payment, orden no existe en DB) → `200` con `reason` explícito en body. Reintentar no cambia el resultado.
+- Errores **transitorios nuestros** (DB update failed, excepción no manejada) → `500`. MP reintenta automáticamente.
+- Stock apply failed → `500`. MP reintenta y el camino de recovery (`mustRecoverStock`) ataca el stock pendiente.
+- **No usar más `console.log/warn/error` directamente** — usar `logWebhookEvent` de [src/lib/logging/webhookLogger.ts](src/lib/logging/webhookLogger.ts) para que los logs sean JSON estructurado.
 
 **Env vars requeridas** (server-only, sin prefijo `NEXT_PUBLIC_`):
 - `MP_ACCESS_TOKEN` — credencial de la app, usada para `GET /v1/payments/:id`.
@@ -360,6 +366,7 @@ Esta lista cubre las tareas **fuera** de la tabla PF-XX (audit externo) — son 
 - 2026-05-23: cerrado **PF-10** (test frágil i18n). Assertion en `route.test.ts:547` referenciaba string en inglés cuando la respuesta era en español. Fix: importar `apiErrorMessages.createOrder.idempotencyConflict` del diccionario canónico — el test ahora sigue válido aunque el copy cambie. Suite full 76/76.
 - 2026-05-23: cerrado **PF-07** (`mp-preference` sin guard de estado). Guard agregado post-load de orden en `mp-preference/route.ts`: rechaza `409` para `payment_status ∈ {completed, refunded}` o `order_status === 'cancelled'`. Permite `failed` para retries. 3 mensajes nuevos en `apiErrorMessages.mpPreference`. Suite 76/76. Tests específicos del guard pendientes como follow-up opcional. Smoke test 2/2 contra prod (POV-889886 completed + POV-356707 cancelled).
 - 2026-05-23: cerrado **PF-06** (drift de precios UI/backend). Modelo **hibrid**: cliente opcionalmente envía `expectedTotal` + `strictPricing`. Default (`strictPricing!==true`) → modo informativo: orden se crea, response incluye `priceDrift: { expected, computed, diff }`. `strictPricing===true` → modo enterprise: `409` + breakdown, orden no se crea. 100% backwards compat (front actual sigue funcionando sin cambios). Mensaje `priceDriftRejected` agregado al diccionario. 4 tests nuevos. Suite 80/80. Front pendiente de wirear el flag.
+- 2026-05-23: cerrado **PF-04** (webhook traga errores). Nuevo logger estructurado `src/lib/logging/webhookLogger.ts` (JSON output, sin deps). `mp-webhook/route.ts` refactorizado: errores transitorios (`upErr`, excepción no manejada) ahora devuelven `500` para que MP reintente; errores no recuperables (id/orderId/order_not_found) siguen `200` pero con `reason` explícito + log warn. 2 mensajes nuevos. 3 tests nuevos. Suite 83/83. Interfaz `logWebhookEvent` preparada para reemplazar por Sentry/Logtail más adelante sin tocar el route.
 
 **No modificar archivos sin aprobación explícita del usuario.**
 

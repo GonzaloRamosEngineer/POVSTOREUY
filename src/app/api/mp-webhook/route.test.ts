@@ -230,4 +230,84 @@ describe('mp-webhook stage 3.3A corrected', () => {
     expect(state.rpcCalls).toBe(0);
     expect(state.orderUpdates.length).toBe(0);
   });
+
+  // PF-04: webhook error handling
+  describe('error handling (PF-04)', () => {
+    it('returns 200 with order_not_found reason when order does not exist in DB', async () => {
+      const supabase = {
+        from: (_table: string) => ({
+          select: (_sel: string) => ({
+            eq: (_col: string, _val: string) => ({
+              single: async () => ({ data: null, error: { message: 'not found' } }),
+            }),
+          }),
+        }),
+        rpc: async () => ({ data: [], error: null }),
+      };
+      currentSupabase = supabase;
+      currentPayment = { status: 'approved', status_detail: 'accredited', external_reference: 'nonexistent-order', metadata: {} };
+
+      const res: any = await POST(buildWebhookRequest('pay-1'));
+
+      expect(res.status).toBe(200);
+      expect(res.body.reason).toBe('order_not_found');
+    });
+
+    it('returns 500 when DB update fails so MP retries', async () => {
+      // Mock where select succeeds pero update devuelve error
+      const supabase = {
+        from: (_table: string) => ({
+          select: (_sel: string) => ({
+            eq: (_col: string, _val: string) => ({
+              single: async () => ({
+                data: {
+                  id: 'order-1',
+                  payment_status: 'pending',
+                  stock_applied_at: null,
+                },
+                error: null,
+              }),
+            }),
+          }),
+          update: (_payload: any) => ({
+            eq: async (_col: string, _val: string) => ({
+              error: { message: 'transient DB error' },
+            }),
+          }),
+        }),
+        rpc: async () => ({ data: [], error: null }),
+      };
+      currentSupabase = supabase;
+      currentPayment = { status: 'approved', status_detail: 'accredited', external_reference: 'order-1', metadata: {} };
+
+      const res: any = await POST(buildWebhookRequest('pay-1'));
+
+      expect(res.status).toBe(500);
+      expect(res.body.ok).toBe(false);
+    });
+
+    it('returns 500 when handler throws (unhandled exception) so MP retries', async () => {
+      // Hacemos que mpGetPayment falle haciéndo throw en fetch
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async () => {
+          throw new Error('network broken');
+        }) as any,
+      );
+
+      const { supabase } = makeSupabaseMock({
+        id: 'order-1',
+        payment_status: 'pending',
+        order_status: 'pending',
+        stock_applied_at: null,
+      });
+      currentSupabase = supabase;
+      // currentPayment no se va a usar porque fetch throwea antes
+
+      const res: any = await POST(buildWebhookRequest('pay-1'));
+
+      expect(res.status).toBe(500);
+      expect(res.body.ok).toBe(false);
+    });
+  });
 });

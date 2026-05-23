@@ -62,6 +62,8 @@ export const apiErrorMessages = {
     missingWebhookSecret: 'Falta la configuración del webhook de MercadoPago (MP_WEBHOOK_SECRET).',
     invalidSignature: (reason: string) => `Firma de webhook inválida: ${reason}`,
     invalidTransition: (current: string, target: string) => `Transición de estado inválida: de '${current}' a '${target}'`,
-    stockApplyFailed: (reason: string) => `Error al aplicar stock: ${reason}`
+    stockApplyFailed: (reason: string) => `Error al aplicar stock: ${reason}`,
+    dbUpdateFailed: 'Fallo transitorio al actualizar la orden. MP reintentará.',
+    unhandledException: 'Error inesperado en el webhook. MP reintentará.'
   }
 };
