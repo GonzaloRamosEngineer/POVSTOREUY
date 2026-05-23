@@ -331,6 +331,20 @@ export async function PATCH(
       });
 
       if (!stockResult.ok) {
+        // Stock insuficiente al confirmar pago (race con otra orden, o admin
+        // decidió marcar como pagada una orden cuyo stock ya se consumió).
+        // Devolvemos 409 para que el admin sepa que NO se completó la operación
+        // y vea el detalle del producto que falta.
+        if (stockResult.reason === 'insufficient_stock') {
+          return NextResponse.json(
+            {
+              error: msgs.insufficientStockOnApply,
+              shortfall: stockResult.shortfall,
+            },
+            { status: 409 }
+          );
+        }
+
         return NextResponse.json(
           { error: msgs.stockApplyError, details: stockResult.reason },
           { status: 500 }

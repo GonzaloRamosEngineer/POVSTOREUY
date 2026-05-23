@@ -27,7 +27,10 @@ type OrderRow = {
   shipping_address?: string | null;
 };
 
-function makeSupabaseMock(initialOrder: OrderRow, opts?: { userRole?: string }) {
+function makeSupabaseMock(
+  initialOrder: OrderRow,
+  opts?: { userRole?: string; rpcOverride?: (fn: string, args: any) => any }
+) {
   const state = {
     order: { ...initialOrder },
     orderUpdates: [] as any[],
@@ -76,8 +79,12 @@ function makeSupabaseMock(initialOrder: OrderRow, opts?: { userRole?: string }) 
         }),
       };
     },
-    rpc: async (fn: string, _args: any) => {
+    rpc: async (fn: string, args: any) => {
       state.lastRpcFn = fn;
+      if (opts?.rpcOverride) {
+        state.rpcCalls += 1;
+        return opts.rpcOverride(fn, args);
+      }
       if (fn === 'apply_order_stock_once') {
         state.rpcCalls += 1;
         if (state.order.stock_applied_at) {
@@ -369,6 +376,77 @@ describe('admin orders PATCH stage 3.3A corrected', () => {
       expect(state.lastRpcFn).toBe('apply_order_stock_once');
       expect(state.stockRevertedCount).toBe(0);
       expect(state.stockAppliedCount).toBe(0);
+    });
+  });
+
+  // Apply stock strict — race condition fix (RAISE EXCEPTION en lugar de GREATEST silencioso).
+  describe('insufficient_stock on manual mark-paid', () => {
+    it('returns 409 with shortfall when apply_order_stock_once raises insufficient_stock', async () => {
+      const { supabase } = makeSupabaseMock(
+        {
+          id: 'o1',
+          order_number: 'POV-1',
+          order_status: 'processing',
+          payment_status: 'pending',
+          payment_method: 'bank_transfer',
+          stock_applied_at: null,
+          shipping_address: 'Calle Falsa 123',
+        },
+        {
+          rpcOverride: (fn) => {
+            if (fn === 'apply_order_stock_once') {
+              return {
+                data: null,
+                error: {
+                  message: 'insufficient_stock',
+                  details: 'product_id=prod-xyz name=Camera POV available=0 needed=2',
+                },
+              };
+            }
+            throw new Error(`Unexpected rpc: ${fn}`);
+          },
+        }
+      );
+      currentSupabase = supabase;
+
+      const res: any = await PATCH(buildPatchRequest({ payment_status: 'completed' }) as any, {
+        params: Promise.resolve({ id: 'POV-1' }),
+      });
+
+      expect(res.status).toBe(409);
+      expect(res.body.shortfall).toEqual({
+        productId: 'prod-xyz',
+        name: 'Camera POV',
+        available: 0,
+        needed: 2,
+      });
+    });
+
+    it('returns 500 for other apply errors (DB transient, etc.)', async () => {
+      const { supabase } = makeSupabaseMock(
+        {
+          id: 'o1',
+          order_number: 'POV-1',
+          order_status: 'processing',
+          payment_status: 'pending',
+          payment_method: 'bank_transfer',
+          stock_applied_at: null,
+          shipping_address: 'Calle Falsa 123',
+        },
+        {
+          rpcOverride: () => ({
+            data: null,
+            error: { message: 'connection refused' },
+          }),
+        }
+      );
+      currentSupabase = supabase;
+
+      const res: any = await PATCH(buildPatchRequest({ payment_status: 'completed' }) as any, {
+        params: Promise.resolve({ id: 'POV-1' }),
+      });
+
+      expect(res.status).toBe(500);
     });
   });
 });

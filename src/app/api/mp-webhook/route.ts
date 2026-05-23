@@ -153,6 +153,31 @@ export async function POST(request: Request) {
       });
 
       if (!stockResult.ok) {
+        // Insufficient stock al confirmar pago: retry de MP no ayuda (el stock
+        // no se arregla en segundos). Devolvemos 200 con reason en body para
+        // que MP no reintente, log warn estructurado para alerta operacional,
+        // y dejamos la orden con stock_applied_at=null para que el admin la
+        // vea en el dashboard y reconcilie (refund o conseguir inventario).
+        if (stockResult.reason === 'insufficient_stock') {
+          const detail = stockResult.shortfall
+            ? `${stockResult.shortfall.name} (necesita ${stockResult.shortfall.needed}, disponible ${stockResult.shortfall.available})`
+            : 'shortfall sin detalle';
+          logWebhookEvent('warn', 'stock apply blocked by insufficient stock', {
+            paymentId: String(id),
+            orderId,
+            reason: stockResult.reason,
+            shortfall: stockResult.shortfall,
+          });
+          return NextResponse.json({
+            ok: false,
+            no_op: false,
+            reason: 'insufficient_stock',
+            error: msgs.insufficientStock(detail),
+            shortfall: stockResult.shortfall,
+          });
+        }
+
+        // Otros errores (DB transitorio, malformado): 500 → MP reintenta.
         logWebhookEvent('error', 'stock apply failed', {
           paymentId: String(id),
           orderId,

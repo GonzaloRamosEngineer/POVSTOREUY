@@ -67,6 +67,7 @@ export const apiErrorMessages = {
     invalidTransition: (current: string, target: string) => `Transición de estado inválida: de '${current}' a '${target}'`,
     stockApplyFailed: (reason: string) => `Error al aplicar stock: ${reason}`,
     dbUpdateFailed: 'Fallo transitorio al actualizar la orden. MP reintentará.',
-    unhandledException: 'Error inesperado en el webhook. MP reintentará.'
+    unhandledException: 'Error inesperado en el webhook. MP reintentará.',
+    insufficientStock: (detail: string) => `Stock insuficiente al confirmar pago: ${detail}. Orden requiere reconciliación manual.`
   }
 };

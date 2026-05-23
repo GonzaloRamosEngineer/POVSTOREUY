@@ -23,6 +23,7 @@ export const adminOrderApiMessages = {
     manualConfirmBankOnly: 'La confirmación manual de pago aplica solo a transferencias bancarias',
     invalidPaymentTransition: (status: string) => `Transición inválida: no se puede confirmar pago desde el estado '${status}'`,
     stockApplyError: 'Error al aplicar descuento de stock',
+    insufficientStockOnApply: 'Stock insuficiente al confirmar pago. La orden no puede marcarse como pagada hasta reponer inventario o reconciliar manualmente.',
     stockRevertError: 'Error al restituir stock al revertir el pago',
     serverError: 'Error al actualizar la orden',
   }

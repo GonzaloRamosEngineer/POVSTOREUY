@@ -28,7 +28,10 @@ type OrderRow = {
   stock_applied_at: string | null;
 };
 
-function makeSupabaseMock(initialOrder: OrderRow) {
+function makeSupabaseMock(
+  initialOrder: OrderRow,
+  opts?: { rpcOverride?: (fn: string, args: any) => any }
+) {
   const state = {
     order: { ...initialOrder },
     orderUpdates: [] as any[],
@@ -55,9 +58,10 @@ function makeSupabaseMock(initialOrder: OrderRow) {
         }),
       };
     },
-    rpc: async (fn: string, _args: any) => {
+    rpc: async (fn: string, args: any) => {
       if (fn !== 'apply_order_stock_once') throw new Error(`Unexpected rpc: ${fn}`);
       state.rpcCalls += 1;
+      if (opts?.rpcOverride) return opts.rpcOverride(fn, args);
       if (state.order.stock_applied_at) {
         return { data: [{ ok: true, no_op: true, reason: 'stock_already_applied' }], error: null };
       }
@@ -308,6 +312,74 @@ describe('mp-webhook stage 3.3A corrected', () => {
 
       expect(res.status).toBe(500);
       expect(res.body.ok).toBe(false);
+    });
+  });
+
+  // Apply stock strict — race condition fix (RAISE EXCEPTION en lugar de GREATEST silencioso).
+  describe('insufficient_stock handling (strict apply)', () => {
+    it('returns 200 with reason="insufficient_stock" (no retry) + shortfall in body', async () => {
+      const { supabase, state } = makeSupabaseMock(
+        {
+          id: 'order-1',
+          payment_status: 'pending',
+          order_status: 'pending',
+          stock_applied_at: null,
+        },
+        {
+          rpcOverride: () => ({
+            data: null,
+            error: {
+              message: 'insufficient_stock',
+              details: 'product_id=abc-123 name=Camera POV available=0 needed=1',
+            },
+          }),
+        }
+      );
+      currentSupabase = supabase;
+      currentPayment = { status: 'approved', status_detail: 'accredited', external_reference: 'order-1', metadata: {} };
+
+      const res: any = await POST(buildWebhookRequest('pay-1'));
+
+      // Crucial: 200 — NO queremos que MP reintente, el stock no se arregla en segundos.
+      expect(res.status).toBe(200);
+      expect(res.body.ok).toBe(false);
+      expect(res.body.reason).toBe('insufficient_stock');
+      expect(res.body.shortfall).toEqual({
+        productId: 'abc-123',
+        name: 'Camera POV',
+        available: 0,
+        needed: 1,
+      });
+      // payment_status update sí ocurrió antes del intento de stock — aceptamos esa inconsistencia
+      // (documentada): el admin verá la orden con stock_applied_at=null en el dashboard.
+      expect(state.orderUpdates).toHaveLength(1);
+      // stock_applied_at no se setea
+      expect(state.order.stock_applied_at).toBeNull();
+    });
+
+    it('still returns 500 (retry) for non-insufficient_stock errors (DB transient)', async () => {
+      const { supabase, state } = makeSupabaseMock(
+        {
+          id: 'order-1',
+          payment_status: 'pending',
+          order_status: 'pending',
+          stock_applied_at: null,
+        },
+        {
+          rpcOverride: () => ({
+            data: null,
+            error: { message: 'connection refused' },
+          }),
+        }
+      );
+      currentSupabase = supabase;
+      currentPayment = { status: 'approved', status_detail: 'accredited', external_reference: 'order-1', metadata: {} };
+
+      const res: any = await POST(buildWebhookRequest('pay-1'));
+
+      expect(res.status).toBe(500);
+      expect(res.body.ok).toBe(false);
+      expect(state.order.stock_applied_at).toBeNull();
     });
   });
 });
