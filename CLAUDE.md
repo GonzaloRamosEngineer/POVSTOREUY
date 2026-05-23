@@ -124,9 +124,9 @@ Audit externo recibido 2026-05-23. 10 puntos catalogados PF-01 a PF-10. Esta tab
 | PF-07 | P1 | `mp-preference` no valida estado de orden | ❌ Abierto | [mp-preference/route.ts:58-67](src/app/api/mp-preference/route.ts#L58-L67) no chequea `payment_status`/`order_status` antes de crear preference. Solución: guard al inicio (rechazar si `payment_status='completed'` o `order_status='cancelled'`). Esfuerzo: ~15 min. |
 | PF-08 | P1 | Sin compensación de stock al revertir `payment_status` | ⚠️ Parcial | [admin/orders/[id]/route.ts:279-307](src/app/api/admin/orders/%5Bid%5D/route.ts#L279-L307) restringe transiciones y aplica stock en `completed`, pero al revertir `completed → pending/failed` no devuelve stock. Solución: RPC `revert_order_stock_once` simétrica + llamarla desde admin PATCH. |
 | PF-09 | P2 | Detección pickup vía `!shipping_address` | ❌ Abierto | Patrón hardcodeado en 6 lugares ([admin/orders/[id]/route.ts:123](src/app/api/admin/orders/%5Bid%5D/route.ts#L123), [OrdersTable.tsx:76](src/app/admin-dashboard/components/OrdersTable.tsx#L76), [OrderHistoryTable.tsx:111](src/app/admin-dashboard/components/OrderHistoryTable.tsx#L111), [OrderDetailsModal.tsx](src/app/admin-dashboard/components/OrderDetailsModal.tsx), [OrderConfirmationInteractive.tsx:159](src/app/order-confirmation/components/OrderConfirmationInteractive.tsx#L159)). Solución: columna explícita `delivery_method` enum en `orders` + migration de backfill. |
-| PF-10 | P2 | Test frágil por texto literal i18n | ❓ Verificar | Posible match con "1 test pre-existente fallando" registrado en Deuda técnica ([create-order/route.test.ts](src/app/api/create-order/route.test.ts), caso "same idempotency_key + different logical payload returns 409"). Abrir el test y confirmar si el mismatch es i18n o lógico. |
+| PF-10 | P2 | Test frágil por texto literal i18n | ✅ Cerrado 2026-05-23 | Confirmado: assertion en [route.test.ts:547](src/app/api/create-order/route.test.ts#L547) esperaba `'Idempotency key already used'` (inglés) pero el mensaje real era `apiErrorMessages.createOrder.idempotencyConflict` (español). Fix: assertion ahora referencia la constante del diccionario, así si el copy cambia el test sigue válido. Suite 76/76. |
 
-**Estado consolidado al 2026-05-23:** 3/10 cerrados (los tres P0 de auth/firma). Quedan 2 P0 abiertos (PF-04, PF-05), 3 P1 (PF-06 parcial, PF-07, PF-08 parcial), 2 P2 (PF-09, PF-10).
+**Estado consolidado al 2026-05-23:** 4/10 cerrados (los tres P0 de auth/firma + PF-10). Quedan 2 P0 abiertos (PF-04, PF-05), 3 P1 (PF-06 parcial, PF-07, PF-08 parcial), 1 P2 (PF-09).
 
 **Orden sugerido de cierre** (severidad + ratio impacto/esfuerzo, ortogonal a "Próximos pasos recomendados"):
 
@@ -134,11 +134,10 @@ Audit externo recibido 2026-05-23. 10 puntos catalogados PF-01 a PF-10. Esta tab
 2. **PF-05** (~3-4 h): RPC transaccional. Cierra el P0 más grave que queda.
 3. **PF-04** (~2 h): logger estructurado + dejar de tragar errores en webhook.
 4. **PF-08** (~2 h): RPC de reversión simétrica + llamada desde admin PATCH.
-5. **PF-10** (~15 min): leer el test, confirmar si es i18n y arreglar string.
-6. **PF-09** (~1 h): migration + reemplazar las 6 ocurrencias.
-7. **PF-06** (~30 min): flag `price_drift` en respuesta de `create-order`.
+5. **PF-09** (~1 h): migration + reemplazar las 6 ocurrencias.
+6. **PF-06** (~30 min): flag `price_drift` en respuesta de `create-order`.
 
-Total estimado para cerrar los 7 abiertos: **~9-10 horas de trabajo**. Tras ese sprint, el audit queda 10/10 cerrado.
+Total estimado para cerrar los 6 abiertos: **~9-10 horas de trabajo**. Tras ese sprint, el audit queda 10/10 cerrado.
 
 **Nota sobre alcance:** los issues 🔴 `.env` commiteada y 🟠 rate-limit ausente listados en "Issues críticos de seguridad PENDIENTES" **no** están en esta tabla — el audit externo no los cubrió. Son prioridad propia (ver "Próximos pasos recomendados" pasos 3 y 4).
 
@@ -164,7 +163,6 @@ Total estimado para cerrar los 7 abiertos: **~9-10 horas de trabajo**. Tras ese 
 - **61 `console.log`/`console.error`** sin logger estructurado ni Sentry.
 - **Tests sólo en API + validator.** No hay E2E del flujo de checkout.
 - ~~**🔴 Modelo de stock de packs incoherente.**~~ **RESUELTO 2026-05-23** — ver sección "Stock de packs es DERIVADO" en Convenciones (incluye SQL one-shot para limpieza del JSONB zombie pendiente, no bloqueante).
-- **1 test pre-existente fallando** en [src/app/api/create-order/route.test.ts](src/app/api/create-order/route.test.ts) (caso "same idempotency_key + different logical payload returns 409"). Ver tracking en **PF-10** (tabla Audit PF-XX).
 - **`products.stock_count` puede desfasarse de la suma de variantes** (detectado 2026-05-23: MicroSD tenía variante Negro=9 pero `stock_count=8`). El form re-sincroniza `stock_count = sum(variants.stock)` solo cuando se edita una variante en el form ([ProductForm.tsx:753](src/app/admin-dashboard/inventory/components/ProductForm.tsx#L753)). Si la data vino por SQL/migración o se editó sin re-guardar, queda desfasado. **Impacto:** el cálculo de stock de kits es conservador (usa `stock_count`), así que no oversold-ea, pero puede sub-estimar disponibilidad. SQL de sync one-shot para correr en Supabase Studio cuando convenga:
   ```sql
   UPDATE products SET stock_count = (
@@ -357,6 +355,7 @@ Esta lista cubre las tareas **fuera** de la tabla PF-XX (audit externo) — son 
 - 2026-05-23: refactor de stock de packs a modelo **derivado** (eliminado `pack.stock` editable). Nueva helper `src/lib/packs/computePackStock.ts` con 12 tests. Cierra el bug histórico de "ÚLTIMAS -2" y la deuda 🔴 de "modelo de stock incoherente". `min={0}` agregado a inputs de stock de variante y stock_count general en ProductForm. Endpoint `/api/admin/products` con `sanitizePacksForPersistence()` como defensa en profundidad. Cards de home con chip "AGOTADO" + CTA deshabilitado cuando stock = 0.
 - 2026-05-23: cleanup CLAUDE.md (deduplicación de Issues críticos / Próximos pasos / Deuda técnica, cross-refs entre PF-XX y bugs relacionados, file pointers preservados). De 383 → 370 líneas con densidad informativa mayor.
 - 2026-05-23: **Próximos pasos #1 y #2 cerrados**: `package.json` → `"start": "next start"` (cierra trampa de `npm start` arrancando dev server) + limpieza de código muerto (`api_/`, `estructura.txt`, `src/app/support/page.tsx.backup`, `src/app/product-details/page.backup.txt`). Cero imports a `api_/` verificados antes de borrar.
+- 2026-05-23: cerrado **PF-10** (test frágil i18n). Assertion en `route.test.ts:547` referenciaba string en inglés cuando la respuesta era en español. Fix: importar `apiErrorMessages.createOrder.idempotencyConflict` del diccionario canónico — el test ahora sigue válido aunque el copy cambie. Suite full 76/76.
 
 **No modificar archivos sin aprobación explícita del usuario.**
 

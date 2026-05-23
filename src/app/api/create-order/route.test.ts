@@ -24,6 +24,7 @@ vi.mock('@/lib/supabaseAdmin', () => ({
 }));
 
 import { POST } from './route';
+import { apiErrorMessages } from '@/messages/apiErrorMessages';
 
 type ProductRow = {
   id: string;
@@ -544,7 +545,7 @@ describe('create-order pack expansion + idempotency', () => {
 
     expect(res1.status).toBe(200);
     expect(res2.status).toBe(409);
-    expect(res2.body.error).toContain('Idempotency key already used');
+    expect(res2.body.error).toBe(apiErrorMessages.createOrder.idempotencyConflict);
   });
 
   it('missing or invalid idempotency_key returns 400', async () => {
