@@ -75,7 +75,7 @@ function makeSupabaseMock(params: {
 
   let orderSeq = seeded.length + 1;
 
-  const supabase = {
+  const supabase: any = {
     from: (table: string) => {
       if (table === 'products') {
         return {
@@ -93,6 +93,7 @@ function makeSupabaseMock(params: {
       }
 
       if (table === 'orders') {
+        // Solo para el pre-check de idempotencia. Los inserts ahora van por RPC.
         return {
           select: (_sel: string) => ({
             eq: (_column: string, key: string) => ({
@@ -102,63 +103,87 @@ function makeSupabaseMock(params: {
               }),
             }),
           }),
-          insert: (rows: any[]) => {
-            captures.orderInsertCallCount += 1;
-            captures.orderInsertPayload = rows?.[0];
-
-            const key = String(captures.orderInsertPayload?.idempotency_key || '');
-            if (key && ordersByIdempotency.has(key)) {
-              return {
-                select: (_sel: string) => ({
-                  single: async () => ({
-                    data: null,
-                    error: { code: '23505', message: 'duplicate key value violates unique constraint' },
-                  }),
-                }),
-              };
-            }
-
-            const inserted: OrderRow = {
-              id: `order-${orderSeq++}`,
-              order_number: captures.orderInsertPayload?.order_number || 'POV-000001',
-              total: captures.orderInsertPayload?.total ?? 0,
-              idempotency_key: captures.orderInsertPayload?.idempotency_key || null,
-              idempotency_payload_hash: captures.orderInsertPayload?.idempotency_payload_hash || null,
-            };
-
-            if (inserted.idempotency_key) {
-              ordersByIdempotency.set(inserted.idempotency_key, inserted);
-            }
-
-            return {
-              select: (_sel: string) => ({
-                single: async () => ({
-                  data: {
-                    id: inserted.id,
-                    order_number: inserted.order_number,
-                    total: inserted.total,
-                    payment_status: 'pending',
-                    order_status: 'pending',
-                  },
-                  error: null,
-                }),
-              }),
-            };
-          },
-        };
-      }
-
-      if (table === 'order_items') {
-        return {
-          insert: async (rows: any[]) => {
-            captures.orderItemsInsertCallCount += 1;
-            captures.orderItemsInserted = rows;
-            return { error: null };
-          },
         };
       }
 
       throw new Error(`Unexpected table: ${table}`);
+    },
+    // PF-05: el handler ahora llama a la RPC create_order_transactional.
+    // Este mock simula su contrato: orders + order_items atómicos, con status para idempotencia.
+    rpc: async (name: string, args: any) => {
+      if (name !== 'create_order_transactional') {
+        throw new Error(`Unexpected RPC: ${name}`);
+      }
+
+      captures.orderInsertCallCount += 1;
+      // Mapeamos los args de la RPC al shape plano que esperan los tests.
+      captures.orderInsertPayload = {
+        order_number: args.p_order_number,
+        customer_email: args.p_customer_email,
+        customer_name: args.p_customer_name,
+        customer_phone: args.p_customer_phone,
+        shipping_address: args.p_shipping_address,
+        shipping_city: args.p_shipping_city,
+        shipping_department: args.p_shipping_department,
+        shipping_postal_code: args.p_shipping_postal_code,
+        subtotal: args.p_subtotal,
+        shipping_cost: args.p_shipping_cost,
+        total: args.p_total,
+        payment_method: args.p_payment_method,
+        notes: args.p_notes,
+        idempotency_key: args.p_idempotency_key,
+        idempotency_payload_hash: args.p_idempotency_payload_hash,
+      };
+
+      captures.orderItemsInsertCallCount += 1;
+      captures.orderItemsInserted = args.p_items;
+
+      const key = String(args.p_idempotency_key || '');
+      const hash = String(args.p_idempotency_payload_hash || '');
+
+      const existing = ordersByIdempotency.get(key);
+      if (existing) {
+        const existingHash = String(existing.idempotency_payload_hash || '');
+        if (existingHash !== hash) {
+          return {
+            data: [{
+              order_id: existing.id,
+              order_number: existing.order_number,
+              total: existing.total,
+              status: 'payload_mismatch',
+            }],
+            error: null,
+          };
+        }
+        return {
+          data: [{
+            order_id: existing.id,
+            order_number: existing.order_number,
+            total: existing.total,
+            status: 'idempotent_replay',
+          }],
+          error: null,
+        };
+      }
+
+      const inserted: OrderRow = {
+        id: `order-${orderSeq++}`,
+        order_number: args.p_order_number || 'POV-000001',
+        total: args.p_total ?? 0,
+        idempotency_key: key,
+        idempotency_payload_hash: hash,
+      };
+      ordersByIdempotency.set(key, inserted);
+
+      return {
+        data: [{
+          order_id: inserted.id,
+          order_number: inserted.order_number,
+          total: inserted.total,
+          status: 'created',
+        }],
+        error: null,
+      };
     },
   };
 
@@ -678,6 +703,107 @@ describe('create-order pack expansion + idempotency', () => {
       // Confirma que NO se creó la orden cuando se rechaza
       expect(captures.orderInsertCallCount).toBe(0);
       expect(captures.orderItemsInsertCallCount).toBe(0);
+    });
+  });
+
+  // PF-05: contrato de la RPC create_order_transactional
+  describe('RPC create_order_transactional (PF-05)', () => {
+    const simpleProductId = '11111111-1111-4111-8111-111111111111';
+    const simpleProductRow: ProductRow = {
+      id: simpleProductId,
+      name: 'Simple Cam',
+      price: 1200,
+      cash_price: 1000,
+      card_price: 1200,
+      stock_count: 10,
+      is_active: true,
+      packs: [],
+    };
+
+    it('returns 500 when the RPC returns a DB error', async () => {
+      const { supabase } = makeSupabaseMock({ baseProducts: [simpleProductRow] });
+      supabase.rpc = async () => ({
+        data: null,
+        error: { code: 'XX000', message: 'simulated DB failure' },
+      });
+      currentSupabase = supabase;
+
+      const res: any = await POST(
+        buildRequest({
+          idempotencyKey: 'idem-rpc-err',
+          items: [{ type: 'product', product_id: simpleProductId, quantity: 1 }],
+        }),
+      );
+
+      expect(res.status).toBe(500);
+      expect(res.body.error).toBe(apiErrorMessages.createOrder.orderCreationFailed);
+    });
+
+    it('returns 500 when the RPC returns an empty/null result row', async () => {
+      const { supabase } = makeSupabaseMock({ baseProducts: [simpleProductRow] });
+      supabase.rpc = async () => ({ data: [], error: null });
+      currentSupabase = supabase;
+
+      const res: any = await POST(
+        buildRequest({
+          idempotencyKey: 'idem-rpc-empty',
+          items: [{ type: 'product', product_id: simpleProductId, quantity: 1 }],
+        }),
+      );
+
+      expect(res.status).toBe(500);
+      expect(res.body.error).toBe(apiErrorMessages.createOrder.orderCreationFailed);
+    });
+
+    it('returns 409 when the RPC reports payload_mismatch (bypass of pre-check)', async () => {
+      const { supabase } = makeSupabaseMock({ baseProducts: [simpleProductRow] });
+      supabase.rpc = async () => ({
+        data: [{
+          order_id: 'pre-existing-id',
+          order_number: 'POV-999999',
+          total: 1234,
+          status: 'payload_mismatch',
+        }],
+        error: null,
+      });
+      currentSupabase = supabase;
+
+      const res: any = await POST(
+        buildRequest({
+          idempotencyKey: 'idem-rpc-mismatch',
+          items: [{ type: 'product', product_id: simpleProductId, quantity: 1 }],
+        }),
+      );
+
+      expect(res.status).toBe(409);
+      expect(res.body.error).toBe(apiErrorMessages.createOrder.idempotencyConflict);
+    });
+
+    it('returns 200 with the existing order when the RPC reports idempotent_replay', async () => {
+      const { supabase } = makeSupabaseMock({ baseProducts: [simpleProductRow] });
+      supabase.rpc = async () => ({
+        data: [{
+          order_id: 'replay-id',
+          order_number: 'POV-111111',
+          total: 1000,
+          status: 'idempotent_replay',
+        }],
+        error: null,
+      });
+      currentSupabase = supabase;
+
+      const res: any = await POST(
+        buildRequest({
+          idempotencyKey: 'idem-rpc-replay',
+          items: [{ type: 'product', product_id: simpleProductId, quantity: 1 }],
+        }),
+      );
+
+      expect(res.status).toBe(200);
+      expect(res.body.ok).toBe(true);
+      expect(res.body.orderId).toBe('replay-id');
+      expect(res.body.orderNumber).toBe('POV-111111');
+      expect(res.body.total).toBe(1000);
     });
   });
 });

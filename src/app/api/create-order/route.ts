@@ -471,74 +471,48 @@ export async function POST(request: Request) {
 
     const orderNumber = `POV-${Math.floor(100000 + Math.random() * 900000)}`;
 
-    const { data: orderInserted, error: orderErr } = await supabase
-      .from('orders')
-      .insert([{
-        user_id: null,
-        order_number: orderNumber,
-        customer_email: customerInfo.email,
-        customer_name: customerInfo.fullName,
-        customer_phone: customerInfo.phone,
-        shipping_address: dm === 'pickup' ? '' : (customerInfo.address || ''),
-        shipping_city: dm === 'pickup' ? '' : (customerInfo.city || ''),
-        shipping_department: dm === 'pickup' ? 'Montevideo' : (customerInfo.department || 'Montevideo'),
-        shipping_postal_code: dm === 'pickup' ? '' : (customerInfo.postalCode || ''),
-        subtotal,
-        shipping_cost,
-        total,
-        order_status: 'pending',
-        payment_method: paymentMethod,
-        payment_status: 'pending',
-        notes: dm === 'pickup' ? `Retiro en local físico: ${PICKUP_ADDRESS}` : null,
-        idempotency_key: idempotencyKey,
-        idempotency_payload_hash: idempotencyPayloadHash,
-      }])
-      .select('id, order_number, total, payment_status, order_status')
-      .single();
+    // PF-05: orders + order_items en una sola transacción atómica vía RPC.
+    // Si falla cualquiera de los dos inserts, la transacción de la función revierte ambos.
+    const { data: rpcResult, error: rpcErr } = await supabase.rpc('create_order_transactional', {
+      p_order_number:             orderNumber,
+      p_customer_email:           customerInfo.email,
+      p_customer_name:            customerInfo.fullName,
+      p_customer_phone:           customerInfo.phone,
+      p_shipping_address:         dm === 'pickup' ? '' : (customerInfo.address || ''),
+      p_shipping_city:            dm === 'pickup' ? '' : (customerInfo.city || ''),
+      p_shipping_department:      dm === 'pickup' ? 'Montevideo' : (customerInfo.department || 'Montevideo'),
+      p_shipping_postal_code:     dm === 'pickup' ? '' : (customerInfo.postalCode || ''),
+      p_subtotal:                 subtotal,
+      p_shipping_cost:            shipping_cost,
+      p_total:                    total,
+      p_payment_method:           paymentMethod,
+      p_notes:                    dm === 'pickup' ? `Retiro en local físico: ${PICKUP_ADDRESS}` : null,
+      p_idempotency_key:          idempotencyKey,
+      p_idempotency_payload_hash: idempotencyPayloadHash,
+      p_items:                    normalizedItems,
+    });
 
-    if (orderErr) {
-      const code = String((orderErr as any)?.code || '');
-      if (code === '23505') {
-        const { data: existingAfterConflict, error: existingAfterConflictErr } = await supabase
-          .from('orders')
-          .select('id, order_number, total, idempotency_payload_hash')
-          .eq('idempotency_key', idempotencyKey)
-          .maybeSingle();
-
-        if (existingAfterConflictErr || !existingAfterConflict) {
-          return NextResponse.json({ error: msgs.idempotencyResolveFailed }, { status: 500 });
-        }
-
-        if (String(existingAfterConflict.idempotency_payload_hash || '') !== idempotencyPayloadHash) {
-          return NextResponse.json({ error: msgs.idempotencyConflict }, { status: 409 });
-        }
-
-        return NextResponse.json({
-          ok: true,
-          orderId: existingAfterConflict.id,
-          orderNumber: existingAfterConflict.order_number,
-          total: existingAfterConflict.total,
-        });
-      }
-
-      return NextResponse.json({ error: msgs.orderCreationFailed, details: orderErr.message }, { status: 500 });
+    if (rpcErr) {
+      return NextResponse.json(
+        { error: msgs.orderCreationFailed, details: rpcErr.message },
+        { status: 500 }
+      );
     }
 
-    const orderId = orderInserted.id;
+    const row = Array.isArray(rpcResult) ? rpcResult[0] : rpcResult;
+    if (!row) {
+      return NextResponse.json({ error: msgs.orderCreationFailed }, { status: 500 });
+    }
 
-    const itemsToInsert = normalizedItems.map((it: any) => ({
-      order_id: orderId,
-      ...it,
-    }));
-
-    const { error: itemsErr } = await supabase.from('order_items').insert(itemsToInsert);
-    if (itemsErr) return NextResponse.json({ error: msgs.orderItemsCreationFailed, details: itemsErr.message }, { status: 500 });
+    if (row.status === 'payload_mismatch') {
+      return NextResponse.json({ error: msgs.idempotencyConflict }, { status: 409 });
+    }
 
     return NextResponse.json({
       ok: true,
-      orderId,
-      orderNumber: orderInserted.order_number,
-      total: orderInserted.total,
+      orderId: row.order_id,
+      orderNumber: row.order_number,
+      total: row.total,
       ...(priceDrift ? { priceDrift } : {}),
     });
 
