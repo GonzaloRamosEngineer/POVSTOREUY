@@ -33,6 +33,7 @@ export const apiErrorMessages = {
     packComponentsLoadFailed: 'Ocurrió un error al cargar los artículos de la promoción.',
     notEnoughStock: (name: string) => `No hay stock suficiente para: ${name}. Revisa las cantidades.`,
     idempotencyResolveFailed: 'Error al resolver el estado de la transacción.',
+    priceDriftRejected: 'Los precios cambiaron desde que armaste el carrito. Revisá el nuevo total antes de continuar.',
     orderCreationFailed: 'Ocurrió un error al registrar tu pedido. Por favor, intentá nuevamente.',
     orderItemsCreationFailed: 'Ocurrió un error al guardar los productos de tu pedido.',
     unexpected: 'Ocurrió un error inesperado al procesar tu solicitud. Por favor, intentá más tarde.',

@@ -171,6 +171,8 @@ function buildRequest(args: {
   paymentMethod?: 'mercadopago' | 'bank_transfer';
   deliveryMethod?: 'pickup' | 'delivery';
   customerInfo?: any;
+  expectedTotal?: number;
+  strictPricing?: boolean;
 }) {
   return new Request('http://localhost/api/create-order', {
     method: 'POST',
@@ -185,6 +187,8 @@ function buildRequest(args: {
       paymentMethod: args.paymentMethod || 'bank_transfer',
       deliveryMethod: args.deliveryMethod || 'pickup',
       ...(args.idempotencyKey !== undefined ? { idempotency_key: args.idempotencyKey } : {}),
+      ...(args.expectedTotal !== undefined ? { expectedTotal: args.expectedTotal } : {}),
+      ...(args.strictPricing !== undefined ? { strictPricing: args.strictPricing } : {}),
     }),
   });
 }
@@ -582,5 +586,98 @@ describe('create-order pack expansion + idempotency', () => {
 
     expect(missingKeyRes.status).toBe(400);
     expect(invalidKeyRes.status).toBe(400);
+  });
+
+  // PF-06: price drift detection
+  describe('price drift detection (PF-06)', () => {
+    const simpleProductId = '11111111-1111-4111-8111-111111111111';
+    const simpleProductRow = {
+      id: simpleProductId,
+      name: 'Simple Cam',
+      model: 'SC-1',
+      price: 1200,
+      cash_price: 1000,
+      card_price: 1200,
+      image_url: 'simple.jpg',
+      stock_count: 10,
+      is_active: true,
+      packs: [],
+    };
+
+    it('omits priceDrift in response when no expectedTotal is sent (backwards compat)', async () => {
+      const { supabase } = makeSupabaseMock({ baseProducts: [simpleProductRow] });
+      currentSupabase = supabase;
+
+      const res: any = await POST(
+        buildRequest({
+          idempotencyKey: 'idem-drift-control',
+          items: [{ type: 'product', product_id: simpleProductId, quantity: 1 }],
+        }),
+      );
+
+      expect(res.status).toBe(200);
+      expect(res.body.ok).toBe(true);
+      expect(res.body.total).toBe(1000);
+      expect(res.body.priceDrift).toBeUndefined();
+    });
+
+    it('omits priceDrift when expectedTotal matches computed total', async () => {
+      const { supabase } = makeSupabaseMock({ baseProducts: [simpleProductRow] });
+      currentSupabase = supabase;
+
+      const res: any = await POST(
+        buildRequest({
+          idempotencyKey: 'idem-drift-match',
+          items: [{ type: 'product', product_id: simpleProductId, quantity: 1 }],
+          expectedTotal: 1000,
+        }),
+      );
+
+      expect(res.status).toBe(200);
+      expect(res.body.total).toBe(1000);
+      expect(res.body.priceDrift).toBeUndefined();
+    });
+
+    it('includes priceDrift in 200 response when expectedTotal mismatches and strictPricing is not set (informational mode)', async () => {
+      const { supabase, captures } = makeSupabaseMock({ baseProducts: [simpleProductRow] });
+      currentSupabase = supabase;
+
+      const res: any = await POST(
+        buildRequest({
+          idempotencyKey: 'idem-drift-info',
+          items: [{ type: 'product', product_id: simpleProductId, quantity: 1 }],
+          expectedTotal: 950,
+        }),
+      );
+
+      expect(res.status).toBe(200);
+      expect(res.body.ok).toBe(true);
+      expect(res.body.total).toBe(1000);
+      expect(res.body.priceDrift).toEqual({ expected: 950, computed: 1000, diff: 50 });
+      // Confirma que la orden SÍ se creó en modo informativo
+      expect(captures.orderInsertCallCount).toBe(1);
+      expect(captures.orderItemsInsertCallCount).toBe(1);
+    });
+
+    it('rejects with 409 + priceDrift when mismatch and strictPricing=true, without creating order (enterprise mode)', async () => {
+      const { supabase, captures } = makeSupabaseMock({ baseProducts: [simpleProductRow] });
+      currentSupabase = supabase;
+
+      const res: any = await POST(
+        buildRequest({
+          idempotencyKey: 'idem-drift-strict',
+          items: [{ type: 'product', product_id: simpleProductId, quantity: 1 }],
+          expectedTotal: 950,
+          strictPricing: true,
+        }),
+      );
+
+      expect(res.status).toBe(409);
+      expect(res.body.error).toBe(apiErrorMessages.createOrder.priceDriftRejected);
+      expect(res.body.priceDrift).toEqual({ expected: 950, computed: 1000, diff: 50 });
+      // Confirma que NO se creó la orden cuando se rechaza
+      expect(captures.orderInsertCallCount).toBe(0);
+      expect(captures.orderItemsInsertCallCount).toBe(0);
+    });
   });
 });

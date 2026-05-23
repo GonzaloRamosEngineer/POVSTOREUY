@@ -188,7 +188,7 @@ export async function POST(request: Request) {
   try {
     const supabase = getSupabaseAdmin();
     const body = await request.json();
-    const { customerInfo, items, paymentMethod, deliveryMethod, idempotency_key } = body;
+    const { customerInfo, items, paymentMethod, deliveryMethod, idempotency_key, expectedTotal, strictPricing } = body;
 
     const idempotencyKey = String(idempotency_key || '').trim();
     if (!idempotencyKey || idempotencyKey.length > 128) {
@@ -453,6 +453,22 @@ export async function POST(request: Request) {
     const shipping_cost = dm === 'pickup' ? 0 : (subtotal >= 2000 ? 0 : 300);
     const total = subtotal + shipping_cost;
 
+    // PF-06: price drift detection (hibrid).
+    // Si el cliente envía expectedTotal y difiere del computado (>0.01 tolerancia float):
+    //   - strictPricing=true → 409 + breakdown, NO se crea la orden (modo enterprise / front nuevo).
+    //   - strictPricing=false (default) → continúa, se crea la orden, se incluye breakdown informativo (modo backwards-compat).
+    const expectedTotalNum = expectedTotal != null && Number.isFinite(Number(expectedTotal)) ? Number(expectedTotal) : null;
+    const priceDrift = expectedTotalNum != null && Math.abs(expectedTotalNum - total) > 0.01
+      ? { expected: expectedTotalNum, computed: total, diff: Number((total - expectedTotalNum).toFixed(2)) }
+      : null;
+
+    if (priceDrift && strictPricing === true) {
+      return NextResponse.json(
+        { error: msgs.priceDriftRejected, priceDrift },
+        { status: 409 }
+      );
+    }
+
     const orderNumber = `POV-${Math.floor(100000 + Math.random() * 900000)}`;
 
     const { data: orderInserted, error: orderErr } = await supabase
@@ -523,6 +539,7 @@ export async function POST(request: Request) {
       orderId,
       orderNumber: orderInserted.order_number,
       total: orderInserted.total,
+      ...(priceDrift ? { priceDrift } : {}),
     });
 
   } catch (e: any) {
