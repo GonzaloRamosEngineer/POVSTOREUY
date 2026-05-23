@@ -6,6 +6,7 @@ import Icon from '@/components/ui/AppIcon';
 import { toast } from 'react-hot-toast';
 import { adminOrderMessages } from '@/messages/adminOrderMessages';
 import { getSupabaseBrowserClient } from '@/lib/supabaseClient';
+import { adminFetch, AdminFetchError } from '@/lib/api/adminFetch';
 import { isPickup, type DeliveryMethod } from '@/lib/orders/deliveryMethod';
 
 interface OrderItem {
@@ -101,12 +102,6 @@ export default function OrderDetailsModal({ orderId, isOpen, onClose }: OrderDet
 
   const supabase = useMemo(() => getSupabaseBrowserClient(), []);
 
-  async function getAuthHeader(): Promise<Record<string, string>> {
-    const { data } = await supabase.auth.getSession();
-    const token = data.session?.access_token;
-    return token ? { Authorization: `Bearer ${token}` } : {};
-  }
-
   useEffect(() => {
     if (isOpen && orderId) fetchOrderDetails();
   }, [isOpen, orderId]);
@@ -114,11 +109,7 @@ export default function OrderDetailsModal({ orderId, isOpen, onClose }: OrderDet
   const fetchOrderDetails = async () => {
     setLoading(true);
     try {
-      const authHeader = await getAuthHeader();
-      const response = await fetch(`/api/admin/orders/${orderId}`, {
-        headers: { ...authHeader },
-      });
-      const data = await response.json();
+      const data = await adminFetch<OrderDetails>(`/api/admin/orders/${orderId}`);
       setOrderDetails(data);
       setTrackingInput(data.tracking_number || '');
     } catch (err) {
@@ -138,23 +129,16 @@ export default function OrderDetailsModal({ orderId, isOpen, onClose }: OrderDet
   const handleUpdatePaymentStatus = async (newPaymentStatus: string) => {
     setUpdating(true);
     try {
-      const authHeader = await getAuthHeader();
-      const response = await fetch(`/api/admin/orders/${orderId}`, {
+      await adminFetch(`/api/admin/orders/${orderId}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', ...authHeader },
         body: JSON.stringify({ payment_status: newPaymentStatus }),
       });
-      if (response.ok) {
-        toast.success(toasts.paymentUpdateSuccess);
-        await fetchOrderDetails();
-      } else {
-        const err = await response.json().catch(() => ({}));
-        console.error('PATCH error:', err);
-        toast.error(err.error || toasts.paymentUpdateError);
-      }
+      toast.success(toasts.paymentUpdateSuccess);
+      await fetchOrderDetails();
     } catch (err) {
-      console.error('Error:', err);
-      toast.error(toasts.paymentUpdateError);
+      console.error('PATCH error:', err);
+      const msg = err instanceof AdminFetchError ? (err.message || toasts.paymentUpdateError) : toasts.paymentUpdateError;
+      toast.error(msg);
     } finally {
       setUpdating(false);
     }
@@ -163,28 +147,20 @@ export default function OrderDetailsModal({ orderId, isOpen, onClose }: OrderDet
   const handleCancelOrder = async () => {
     setUpdating(true);
     try {
-      const authHeader = await getAuthHeader();
-      const response = await fetch(`/api/admin/orders/${orderId}`, {
+      await adminFetch(`/api/admin/orders/${orderId}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', ...authHeader },
         body: JSON.stringify({
           status: 'cancelled',
           cancel_payment: true
         }),
       });
-      
-      if (response.ok) {
-        toast.success(toasts.orderCancelSuccess);
-        await fetchOrderDetails();
-        setShowCancelConfirm(false);
-      } else {
-        const err = await response.json().catch(() => ({}));
-        console.error('PATCH error:', err);
-        toast.error(err.error || toasts.orderCancelError);
-      }
+      toast.success(toasts.orderCancelSuccess);
+      await fetchOrderDetails();
+      setShowCancelConfirm(false);
     } catch (err) {
-      console.error('Error:', err);
-      toast.error(toasts.orderCancelError);
+      console.error('PATCH error:', err);
+      const msg = err instanceof AdminFetchError ? (err.message || toasts.orderCancelError) : toasts.orderCancelError;
+      toast.error(msg);
     } finally {
       setUpdating(false);
     }
@@ -193,28 +169,20 @@ export default function OrderDetailsModal({ orderId, isOpen, onClose }: OrderDet
   const handleCancelMercadoPago = async () => {
     setUpdating(true);
     try {
-      const authHeader = await getAuthHeader();
-      const response = await fetch(`/api/admin/orders/${orderId}`, {
+      await adminFetch(`/api/admin/orders/${orderId}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', ...authHeader },
         body: JSON.stringify({
           status: 'cancelled',
           cancel_mp: true
         }),
       });
-      
-      if (response.ok) {
-        toast.success(toasts.mpCancelSuccess);
-        await fetchOrderDetails();
-        setShowCancelMPConfirm(false);
-      } else {
-        const err = await response.json().catch(() => ({}));
-        console.error('PATCH error:', err);
-        toast.error(err.error || toasts.mpCancelError);
-      }
+      toast.success(toasts.mpCancelSuccess);
+      await fetchOrderDetails();
+      setShowCancelMPConfirm(false);
     } catch (err) {
-      console.error('Error:', err);
-      toast.error(toasts.mpCancelError);
+      console.error('PATCH error:', err);
+      const msg = err instanceof AdminFetchError ? (err.message || toasts.mpCancelError) : toasts.mpCancelError;
+      toast.error(msg);
     } finally {
       setUpdating(false);
     }
@@ -233,24 +201,16 @@ export default function OrderDetailsModal({ orderId, isOpen, onClose }: OrderDet
         }
       }
 
-      const authHeader = await getAuthHeader();
-      const response = await fetch(`/api/admin/orders/${orderId}`, {
+      await adminFetch(`/api/admin/orders/${orderId}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', ...authHeader },
         body: JSON.stringify(payload),
       });
-
-      if (response.ok) {
-        toast.success(toasts.orderUpdateSuccess);
-        await fetchOrderDetails();
-      } else {
-        const err = await response.json().catch(() => ({}));
-        console.error('PATCH error:', err);
-        toast.error(err.error || toasts.orderUpdateError);
-      }
+      toast.success(toasts.orderUpdateSuccess);
+      await fetchOrderDetails();
     } catch (err) {
-      console.error('Error:', err);
-      toast.error(toasts.orderUpdateError);
+      console.error('PATCH error:', err);
+      const msg = err instanceof AdminFetchError ? (err.message || toasts.orderUpdateError) : toasts.orderUpdateError;
+      toast.error(msg);
     } finally {
       setUpdating(false);
     }

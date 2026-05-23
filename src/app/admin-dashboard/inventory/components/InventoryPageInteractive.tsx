@@ -5,17 +5,12 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import Icon from '@/components/ui/AppIcon';
 import { getSupabaseBrowserClient } from '@/lib/supabaseClient';
+import { adminFetch, AdminFetchError } from '@/lib/api/adminFetch';
 import ProductTable, { type ProductRow } from './ProductTable';
 // IMPORTAMOS EL TOAST
 import { toast } from 'react-hot-toast';
 
 type AdminCheck = { ok: true } | { ok: false; message: string };
-
-async function getAccessToken() {
-  const supabase = getSupabaseBrowserClient();
-  const { data } = await supabase.auth.getSession();
-  return data.session?.access_token || null;
-}
 
 export default function InventoryPageInteractive() {
   const router = useRouter();
@@ -50,13 +45,6 @@ export default function InventoryPageInteractive() {
   async function loadProducts() {
     setLoading(true);
     setErrorMsg('');
-
-    const token = await getAccessToken();
-    if (!token) {
-      setLoading(false);
-      setErrorMsg('No hay sesión activa. Iniciá sesión como admin.');
-      return;
-    }
 
     const params = new URLSearchParams();
     if (q.trim()) params.set('q', q.trim());
@@ -95,14 +83,15 @@ export default function InventoryPageInteractive() {
   }
 
   async function onDeactivate(id: string) {
-    const token = await getAccessToken();
-    if (!token) return;
+    try {
+      await adminFetch(`/api/admin/products?id=${id}`, { method: 'DELETE' });
+    } catch (err) {
+      // Preservamos fire-and-forget: si el endpoint admin falla, seguimos con
+      // el toggle local. La sesión sin token o sin rol admin lo va a frenar
+      // igual en la siguiente operación.
+      if (!(err instanceof AdminFetchError)) console.error(err);
+    }
 
-    const res = await fetch(`/api/admin/products?id=${id}`, {
-      method: 'DELETE', 
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    
     const product = rows.find(r => r.id === id);
     if (!product) return;
 

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Icon from '@/components/ui/AppIcon';
 import { getSupabaseBrowserClient } from '@/lib/supabaseClient';
+import { adminFetch, AdminFetchError } from '@/lib/api/adminFetch';
 import { toast } from 'react-hot-toast';
 import { computePackEffectiveStock, buildProductsLookup } from '@/lib/packs/computePackStock';
 
@@ -912,12 +913,8 @@ useEffect(() => {
         return;
         }
 
-        const res = await fetch(`/api/admin/products?id=${productId}`, {
-        headers: { Authorization: `Bearer ${session.session.access_token}` },
-        });
-
-        if (res.ok) {
-        const { product: p } = await res.json();
+        try {
+        const { product: p } = await adminFetch<{ product: any }>(`/api/admin/products?id=${productId}`);
         const loadedSpecs = p.tech_specs
             ? Object.entries(p.tech_specs).map(([k, v]) => ({ label: k, value: String(v) }))
             : [];
@@ -960,6 +957,13 @@ useEffect(() => {
         setFeaturesText(stringifyFeatures(p.features));
         setSpecsList(loadedSpecs);
         setLoading(false);
+        } catch (err) {
+          if (err instanceof AdminFetchError) {
+            setErrorMsg(formatAdminSaveError(err.body));
+          } else {
+            console.error(err);
+          }
+          setLoading(false);
         }
     } else {
         setLoading(false);
@@ -994,25 +998,25 @@ const onSubmit = async () => {
     tech_specs: specsObject,
     };
 
-    const res = await fetch(mode === 'create' ? '/api/admin/products' : `/api/admin/products?id=${productId}`, {
-    method: mode === 'create' ? 'POST' : 'PATCH',
-    headers: {
-        Authorization: `Bearer ${session.session.access_token}`,
-        'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(payload),
-    });
-
-    if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    setErrorMsg(formatAdminSaveError(err));
+    let responseData: any = null;
+    try {
+    responseData = await adminFetch<any>(
+        mode === 'create' ? '/api/admin/products' : `/api/admin/products?id=${productId}`,
+        {
+        method: mode === 'create' ? 'POST' : 'PATCH',
+        body: JSON.stringify(payload),
+        }
+    );
+    } catch (err) {
+    setErrorMsg(formatAdminSaveError(err instanceof AdminFetchError ? err.body : err));
     setSaving(false);
-    } else {
+    return;
+    }
+
     try {
         let finalId = productId;
         if (mode === 'create') {
-        const responseData = await res.json();
-        finalId = responseData.id || responseData.product?.id;
+        finalId = responseData?.id || responseData?.product?.id;
         }
 
         if (finalId) {
@@ -1056,7 +1060,6 @@ const onSubmit = async () => {
         console.error('Error guardando extras o reseñas:', e);
     }
     router.push('/admin-dashboard/inventory');
-    }
 };
 
 if (loading) {
