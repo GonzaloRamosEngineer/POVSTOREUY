@@ -9,8 +9,9 @@ import ProductCard from './ProductCard';
 import MobileStickyCTA from './MobileStickyCTA';
 import Icon from '@/components/ui/AppIcon';
 import { getSupabaseBrowserClient } from '@/lib/supabaseClient';
+import { computePackEffectiveStock, buildProductsLookup } from '@/lib/packs/computePackStock';
 // <-- NUEVO: Importamos el carrusel de accesorios -->
-import AccessoriesCarousel from '@/components/common/AccessoriesCarousel'; 
+import AccessoriesCarousel from '@/components/common/AccessoriesCarousel';
 
 // Helper del carrito
 import {
@@ -102,19 +103,31 @@ const HomepageInteractive = () => {
 
       const allCards: Product[] = [];
 
+      // Diccionario para cómputo de stock derivado de packs.
+      // Incluye TODOS los productos activos (no solo show_on_home) para que kits que dependen
+      // de accesorios "ocultos" en home (memorias, arneses, etc.) se calculen correctamente.
+      const productsLookup = buildProductsLookup(
+        (data ?? []).map((p: any) => ({
+          id: p.id,
+          name: p.name,
+          stock_count: Number(p.stock_count ?? 0),
+          is_active: p.is_active !== false,
+        }))
+      );
+
       (data ?? []).forEach((p: any) => {
         if (p.show_on_home) {
           allCards.push({
             id: p.id,
             slug: p.slug,
             name: p.name,
-            description: p.description || '', 
+            description: p.description || '',
             price: Number(p.price),
             originalPrice: p.original_price != null ? Number(p.original_price) : undefined,
             image: p.image_url,
             alt: `${p.name} ${p.model ?? ''}`.trim(),
             features: normalizeFeatures(p.features),
-            stockCount: Number(p.stock_count ?? 0),
+            stockCount: Math.max(0, Number(p.stock_count ?? 0)),
             badge: p.badge ?? undefined,
             is_outlet: p.is_outlet ?? false,
           });
@@ -129,19 +142,21 @@ const HomepageInteractive = () => {
 
         loadedPacks.forEach((pack) => {
           if (pack.show_on_home) {
+            // Stock derivado: ignoramos `pack.stock` editable, calculamos desde componentes.
+            const effective = computePackEffectiveStock(pack, productsLookup);
             allCards.push({
-              id: `${p.id}-${pack.id}`, 
-              slug: `${p.slug}?pack=${pack.id}`, 
-              name: pack.name, 
-              description: pack.tagline || p.description || '', 
+              id: `${p.id}-${pack.id}`,
+              slug: `${p.slug}?pack=${pack.id}`,
+              name: pack.name,
+              description: pack.tagline || p.description || '',
               price: Number(pack.price),
               originalPrice: pack.original_price != null ? Number(pack.original_price) : undefined,
-              image: (pack.images && pack.images.length > 0) ? pack.images[0] : p.image_url, 
+              image: (pack.images && pack.images.length > 0) ? pack.images[0] : p.image_url,
               alt: `${p.name} ${pack.name}`,
               features: (pack.includes && pack.includes.length > 0) ? pack.includes : normalizeFeatures(p.features),
-              stockCount: Number(pack.stock ?? 0), 
-              badge: pack.badge || 'ENVÍO GRATIS', 
-              is_outlet: false, 
+              stockCount: effective.stock,
+              badge: pack.badge || 'ENVÍO GRATIS',
+              is_outlet: false,
             });
           }
         });

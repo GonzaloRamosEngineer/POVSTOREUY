@@ -9,6 +9,11 @@ import { getSupabaseBrowserClient } from '@/lib/supabaseClient';
 import { upsertCartItem } from '@/lib/cart';
 import Icon from '@/components/ui/AppIcon';
 import AccessoriesCarousel from '@/components/common/AccessoriesCarousel';
+import {
+  buildProductsLookup,
+  computePackEffectiveStock,
+  type ProductStockLike,
+} from '@/lib/packs/computePackStock';
 
 interface GalleryImage {
   id: string;
@@ -22,6 +27,12 @@ type PackBadge = {
   variant: 'red' | 'green' | 'orange' | 'blue';
 };
 
+interface ProductPackComponent {
+  product_id: string;
+  quantity: number;
+  role?: 'primary' | 'component';
+}
+
 interface ProductPack {
   id: string;
   name: string;
@@ -32,7 +43,7 @@ interface ProductPack {
   card_price?: number | null;
   includes: string[];
   images?: string[];
-  stock?: number;
+  components?: ProductPackComponent[];
   badge?: PackBadge;
 }
 
@@ -170,6 +181,7 @@ export default function ProductDetailsInteractive({
   const [selectedPack, setSelectedPack] = useState<ProductPack | null>(null);
   const [isAdding, setIsAdding] = useState(false);
   const [quantity, setQuantity] = useState(1);
+  const [componentsLookup, setComponentsLookup] = useState<Map<string, ProductStockLike>>(new Map());
 
   const [mounted, setMounted] = useState(false);
   const [timeLeft, setTimeLeft] = useState({ hours: 0, minutes: 0, seconds: 0 });
@@ -237,6 +249,45 @@ export default function ProductDetailsInteractive({
     fetchPacks();
   }, [product.id, supabase, searchParams]);
 
+  // Carga el lookup de productos para calcular stock derivado de los packs.
+  // Solo trae los componentes referenciados por los packs cargados (query acotada).
+  useEffect(() => {
+    if (dbPacks.length === 0) return;
+    const componentIds = new Set<string>();
+    for (const pack of dbPacks) {
+      for (const c of pack.components || []) {
+        if (c?.product_id) componentIds.add(c.product_id);
+      }
+    }
+    if (componentIds.size === 0) return;
+
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from('products')
+        .select('id, name, stock_count, is_active')
+        .in('id', Array.from(componentIds));
+      if (cancelled || !data) return;
+      const rows: ProductStockLike[] = data.map((p: any) => ({
+        id: p.id,
+        name: p.name,
+        stock_count: Number(p.stock_count ?? 0),
+        is_active: p.is_active !== false,
+      }));
+      // Incluimos el producto que estamos viendo con su stock actual (puede ser el primary de varios packs).
+      rows.push({
+        id: product.id,
+        name: product.name,
+        stock_count: Number(product.stock_count ?? 0),
+        is_active: product.is_active !== false,
+      });
+      setComponentsLookup(buildProductsLookup(rows));
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [dbPacks, supabase, product.id, product.name, product.stock_count, product.is_active]);
+
   useEffect(() => {
     const urlPackId = searchParams?.get('pack');
 
@@ -257,25 +308,14 @@ export default function ProductDetailsInteractive({
   }, [selectedPack?.id]);
 
   const currentStock = useMemo(() => {
-    if (!selectedPack) return Number(product.stock_count);
+    // Producto simple (sin pack seleccionado): stock crudo del producto.
+    if (!selectedPack) return Math.max(0, Number(product.stock_count ?? 0));
 
-    let minStock = Number(product.stock_count);
-
-    if (selectedPack.includes && selectedPack.includes.length > 0 && addonsDictionary.length > 0) {
-      selectedPack.includes.forEach((itemId) => {
-        const addonReal = addonsDictionary.find((a) => a.id === itemId);
-        if (addonReal && addonReal.stock_count < minStock) {
-          minStock = addonReal.stock_count;
-        }
-      });
-    }
-
-    if (selectedPack.stock !== undefined && selectedPack.stock < minStock) {
-      minStock = selectedPack.stock;
-    }
-
-    return minStock;
-  }, [selectedPack, product.stock_count, addonsDictionary]);
+    // Pack: stock derivado de sus componentes. Si todavía no cargó el lookup,
+    // devolvemos 0 conservadoramente para no permitir compras prematuras.
+    if (componentsLookup.size === 0) return 0;
+    return computePackEffectiveStock(selectedPack, componentsLookup).stock;
+  }, [selectedPack, product.stock_count, componentsLookup]);
 
   const dynamicGallery = useMemo(() => {
     if (selectedPack && selectedPack.images && selectedPack.images.length > 0) {

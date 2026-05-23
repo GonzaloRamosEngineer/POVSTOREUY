@@ -44,7 +44,10 @@ const ProductCard = ({
     ? Math.round(((originalPrice - price) / originalPrice) * 100)
     : 0;
 
-  const isLowStock = stockCount <= 5;
+  // Clamp defensivo: si llega data corrupta (stock negativo histórico), tratamos como 0.
+  const safeStock = Math.max(0, Number.isFinite(stockCount) ? stockCount : 0);
+  const isSoldOut = safeStock === 0;
+  const isLowStock = !isSoldOut && safeStock <= 5;
 
   const productUrl = `/products/${slug}`;
 
@@ -130,9 +133,9 @@ const ProductCard = ({
       {/* CONTENT */}
       <div className="relative p-6 space-y-5 bg-neutral-900">
         {/* CHIPS ROW (metadata comercial fuera de la imagen) */}
-        {(badgeText || isLowStock) && (
+        {(badgeText || isLowStock || isSoldOut) && (
           <div className="flex flex-wrap items-center gap-2">
-            {badgeText && (
+            {badgeText && !isSoldOut && (
               <span
                 className={`inline-flex items-center px-2.5 py-1 text-[10px] font-bold rounded-full uppercase tracking-wider ${badgeClasses}`}
               >
@@ -140,10 +143,17 @@ const ProductCard = ({
               </span>
             )}
 
+            {isSoldOut && (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 text-[10px] font-bold rounded-full uppercase tracking-wider bg-neutral-700/40 text-neutral-300 ring-1 ring-neutral-600/50">
+                <Icon name="XCircleIcon" size={12} variant="solid" />
+                <span>Agotado</span>
+              </span>
+            )}
+
             {isLowStock && (
               <span className="inline-flex items-center gap-1.5 px-2.5 py-1 text-[10px] font-bold rounded-full uppercase tracking-wider bg-red-500/10 text-red-300 ring-1 ring-red-500/30">
                 <Icon name="ExclamationTriangleIcon" size={12} variant="solid" />
-                <span>Últimas {stockCount}</span>
+                <span>Últimas {safeStock}</span>
               </span>
             )}
           </div>
@@ -196,13 +206,25 @@ const ProductCard = ({
 
         {/* BUTTON */}
         <div className="pt-4">
-          <Link
-            href={productUrl}
-            className="w-full px-6 py-3.5 bg-red-600 hover:bg-red-500 text-white text-center font-bold rounded-xl transition-all shadow-[0_4px_14px_0_rgba(220,38,38,0.39)] hover:shadow-[0_6px_20px_rgba(220,38,38,0.23)] hover:-translate-y-0.5 active:translate-y-0 uppercase tracking-wide flex items-center justify-center gap-2"
-          >
-            <Icon name="ShoppingCartIcon" size={18} variant="solid" />
-            <span>Comprar Ahora</span>
-          </Link>
+          {isSoldOut ? (
+            <button
+              type="button"
+              disabled
+              aria-disabled="true"
+              className="w-full px-6 py-3.5 bg-neutral-800 text-neutral-500 text-center font-bold rounded-xl uppercase tracking-wide flex items-center justify-center gap-2 cursor-not-allowed"
+            >
+              <Icon name="XCircleIcon" size={18} variant="solid" />
+              <span>Agotado</span>
+            </button>
+          ) : (
+            <Link
+              href={productUrl}
+              className="w-full px-6 py-3.5 bg-red-600 hover:bg-red-500 text-white text-center font-bold rounded-xl transition-all shadow-[0_4px_14px_0_rgba(220,38,38,0.39)] hover:shadow-[0_6px_20px_rgba(220,38,38,0.23)] hover:-translate-y-0.5 active:translate-y-0 uppercase tracking-wide flex items-center justify-center gap-2"
+            >
+              <Icon name="ShoppingCartIcon" size={18} variant="solid" />
+              <span>Comprar Ahora</span>
+            </Link>
+          )}
         </div>
       </div>
     </div>

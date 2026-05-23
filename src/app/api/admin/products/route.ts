@@ -14,6 +14,21 @@ function hasOwn(obj: any, key: string) {
   return Object.prototype.hasOwnProperty.call(obj || {}, key);
 }
 
+/**
+ * Quita el campo `stock` de cada pack antes de persistirlo.
+ * El stock de un pack es derivado (ver src/lib/packs/computePackStock.ts); guardarlo
+ * en JSONB crea una segunda fuente de verdad que diverge. Defensa en profundidad:
+ * aunque la UI ya no manda el campo, otros clientes (curl/postman/scripts) podrían.
+ */
+function sanitizePacksForPersistence(packs: any): any {
+  if (!Array.isArray(packs)) return packs;
+  return packs.map((p) => {
+    if (!p || typeof p !== 'object') return p;
+    const { stock, ...rest } = p as Record<string, any>;
+    return rest;
+  });
+}
+
 function collectComponentProductIds(packs: Array<{ components: Array<{ product_id: string }> }>) {
   const ids = new Set<string>();
   for (const pack of packs || []) {
@@ -188,7 +203,7 @@ export async function POST(req: Request) {
     features: Array.isArray(body?.features) ? body.features : [],
     badge: body?.badge ? String(body.badge).trim() : null,
     is_active: Boolean(body?.is_active),
-    packs: Array.isArray(body?.packs) ? body.packs : undefined,
+    packs: Array.isArray(body?.packs) ? sanitizePacksForPersistence(body.packs) : undefined,
   };
 
   const { data, error } = await auth.supabase.from('products').insert(payload).select('*').single();
@@ -243,8 +258,13 @@ export async function PATCH(req: Request) {
     }
   }
 
-  const { data, error } = await auth.supabase.from('products').update(body).eq('id', id).select('*').single();
-  
+  // Sanitizamos packs antes de update (defensa en profundidad: el campo `stock` no se persiste).
+  const sanitizedBody = hasPacksField
+    ? { ...body, packs: sanitizePacksForPersistence(body.packs) }
+    : body;
+
+  const { data, error } = await auth.supabase.from('products').update(sanitizedBody).eq('id', id).select('*').single();
+
   if (error) return json(500, { error: error.message });
   return json(200, { product: data });
 }

@@ -141,8 +141,15 @@ Todos son `USER-DEFINED` types. **No usar `text` en columnas que apunten a estos
   - `customer_addresses` — libreta de direcciones para usuarios logueados. El checkout es 100% guest y `orders` denormaliza el shipping. Reservada para feature futura de "mis direcciones" o muerta de origen — confirmar intención antes de planificar trabajo encima.
 - **61 `console.log`/`console.error`** sin logger estructurado ni Sentry.
 - **Tests sólo en API + validator.** No hay E2E del flujo de checkout.
-- **`stockCount` puede mostrarse negativo en `ProductCard`** (visto en home: `ÚLTIMAS -2`). Falta `Math.max(0, …)` en la fuente del dato o en el render. Síntoma de que el oversold de la RPC (`GREATEST(0, …)`) no es la única ruta — alguien está restando stock sin clamp.
+- ~~**🔴 Modelo de stock de packs incoherente.**~~ **RESUELTO 2026-05-23** — ver sección "Stock de packs es DERIVADO" en Convenciones. Pendiente: limpieza one-shot del JSONB para sacar los `stock` zombie (-2, -1) que quedaron persistidos; no es bloqueante porque el nuevo código los ignora.
 - **1 test pre-existente fallando** en `src/app/api/create-order/route.test.ts` (caso "same idempotency_key + different logical payload returns 409"). No introducido en sesiones recientes; pertenece a su propia investigación.
+- **`products.stock_count` puede desfasarse de la suma de variantes** (detectado 2026-05-23: MicroSD tenía variante Negro=9 pero `stock_count=8`). El form re-sincroniza `stock_count = sum(variants.stock)` solo cuando se edita una variante en el form ([ProductForm.tsx:753](src/app/admin-dashboard/inventory/components/ProductForm.tsx#L753)). Si la data vino por SQL/migración o se editó sin re-guardar, queda desfasado. **Impacto:** el cálculo de stock de kits es conservador (usa `stock_count`), así que no oversold-ea, pero puede sub-estimar disponibilidad. SQL de sync one-shot para correr en Supabase Studio cuando convenga:
+  ```sql
+  UPDATE products SET stock_count = (
+    SELECT COALESCE(SUM((c->>'stock')::int), 0)
+    FROM jsonb_array_elements(colors) AS c
+  ) WHERE jsonb_typeof(colors) = 'array' AND jsonb_array_length(colors) > 0;
+  ```
 
 ---
 
@@ -191,6 +198,39 @@ Patrón ya implementado en [src/app/api/create-order/route.ts](src/app/api/creat
 
 ### Stock-once
 Toda escritura que descuente stock pasa por [src/lib/stock/applyOrderStockOnce.ts](src/lib/stock/applyOrderStockOnce.ts), que invoca la RPC `apply_order_stock_once` con `FOR UPDATE` + flag `stock_applied_at`. Nunca actualizar `products.stock_count` directamente desde una route.
+
+### Stock de packs es DERIVADO (no editable)
+El stock disponible de un kit/pack **no es un campo editable**. Se calcula en tiempo real con [src/lib/packs/computePackStock.ts](src/lib/packs/computePackStock.ts):
+
+```
+effective_stock = MIN( floor(component.stock_count / component.quantity) )
+                  para cada component en pack.components
+```
+
+Si un componente está faltante o inactivo → `effective_stock = 0` y `ok = false`. La función devuelve también `limiting` (qué componente fue el cuello de botella) y `breakdown` (todos los componentes evaluados) para mostrar al admin **por qué** un kit tiene N unidades.
+
+**Lugares que usan la helper (mantener sincronizados):**
+- [src/app/admin-dashboard/inventory/components/ProductForm.tsx](src/app/admin-dashboard/inventory/components/ProductForm.tsx) — muestra el stock derivado como display read-only al lado de cada pack. **NO hay input editable.**
+- [src/app/homepage/components/HomepageInteractive.tsx](src/app/homepage/components/HomepageInteractive.tsx) — cards de home leen el cálculo, no `pack.stock`.
+- [src/app/product-details/components/ProductDetailsInteractive.tsx](src/app/product-details/components/ProductDetailsInteractive.tsx) — `currentStock` para gating del botón "Agregar al carrito".
+
+**Server-side:**
+- [src/app/api/admin/products/route.ts](src/app/api/admin/products/route.ts) — `sanitizePacksForPersistence()` elimina `stock` de cada pack en POST/PATCH antes de guardar (defensa en profundidad: aunque la UI ya no manda el campo, otros clientes podrían).
+- [src/app/api/create-order/route.ts](src/app/api/create-order/route.ts) y la RPC `apply_order_stock_once` ya operaban sobre `products.stock_count` de los componentes, no sobre `pack.stock`. Sin cambios.
+
+**Data zombie pendiente (decisión 2026-05-23: limpiar cuando sea conveniente, no bloqueante):**
+Los packs en DB tienen valores históricos de `stock` (incluyendo negativos: `-2`, `-1`). El código nuevo los ignora completamente, pero la data queda. SQL para limpieza one-shot (correr en Supabase Studio con backup previo):
+
+```sql
+UPDATE products SET packs = (
+  SELECT jsonb_agg(pack - 'stock')
+  FROM jsonb_array_elements(packs) AS pack
+) WHERE packs IS NOT NULL AND jsonb_array_length(packs) > 0;
+```
+
+(Usa el operador `-` de jsonb para eliminar la clave `stock` de cada pack. Resultado: el campo desaparece del JSON, no queda como `null`.)
+
+**Si en el futuro hace falta "desactivar" un pack:** usar `pack.status` o `pack.show_on_home`/`pack.featured_in_menu`. **No reintroducir** un campo editable de stock.
 
 ### Modelo de packs en `order_items`
 - `line_type ∈ {'simple', 'pack_primary', 'pack_component'}`.
@@ -284,6 +324,9 @@ Estado al 2026-05-23: de los 4 issues 🔴 del audit original, **3 cerrados** (a
 7. **🟡 Quick-action "marcar pagado" inline + export CSV** — *Esfuerzo: ~3-4 h. Impacto: alto operacional.*
    Diferido de la PR de historial filtrable (2026-05-23). Quick-action: botón check verde en cada fila de `OrdersTable` que llama `PATCH /api/admin/orders/[id]` con `payment_status=completed` sin abrir el modal — reduce ~80% de clics en el flujo diario de transferencias. Export CSV: botón en `OrderHistorySection` que descarga el resultado del filtro actual (ya tenemos el endpoint, solo falta endpoint nuevo `/api/admin/orders/export` o un toggle `format=csv`).
 
+8. **🟡 Limpieza one-shot del JSONB `packs[].stock` zombie** — *Esfuerzo: ~5 min en Supabase Studio.*
+   El refactor de stock derivado dejó el campo `stock` ignorado pero todavía persistido en el JSONB con valores históricos (incluso negativos). El código nuevo los ignora, así que NO es bloqueante. SQL de limpieza listo en la sección "Stock de packs es DERIVADO" de Convenciones. Correr con backup previo cuando convenga.
+
 **Nota:** los componentes-dios (`ProductForm.tsx` 1965 LOC, etc.) y la falta de tests E2E son deuda mayor pero no urgente. Se atacan cuando se necesite tocar esas zonas — refactor incremental, no big-bang.
 
 **Logros recientes** (referencia para futuras sesiones):
@@ -292,7 +335,14 @@ Estado al 2026-05-23: de los 4 issues 🔴 del audit original, **3 cerrados** (a
 - 2026-05-22: cerrado MP webhook HMAC (commit + deploy + smoke test 4/4 contra prod).
 - 2026-05-23: cerrado order-details IDOR (commit + deploy + smoke test 3/3 contra prod, incluyendo happy path con orden real).
 - 2026-05-23: historial filtrable de órdenes (`GET /api/admin/orders` + `OrderHistorySection` con URL sync, paginación y summary real). Tests 15/15. Resuelve los review items "sin filtros de órdenes", "AOV ausente" y "conversion rate fake" (este último parcial: el card viejo del dashboard sigue mostrando la métrica fake). Sentó la base de `adminFetch` y `src/config/admin.ts` para reuso futuro.
+- 2026-05-23: refactor de stock de packs a modelo **derivado** (eliminado `pack.stock` editable). Nueva helper `src/lib/packs/computePackStock.ts` con 12 tests. Cierra el bug histórico de "ÚLTIMAS -2" y la deuda 🔴 de "modelo de stock incoherente". `min={0}` agregado a inputs de stock de variante y stock_count general en ProductForm. Endpoint `/api/admin/products` con `sanitizePacksForPersistence()` como defensa en profundidad. Cards de home con chip "AGOTADO" + CTA deshabilitado cuando stock = 0.
 
 **No modificar archivos sin aprobación explícita del usuario.**
 
 Aplica a todo el repo. Investigación, lectura, propuestas y diffs propuestos en respuesta SÍ. Edits, escrituras, comandos destructivos, commits, pushes, migraciones, cambios de config NO — pedir confirmación primero, indicando qué archivo y qué cambio. Esta regla supersede cualquier inferencia de "obvio que querés esto".
+
+**Validación durante desarrollo: NO correr `npm run build` con el dev server arriba.**
+
+Aprendido por incidente 2026-05-23: si corrés `next build` mientras hay un `next dev` activo, el build de producción machaca chunks en `.next/` que el dev server tiene referenciados, dejándolo en estado inconsistente con errores `Cannot find module './XXX.js'` o `vendor-chunks/*.js`. Fix: matar dev, `rm -rf .next`, `npm run dev` de nuevo.
+
+Para validar durante desarrollo usar **`npm run type-check`** + **`npm test`** (rápidos, no tocan `.next/`). Reservar `npm run build` para validaciones pre-merge **cuando el dev server NO esté corriendo**.

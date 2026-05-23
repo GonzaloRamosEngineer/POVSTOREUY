@@ -6,9 +6,10 @@ import Link from 'next/link';
 import Icon from '@/components/ui/AppIcon';
 import { getSupabaseBrowserClient } from '@/lib/supabaseClient';
 import { toast } from 'react-hot-toast';
+import { computePackEffectiveStock, buildProductsLookup } from '@/lib/packs/computePackStock';
 
 type Mode = 'create' | 'edit';
-type SimpleProduct = { id: string; name: string };
+type SimpleProduct = { id: string; name: string; stock_count?: number | null; is_active?: boolean };
 
 type StoryBlock =
 | { type: 'full_video'; video_url: string; title?: string; subtitle?: string; text_color?: 'light' | 'dark' }
@@ -150,7 +151,9 @@ return {
     images: Array.isArray(rawPack?.images) ? rawPack.images.map((x: any) => String(x)).filter(Boolean) : [],
     show_on_home: Boolean(rawPack?.show_on_home),
     featured_in_menu: Boolean(rawPack?.featured_in_menu),
-    stock: rawPack?.stock != null && Number.isFinite(Number(rawPack.stock)) ? Number(rawPack.stock) : 0,
+    // stock de packs es derivado (ver src/lib/packs/computePackStock.ts). Se mantiene en el shape
+    // para retrocompatibilidad de tipos, pero el valor real proviene del cómputo en render.
+    stock: 0,
     badge,
     status: rawPack?.status ? String(rawPack.status) : undefined,
     is_active: rawPack?.is_active !== undefined ? Boolean(rawPack.is_active) : undefined,
@@ -187,7 +190,7 @@ return {
     images: Array.isArray(pack.images) ? pack.images.map((x) => String(x).trim()).filter(Boolean) : [],
     show_on_home: Boolean(pack.show_on_home),
     featured_in_menu: Boolean(pack.featured_in_menu),
-    stock: pack.stock != null && Number.isFinite(Number(pack.stock)) ? Number(pack.stock) : 0,
+    // pack.stock NO se persiste: el stock del kit es derivado de los componentes.
     badge: pack.badge ? { text: String(pack.badge.text || ''), variant: pack.badge.variant || 'red' } : { text: '', variant: 'red' },
     status: pack.status || undefined,
     is_active: pack.is_active,
@@ -899,7 +902,7 @@ const removePackComponent = (packIdx: number, componentIdx: number) => {
 
 useEffect(() => {
     (async () => {
-    const { data: prods } = await supabase.from('products').select('id, name').eq('is_active', true);
+    const { data: prods } = await supabase.from('products').select('id, name, stock_count, is_active').eq('is_active', true);
     if (prods) setAllProducts(prods);
 
     if (mode === 'edit' && productId) {
@@ -1276,8 +1279,9 @@ return (
                 </label>
                 <input
                 type="number"
+                min={0}
                 value={form.stock_count}
-                onChange={(e) => setForm((s) => ({ ...s, stock_count: Number(e.target.value) }))}
+                onChange={(e) => setForm((s) => ({ ...s, stock_count: Math.max(0, Number(e.target.value) || 0) }))}
                 className="w-full p-2 border rounded-md bg-white text-sm font-mono"
                 />
             </div>
@@ -1365,15 +1369,37 @@ return (
                     />
                 </div>
                 <div>
-                    <label className="text-[10px] font-bold uppercase text-gray-500 text-blue-600">
-                    Stock Exclusivo del Kit
+                    <label className="text-[10px] font-bold uppercase text-blue-600">
+                    Stock disponible (calculado)
                     </label>
-                    <input
-                    type="number"
-                    value={pack.stock ?? 0}
-                    onChange={(e) => updatePack(idx, 'stock', Number(e.target.value))}
-                    className="w-full p-2 border border-blue-300 rounded bg-blue-50 text-sm font-mono text-blue-900 focus:ring-2 ring-blue-500 outline-none"
-                    />
+                    {(() => {
+                      // El stock de un kit es derivado de sus componentes. Incluimos el producto
+                      // que se está editando con su stock_count actual del form, así el cálculo
+                      // refleja cambios sin guardar.
+                      const lookup = buildProductsLookup([
+                        ...allProducts,
+                        ...(productId
+                          ? [{ id: productId, name: form.name || 'Este producto', stock_count: form.stock_count, is_active: true }]
+                          : []),
+                      ]);
+                      const r = computePackEffectiveStock(pack, lookup);
+                      const bg = r.stock === 0 ? 'bg-red-50 border-red-200 text-red-800' : 'bg-blue-50 border-blue-200 text-blue-900';
+                      return (
+                        <div className={`w-full p-2 border rounded text-sm font-mono ${bg}`}>
+                          <div className="font-black">{r.stock} kits</div>
+                          {r.limiting && r.ok && (
+                            <div className="text-[10px] font-normal mt-0.5 truncate" title={r.limiting.product_name || r.limiting.product_id}>
+                              Limita: {r.limiting.product_name || r.limiting.product_id} ({r.limiting.available}/{r.limiting.per_kit})
+                            </div>
+                          )}
+                          {!r.ok && (
+                            <div className="text-[10px] font-normal mt-0.5">
+                              {r.breakdown.length === 0 ? 'Sin componentes' : 'Componente faltante/inactivo'}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
                 </div>
                 <div>
                     <label className="text-[10px] font-bold uppercase text-red-600">Texto del Badge</label>
@@ -1602,8 +1628,9 @@ return (
                     <label className="text-[10px] font-bold uppercase text-gray-500">Stock Disponible:</label>
                     <input
                         type="number"
+                        min={0}
                         value={color.stock}
-                        onChange={(e) => updateVariantStock(Number(e.target.value), idx)}
+                        onChange={(e) => updateVariantStock(Math.max(0, Number(e.target.value) || 0), idx)}
                         className="w-24 p-1.5 border border-gray-300 rounded-md text-sm font-mono"
                     />
                     </div>
