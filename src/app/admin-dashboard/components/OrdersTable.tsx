@@ -3,14 +3,16 @@
 import { useState } from 'react';
 import Icon from '@/components/ui/AppIcon';
 import OrderDetailsModal from './OrderDetailsModal';
+import { isPickup as isPickupOrder, type DeliveryMethod } from '@/lib/orders/deliveryMethod';
 
 interface Order {
-  id: string; 
-  order_number: string; 
+  id: string;
+  order_number: string;
   customer_name: string;
   customer_email: string;
   customer_phone: string;
   shipping_address: string;
+  delivery_method?: DeliveryMethod | null;
   total: number;
   order_status: 'pending' | 'completed' | 'processing' | 'cancelled' | 'ready' | 'shipped';
   payment_method: string;
@@ -72,8 +74,8 @@ export default function OrdersTable({ orders, onRefresh }: OrdersTableProps) {
     return colors[status] || 'bg-muted text-muted-foreground';
   };
 
-  // Helper para detectar si es retiro
-  const isPickup = (order: Order) => !order.shipping_address;
+  // PF-09: usar helper centralizado contra columna explícita.
+  const isPickup = (order: Order) => isPickupOrder(order);
 
   // ✅ NUEVO: Helper para obtener el texto y color del estado de pago
   const getPaymentStatusDisplay = (status: 'pending' | 'completed' | 'failed') => {

@@ -3,6 +3,7 @@ import { createHash, randomUUID } from 'crypto';
 import { getSupabaseAdmin } from '@/lib/supabaseAdmin';
 import { applyRateLimit, getClientIp } from '@/lib/rateLimit/apply';
 import { getCreateOrderLimiters } from '@/lib/rateLimit/limiters';
+import { PICKUP_ADDRESS } from '@/lib/orders/deliveryMethod';
 // IMPORTAMOS EL NUEVO DICCIONARIO
 import { apiErrorMessages } from '@/messages/apiErrorMessages';
 
@@ -13,7 +14,6 @@ const URUGUAY_DEPARTMENTS = new Set([
   'Rocha', 'San José', 'Soriano', 'Treinta y Tres',
 ]);
 
-const PICKUP_ADDRESS = 'José Enrique Rodó 2219, 11200 Montevideo, Departamento de Montevideo';
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 function parseMaybeJson(value: any) {
@@ -496,6 +496,7 @@ export async function POST(request: Request) {
       p_idempotency_key:          idempotencyKey,
       p_idempotency_payload_hash: idempotencyPayloadHash,
       p_items:                    normalizedItems,
+      p_delivery_method:          dm,
     });
 
     if (rpcErr) {

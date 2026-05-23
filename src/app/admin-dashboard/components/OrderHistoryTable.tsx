@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import Icon from '@/components/ui/AppIcon';
 import OrderDetailsModal from './OrderDetailsModal';
+import { isPickup, type DeliveryMethod } from '@/lib/orders/deliveryMethod';
 
 export interface HistoryOrder {
   id: string;
@@ -12,6 +13,7 @@ export interface HistoryOrder {
   customer_phone: string;
   shipping_address: string | null;
   shipping_department: string | null;
+  delivery_method?: DeliveryMethod | null;
   total: number | string;
   order_status: 'pending' | 'completed' | 'processing' | 'cancelled' | 'ready' | 'shipped';
   payment_method: string;
@@ -108,12 +110,12 @@ export default function OrderHistoryTable({ orders, loading, onRefresh, emptyLab
           <tbody className="divide-y divide-border">
             {orders.map((o) => {
               const pd = paymentDisplay(o.payment_status);
-              const isPickup = !o.shipping_address;
+              const isPickupRow = isPickup(o);
               return (
                 <tr key={o.id} className="hover:bg-muted/30 transition-colors">
                   <td className="py-3 px-4 font-mono font-bold text-foreground">
                     #{o.order_number}
-                    {isPickup && (
+                    {isPickupRow && (
                       <span className="ml-2 inline-flex items-center gap-1 px-1.5 py-0.5 bg-purple-500/10 text-purple-600 rounded text-[8px] font-black uppercase">
                         <Icon name="BuildingStorefrontIcon" size={10} />
                         Retiro

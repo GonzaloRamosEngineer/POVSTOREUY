@@ -133,6 +133,7 @@ function makeSupabaseMock(params: {
         notes: args.p_notes,
         idempotency_key: args.p_idempotency_key,
         idempotency_payload_hash: args.p_idempotency_payload_hash,
+        delivery_method: args.p_delivery_method,
       };
 
       captures.orderItemsInsertCallCount += 1;
@@ -804,6 +805,85 @@ describe('create-order pack expansion + idempotency', () => {
       expect(res.body.orderId).toBe('replay-id');
       expect(res.body.orderNumber).toBe('POV-111111');
       expect(res.body.total).toBe(1000);
+    });
+  });
+
+  // PF-09: el handler debe pasar deliveryMethod a la RPC como p_delivery_method.
+  describe('PF-09: p_delivery_method passthrough', () => {
+    const simpleProductId = '11111111-1111-4111-8111-111111111111';
+    const simpleProductRow: ProductRow = {
+      id: simpleProductId,
+      name: 'Simple Cam',
+      price: 1200,
+      cash_price: 1000,
+      card_price: 1200,
+      stock_count: 10,
+      is_active: true,
+      packs: [],
+    };
+
+    const deliveryCustomerInfo = {
+      email: 'qa@example.com',
+      fullName: 'QA User',
+      phone: '099123456',
+      address: 'Calle Falsa 123',
+      city: 'Montevideo',
+      department: 'Montevideo',
+      postalCode: '11200',
+    };
+
+    it('passes p_delivery_method="delivery" when deliveryMethod=delivery', async () => {
+      const { supabase, captures } = makeSupabaseMock({ baseProducts: [simpleProductRow] });
+      currentSupabase = supabase;
+
+      const res: any = await POST(
+        buildRequest({
+          idempotencyKey: 'idem-dm-delivery',
+          items: [{ type: 'product', product_id: simpleProductId, quantity: 1 }],
+          deliveryMethod: 'delivery',
+          paymentMethod: 'mercadopago',
+          customerInfo: deliveryCustomerInfo,
+        }),
+      );
+
+      expect(res.status).toBe(200);
+      expect(captures.orderInsertPayload?.delivery_method).toBe('delivery');
+    });
+
+    it('passes p_delivery_method="pickup" when deliveryMethod=pickup', async () => {
+      const { supabase, captures } = makeSupabaseMock({ baseProducts: [simpleProductRow] });
+      currentSupabase = supabase;
+
+      const res: any = await POST(
+        buildRequest({
+          idempotencyKey: 'idem-dm-pickup',
+          items: [{ type: 'product', product_id: simpleProductId, quantity: 1 }],
+          deliveryMethod: 'pickup',
+          paymentMethod: 'mercadopago',
+        }),
+      );
+
+      expect(res.status).toBe(200);
+      expect(captures.orderInsertPayload?.delivery_method).toBe('pickup');
+    });
+
+    it('defaults to "delivery" when deliveryMethod is missing or unknown', async () => {
+      const { supabase, captures } = makeSupabaseMock({ baseProducts: [simpleProductRow] });
+      currentSupabase = supabase;
+
+      const res: any = await POST(
+        buildRequest({
+          idempotencyKey: 'idem-dm-default',
+          items: [{ type: 'product', product_id: simpleProductId, quantity: 1 }],
+          // El normalizador del handler: dm = deliveryMethod === 'pickup' ? 'pickup' : 'delivery'.
+          deliveryMethod: 'whatever' as any,
+          paymentMethod: 'mercadopago',
+          customerInfo: deliveryCustomerInfo,
+        }),
+      );
+
+      expect(res.status).toBe(200);
+      expect(captures.orderInsertPayload?.delivery_method).toBe('delivery');
     });
   });
 });

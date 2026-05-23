@@ -6,6 +6,7 @@ import Icon from '@/components/ui/AppIcon';
 import { toast } from 'react-hot-toast';
 import { adminOrderMessages } from '@/messages/adminOrderMessages';
 import { getSupabaseBrowserClient } from '@/lib/supabaseClient';
+import { isPickup, type DeliveryMethod } from '@/lib/orders/deliveryMethod';
 
 interface OrderItem {
   id: string;
@@ -33,6 +34,7 @@ interface OrderDetails {
   shipping_city: string;
   shipping_department: string;
   shipping_postal_code: string;
+  delivery_method?: DeliveryMethod | null;
   subtotal: number;
   shipping_cost: number;
   total: number;
@@ -221,10 +223,10 @@ export default function OrderDetailsModal({ orderId, isOpen, onClose }: OrderDet
   const handleUpdateOrder = async (newStatus: string, newTracking?: string) => {
     setUpdating(true);
     try {
-      const isPickup = !!orderDetails && !orderDetails.shipping_address;
+      const pickup = isPickup(orderDetails);
       const payload: any = { status: newStatus };
 
-      if (!isPickup) {
+      if (!pickup) {
         const trackingValue = (newTracking ?? trackingInput).trim();
         if (trackingValue) {
           payload.tracking_number = trackingValue;
@@ -255,8 +257,8 @@ export default function OrderDetailsModal({ orderId, isOpen, onClose }: OrderDet
   };
 
   const getPreviousStatus = (status: string) => {
-    const isPickup = !orderDetails?.shipping_address;
-    if (isPickup) {
+    const pickup = isPickup(orderDetails);
+    if (pickup) {
       const pickupSteps: Record<string, string> = { processing: 'pending', ready: 'processing', completed: 'ready' };
       return pickupSteps[status] || null;
     } else {
@@ -285,7 +287,7 @@ export default function OrderDetailsModal({ orderId, isOpen, onClose }: OrderDet
 
   if (!isOpen) return null;
 
-  const isPickup = orderDetails && !orderDetails.shipping_address;
+  const pickup = isPickup(orderDetails);
   const isBankTransfer = orderDetails?.payment_method === 'bank_transfer';
   const isMercadoPago = orderDetails?.payment_method === 'mercadopago';
   const isCancelled = orderDetails?.order_status === 'cancelled';
@@ -381,7 +383,7 @@ export default function OrderDetailsModal({ orderId, isOpen, onClose }: OrderDet
             {orderDetails && (
               <div className="flex items-center gap-2">
                 <span className="text-[10px] bg-primary text-primary-foreground px-2 py-0.5 rounded font-mono">#{orderDetails.order_number}</span>
-                {isPickup && (
+                {pickup && (
                   <span className="text-[9px] bg-purple-600/20 text-purple-600 px-2 py-0.5 rounded font-black uppercase">
                     {modal.badges.pickup}
                   </span>
@@ -623,7 +625,7 @@ export default function OrderDetailsModal({ orderId, isOpen, onClose }: OrderDet
                     <div className="flex justify-between items-center mb-5">
                       <h3 className="text-xs font-black text-primary uppercase flex items-center gap-2">
                         <Icon name="ClipboardDocumentCheckIcon" size={16} /> 
-                        {isPickup ? fulfillment.pickupTitle : fulfillment.shippingTitle}
+                        {pickup ? fulfillment.pickupTitle : fulfillment.shippingTitle}
                       </h3>
                       {getPreviousStatus(orderDetails.order_status) && (
                         <button 
@@ -653,13 +655,13 @@ export default function OrderDetailsModal({ orderId, isOpen, onClose }: OrderDet
                           disabled={updating}
                           className="flex-1 py-3 bg-purple-600 text-white rounded-xl text-xs font-black uppercase hover:scale-[1.02] transition-transform disabled:opacity-50"
                         >
-                          {isPickup ? fulfillment.readyPickup : fulfillment.readyShipping}
+                          {pickup ? fulfillment.readyPickup : fulfillment.readyShipping}
                         </button>
                       )}
                       
                       {orderDetails.order_status === 'ready' && (
                         <>
-                          {isPickup ? (
+                          {pickup ? (
                             <button 
                               onClick={() => handleUpdateOrder('completed')} 
                               disabled={updating}
@@ -688,7 +690,7 @@ export default function OrderDetailsModal({ orderId, isOpen, onClose }: OrderDet
                         </>
                       )}
                       
-                      {orderDetails.order_status === 'shipped' && !isPickup && (
+                      {orderDetails.order_status === 'shipped' && !pickup && (
                         <button 
                           onClick={() => handleUpdateOrder('completed')} 
                           disabled={updating}
@@ -702,7 +704,7 @@ export default function OrderDetailsModal({ orderId, isOpen, onClose }: OrderDet
                     <div className="mt-4 pt-4 border-t border-border">
                       <p className="text-[9px] text-muted-foreground uppercase font-bold mb-2">{fulfillment.currentFlow}</p>
                       <div className="flex items-center gap-2 text-[9px] font-mono">
-                        {isPickup ? (
+                        {pickup ? (
                           <>
                             <span className={orderDetails.order_status === 'pending' ? 'text-primary font-black' : 'text-muted-foreground'}>PENDING</span>
                             <Icon name="ChevronRightIcon" size={12} className="text-muted-foreground" />
@@ -802,9 +804,9 @@ export default function OrderDetailsModal({ orderId, isOpen, onClose }: OrderDet
                   </section>
                   <section className="pt-4 border-t border-border">
                     <h4 className="text-[10px] font-black text-muted-foreground uppercase mb-2">
-                      {isPickup ? summary.pickupLabel : summary.shippingLabel}
+                      {pickup ? summary.pickupLabel : summary.shippingLabel}
                     </h4>
-                    {isPickup ? (
+                    {pickup ? (
                       <div className="p-3 bg-purple-500/10 border border-purple-500/20 rounded-lg">
                         <p className="text-[10px] font-black text-purple-600 dark:text-purple-400 uppercase flex items-center gap-2">
                           <Icon name="BuildingStorefrontIcon" size={14} />

@@ -11,7 +11,7 @@ const ALLOWED_PAYMENT_STATUSES = ['pending', 'completed', 'failed', 'refunded'] 
 const ALLOWED_SORT_FIELDS = ['created_at', 'total', 'order_number'] as const;
 
 const SELECT_FIELDS =
-  'id, order_number, customer_name, customer_email, customer_phone, total, subtotal, shipping_cost, order_status, payment_method, payment_status, payment_id, created_at, updated_at, shipping_address, shipping_city, shipping_department, tracking_number, mp_status, mp_status_detail, notes';
+  'id, order_number, customer_name, customer_email, customer_phone, total, subtotal, shipping_cost, order_status, payment_method, payment_status, payment_id, created_at, updated_at, shipping_address, shipping_city, shipping_department, delivery_method, tracking_number, mp_status, mp_status_detail, notes';
 
 function json(status: number, body: any) {
   return NextResponse.json(body, { status });

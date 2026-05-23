@@ -25,7 +25,8 @@ interface OrderRow {
   payment_method: string;
   payment_status: PaymentStatus;
   created_at: string;
-  shipping_address: string | null; // ✅ AGREGADO
+  shipping_address: string | null;
+  delivery_method?: 'pickup' | 'delivery' | null;
 }
 
 interface OrderItemRow {
@@ -69,7 +70,8 @@ interface OrderUI {
   payment_status: PaymentStatus;
   date: string;
   created_at: string;
-  shipping_address: string; // ✅ AGREGADO para que OrdersTable lo reciba
+  shipping_address: string;
+  delivery_method?: 'pickup' | 'delivery' | null;
 }
 
 interface InventoryItem {
@@ -225,7 +227,7 @@ export default function AdminDashboardInteractive() {
     // ✅ CORREGIDO: Agregado shipping_address al SELECT
     const { data: orderRows, error: oErr } = await supabase
       .from('orders')
-      .select('id, order_number, customer_name, customer_email, customer_phone, total, order_status, payment_method, payment_status, created_at, shipping_address')
+      .select('id, order_number, customer_name, customer_email, customer_phone, total, order_status, payment_method, payment_status, created_at, shipping_address, delivery_method')
       .gte('created_at', fromDate.toISOString())
       .order('created_at', { ascending: false });
 
@@ -272,7 +274,8 @@ export default function AdminDashboardInteractive() {
         payment_status: row.payment_status, 
         paymentStatus: row.payment_status, 
         created_at: row.created_at,
-        shipping_address: row.shipping_address || '' // ✅ CORREGIDO: Incluido en el mapeo
+        shipping_address: row.shipping_address || '',
+        delivery_method: row.delivery_method ?? null,
       };
     });
 

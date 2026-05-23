@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabaseAdmin';
 import { applyOrderStockOnce } from '../../../../../lib/stock/applyOrderStockOnce';
 import { revertOrderStockOnce } from '../../../../../lib/stock/revertOrderStockOnce';
+import { isPickup } from '@/lib/orders/deliveryMethod';
 // IMPORTAMOS EL NUEVO DICCIONARIO
 import { adminOrderApiMessages } from '@/messages/adminOrderApiMessages';
 
@@ -120,8 +121,8 @@ export async function PATCH(
       );
     }
 
-    // ✅ Detectar tipo de pago y entrega
-    const isPickup = !currentOrder.shipping_address;
+    // PF-09: detección por columna explícita en lugar de inferir por shipping_address vacío.
+    const isPickupOrder = isPickup(currentOrder);
     const isBankTransfer = currentOrder.payment_method === 'bank_transfer';
     const isMercadoPago = currentOrder.payment_method === 'mercadopago';
 
@@ -141,7 +142,7 @@ export async function PATCH(
       }
 
       // ✅ VALIDACIÓN: Si es retiro, no permitir estado "shipped"
-      if (isPickup && status === 'shipped') {
+      if (isPickupOrder && status === 'shipped') {
         return NextResponse.json(
           { error: msgs.pickupShippedError },
           { status: 400 }
@@ -149,7 +150,7 @@ export async function PATCH(
       }
 
       // ✅ VALIDACIÓN: Si es envío y se intenta "shipped" sin tracking
-      if (!isPickup && status === 'shipped' && !tracking_number && !currentOrder.tracking_number) {
+      if (!isPickupOrder && status === 'shipped' && !tracking_number && !currentOrder.tracking_number) {
         return NextResponse.json(
           { error: msgs.shippingRequiresTracking },
           { status: 400 }
@@ -267,7 +268,7 @@ export async function PATCH(
       tracking_number === undefined ? undefined : String(tracking_number).trim();
 
     if (normalizedTracking !== undefined && normalizedTracking !== '') {
-      if (isPickup) {
+      if (isPickupOrder) {
         return NextResponse.json(
           { error: msgs.pickupTrackingError },
           { status: 400 }

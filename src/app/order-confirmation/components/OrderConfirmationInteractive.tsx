@@ -15,6 +15,7 @@ import SocialShareCard from './SocialShareCard';
 
 // IMPORTAMOS EL NUEVO DICCIONARIO
 import { orderMessages } from '@/messages/orderMessages';
+import { isPickup, PICKUP_ADDRESS, type DeliveryMethod } from '@/lib/orders/deliveryMethod';
 
 type PaymentStatus = 'completed' | 'pending' | 'failed' | 'refunded';
 
@@ -52,6 +53,8 @@ interface ApiOrder {
   shipping_department: string;
   shipping_postal_code: string;
 
+  delivery_method?: DeliveryMethod | null;
+
   notes: string | null;
 }
 
@@ -76,13 +79,6 @@ function computeUIStatus(urlStatus: string | null, dbStatus?: PaymentStatus): Pa
   if (urlStatus === 'success') return 'completed';
   if (urlStatus === 'pending') return 'pending';
   return 'failed';
-}
-
-function parsePickupFromNotes(notes?: string | null) {
-  if (!notes) return null;
-  const prefix = 'Retiro en local físico:';
-  if (!notes.startsWith(prefix)) return null;
-  return notes.replace(prefix, '').trim();
 }
 
 const OrderConfirmationInteractive: React.FC = () => {
@@ -155,11 +151,11 @@ const OrderConfirmationInteractive: React.FC = () => {
 
     const paymentStatus = computeUIStatus(urlStatus, order.payment_status);
 
-    const pickupAddress = parsePickupFromNotes(order.notes);
-    const isPickup = Boolean(pickupAddress);
+    const pickup = isPickup(order);
+    const pickupAddress = pickup ? PICKUP_ADDRESS : null;
 
-    const shippingMethod = isPickup ? confirmation.deliveryInfo.methodPickup : confirmation.deliveryInfo.methodDelivery;
-    const estimatedDelivery = isPickup ? confirmation.deliveryInfo.estimatePickup : confirmation.deliveryInfo.estimateDelivery;
+    const shippingMethod = pickup ? confirmation.deliveryInfo.methodPickup : confirmation.deliveryInfo.methodDelivery;
+    const estimatedDelivery = pickup ? confirmation.deliveryInfo.estimatePickup : confirmation.deliveryInfo.estimateDelivery;
 
     const mappedItems = items.map((it) => ({
       id: it.id,
@@ -186,16 +182,16 @@ const OrderConfirmationInteractive: React.FC = () => {
       customerEmail: order.customer_email,
       customerPhone: order.customer_phone,
 
-      shippingAddress: isPickup ? (pickupAddress || '') : (order.shipping_address || ''),
-      shippingCity: isPickup ? 'Montevideo' : (order.shipping_city || ''),
-      shippingDepartment: isPickup ? 'Montevideo' : (order.shipping_department || ''),
-      shippingPostalCode: isPickup ? '' : (order.shipping_postal_code || ''),
+      shippingAddress: pickup ? (pickupAddress || '') : (order.shipping_address || ''),
+      shippingCity: pickup ? 'Montevideo' : (order.shipping_city || ''),
+      shippingDepartment: pickup ? 'Montevideo' : (order.shipping_department || ''),
+      shippingPostalCode: pickup ? '' : (order.shipping_postal_code || ''),
 
       shippingMethod,
       estimatedDelivery,
 
       items: mappedItems,
-      isPickup,
+      isPickup: pickup,
       pickupAddress: pickupAddress || null,
     };
   }, [order, items, urlStatus, confirmation.deliveryInfo]);
