@@ -7,7 +7,7 @@
 
     interface AccessoryProduct {
     id: string;
-    slug: string; 
+    slug: string;
     name: string;
     price: number;
     originalPrice?: number;
@@ -16,6 +16,7 @@
     stockCount: number;
     badge?: string;
     rating?: number;
+    features?: string[];
     }
 
     export default function AccessoriesStore() {
@@ -30,7 +31,7 @@
         
         const { data, error } = await supabase
             .from('products')
-            .select('id, slug, name, price, original_price, image_url, stock_count, badge, is_active, rating')
+            .select('id, slug, name, price, original_price, image_url, stock_count, badge, is_active, rating, features')
             .eq('is_active', true)
             .eq('is_accessory', true) 
             .order('created_at', { ascending: false });
@@ -58,7 +59,8 @@
             alt: p.name,
             stockCount: Number(p.stock_count ?? 0),
             badge: p.badge ?? undefined,
-            rating: safeRating 
+            rating: safeRating,
+            features: Array.isArray(p.features) ? (p.features as string[]) : [],
             };
         });
 
@@ -90,14 +92,23 @@
     return (
         <div className="min-h-screen bg-[#F9F9F9] font-sans pb-24">
         
-        {/* Encabezado Simple */}
-        <div className="bg-white border-b border-gray-100 pt-32 pb-16 px-4">
-            <div className="max-w-6xl mx-auto text-center">
-            <h1 className="text-4xl md:text-5xl font-black text-gray-900 tracking-tight mb-4">
+        {/* Encabezado */}
+        <div className="relative overflow-hidden border-b border-gray-100 bg-white pt-32 pb-16 px-4">
+            {/* Acento superior de marca */}
+            <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-red-500/40 to-transparent" />
+            {/* Halo sutil */}
+            <div className="pointer-events-none absolute left-1/2 top-0 h-64 w-[36rem] -translate-x-1/2 rounded-full bg-red-500/[0.04] blur-3xl" />
+
+            <div className="relative max-w-6xl mx-auto text-center">
+            <span className="mb-5 inline-flex items-center gap-2 rounded-full bg-red-50 px-3.5 py-1.5 text-[11px] font-bold uppercase tracking-[0.18em] text-red-600 ring-1 ring-red-100">
+                <span className="h-1.5 w-1.5 rounded-full bg-red-500" />
+                Ecosistema POV
+            </span>
+            <h1 className="mb-4 text-4xl md:text-5xl lg:text-6xl font-black tracking-tight text-gray-900">
                 Accesorios Originales
             </h1>
-            <p className="text-gray-500 text-lg max-w-2xl mx-auto">
-                Potenciá tu cámara con nuestro ecosistema de soportes, lentes y estuches de grado profesional.
+            <p className="mx-auto max-w-2xl text-lg leading-relaxed text-gray-500">
+                Potenciá tu cámara con nuestro ecosistema de soportes, micrófonos y memorias de grado profesional.
             </p>
             </div>
         </div>
