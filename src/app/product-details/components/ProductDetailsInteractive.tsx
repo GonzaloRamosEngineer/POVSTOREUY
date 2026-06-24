@@ -455,6 +455,7 @@ export default function ProductDetailsInteractive({
               rating={currentRating}
               reviewCount={currentReviewCount}
               description={product.description}
+              features={product.features}
               resumen={selectedPack?.tagline || product.resumen}
               mode="header"
             />
@@ -481,6 +482,7 @@ export default function ProductDetailsInteractive({
               rating={currentRating}
               reviewCount={currentReviewCount}
               description={product.description}
+              features={product.features}
               resumen={selectedPack?.tagline || product.resumen}
               mode="pricing"
             />
@@ -499,6 +501,7 @@ export default function ProductDetailsInteractive({
                 rating={currentRating}
                 reviewCount={currentReviewCount}
                 description={product.description}
+                features={product.features}
                 resumen={selectedPack?.tagline || product.resumen}
               />
             </div>

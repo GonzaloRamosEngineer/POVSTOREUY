@@ -12,8 +12,20 @@ interface ProductInfoProps {
   rating: number;
   reviewCount: number;
   description: string;
+  features?: string[] | string | null;
   resumen?: string;
   mode?: 'full' | 'header' | 'pricing';
+}
+
+// Render ligero de markdown inline: **negrita** y *itálica* (el resto pasa como texto).
+function renderInline(text: string) {
+  return text.split(/(\*\*[^*]+\*\*|\*[^*]+\*)/g).map((tok, i) => {
+    const bold = tok.match(/^\*\*([^*]+)\*\*$/);
+    if (bold) return <strong key={i} className="font-semibold text-gray-900">{bold[1]}</strong>;
+    const italic = tok.match(/^\*([^*]+)\*$/);
+    if (italic) return <em key={i}>{italic[1]}</em>;
+    return tok;
+  });
 }
 
 export default function ProductInfo({
@@ -26,9 +38,15 @@ export default function ProductInfo({
   rating,
   reviewCount,
   description,
+  features,
   resumen,
   mode = 'full',
 }: ProductInfoProps) {
+  const featureList = Array.isArray(features)
+    ? features
+    : typeof features === 'string' && features.trim()
+      ? features.split('\n').map((f) => f.trim()).filter(Boolean)
+      : [];
   const scrollToReviews = () => {
     const reviewsSection = document.getElementById('reviews');
     if (reviewsSection) {
@@ -90,6 +108,31 @@ export default function ProductInfo({
                 {resumen}
               </p>
             </div>
+          )}
+
+          {description && (
+            <div className="space-y-3 text-base text-gray-600 leading-relaxed">
+              {description.split(/\n{2,}/).map((para, i) => (
+                <p key={i} className="whitespace-pre-line">
+                  {renderInline(para)}
+                </p>
+              ))}
+            </div>
+          )}
+
+          {featureList.length > 0 && (
+            <ul className="space-y-2 pt-1">
+              {featureList.map((feat, i) => (
+                <li key={i} className="flex items-start gap-2 text-sm text-gray-700">
+                  <Icon
+                    name="CheckCircleIcon"
+                    size={18}
+                    className="text-[#10b981] mt-0.5 shrink-0"
+                  />
+                  <span>{renderInline(feat)}</span>
+                </li>
+              ))}
+            </ul>
           )}
         </>
       )}
