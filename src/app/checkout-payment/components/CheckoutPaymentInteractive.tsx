@@ -308,7 +308,7 @@ export default function CheckoutPaymentInteractive() {
       const created = await createOrder();
       clearCart();
 
-      const whatsappNumber = '59897801202';
+      const whatsappNumber = '59896482949';
       const message = checkoutMessages.whatsapp.template(created.orderNumber);
       const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(message)}`;
 

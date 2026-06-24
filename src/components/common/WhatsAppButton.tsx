@@ -2,7 +2,7 @@
 
     export default function WhatsAppButton() {
     // Reemplazá con tu número real. Formato: Código de país (598) + número sin el 0 inicial
-    const phoneNumber = "59897801202"; 
+    const phoneNumber = "59896482949"; 
     const defaultMessage = "¡Hola! Vengo de la tienda web y tengo una consulta.";
     const waLink = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(defaultMessage)}`;
 

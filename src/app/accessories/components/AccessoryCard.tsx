@@ -37,7 +37,7 @@ export default function AccessoryCard({
   const isOutOfStock = stockCount <= 0;
   const { accessoryCard } = globalMessages;
 
-  const whatsappUrl = `https://wa.me/59897801202?text=${encodeURIComponent(
+  const whatsappUrl = `https://wa.me/59896482949?text=${encodeURIComponent(
     accessoryCard.whatsappTemplate(name)
   )}`;
 

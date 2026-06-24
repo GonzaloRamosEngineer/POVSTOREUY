@@ -5,7 +5,7 @@ import Icon from '@/components/ui/AppIcon';
 export default function ContactPage() {
   
   // 1. Configuración de WhatsApp con mensaje personalizado
-  const phoneNumber = '59897801202';
+  const phoneNumber = '59896482949';
   const message = '¡Hola POV Store! 👋 Vi su web y quiero consultar sobre las cámaras de acción y accesorios. ¿Me podrían asesorar?';
   const whatsappUrl = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(message)}`;
 
