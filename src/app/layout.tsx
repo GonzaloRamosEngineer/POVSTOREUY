@@ -14,12 +14,28 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
+  metadataBase: new URL('https://povstore.uy'),
   title: 'POV Store Uruguay',
   description: 'Cámaras POV mini 4K profesionales.',
   icons: {
-    icon: '/icon.png', 
-    shortcut: '/favicon.ico', 
-    apple: '/icon.png', 
+    icon: '/icon.png',
+    shortcut: '/favicon.ico',
+    apple: '/icon.png',
+  },
+  openGraph: {
+    type: 'website',
+    siteName: 'POV Store Uruguay',
+    locale: 'es_UY',
+    url: 'https://povstore.uy',
+    title: 'POV Store Uruguay',
+    description: 'Cámaras POV mini 4K profesionales.',
+    images: [{ url: '/icon.png', width: 512, height: 512, alt: 'POV Store Uruguay' }],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'POV Store Uruguay',
+    description: 'Cámaras POV mini 4K profesionales.',
+    images: ['/icon.png'],
   },
 };
 

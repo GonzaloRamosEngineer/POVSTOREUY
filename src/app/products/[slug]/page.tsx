@@ -30,6 +30,8 @@ function cleanMarkdown(text: string | null) {
     .replace(/\*(.*?)\*/g, '$1')
     .replace(/__(.*?)__/g, '$1')
     .replace(/#+/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
     .substring(0, 160);
 }
 
@@ -41,7 +43,7 @@ const isUUID = (str: string) => {
 export async function generateMetadata({ params }: Props) {
   const { slug } = await params;
 
-  let query = supabase.from('products').select('name, description');
+  let query = supabase.from('products').select('name, description, image_url, slug');
   if (isUUID(slug)) {
     query = query.eq('id', slug);
   } else {
@@ -52,9 +54,32 @@ export async function generateMetadata({ params }: Props) {
 
   if (!product) return { title: 'Producto no encontrado' };
 
+  const description = cleanMarkdown(product.description);
+  const title = `${product.name} · POV Store Uruguay`;
+  const url = `https://povstore.uy/products/${product.slug || slug}`;
+  const image = product.image_url || undefined;
+
   return {
-    title: `${product.name} - POV Store Uruguay`,
-    description: cleanMarkdown(product.description),
+    title,
+    description,
+    alternates: { canonical: url },
+    openGraph: {
+      type: 'website',
+      siteName: 'POV Store Uruguay',
+      locale: 'es_UY',
+      url,
+      title,
+      description,
+      images: image
+        ? [{ url: image, width: 1024, height: 1024, alt: product.name }]
+        : undefined,
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title,
+      description,
+      images: image ? [image] : undefined,
+    },
   };
 }
 
