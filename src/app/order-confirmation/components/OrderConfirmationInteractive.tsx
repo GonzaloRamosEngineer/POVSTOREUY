@@ -16,6 +16,10 @@ import SocialShareCard from './SocialShareCard';
 // IMPORTAMOS EL NUEVO DICCIONARIO
 import { orderMessages } from '@/messages/orderMessages';
 import { isPickup, PICKUP_ADDRESS, type DeliveryMethod } from '@/lib/orders/deliveryMethod';
+import { trackPurchase } from '@/lib/analytics/metaPixel';
+
+// Moneda de la tienda (MercadoPago UY). Alineado con currency_id en mp-preference.
+const STORE_CURRENCY = 'UYU';
 
 type PaymentStatus = 'completed' | 'pending' | 'failed' | 'refunded';
 
@@ -195,6 +199,42 @@ const OrderConfirmationInteractive: React.FC = () => {
       pickupAddress: pickupAddress || null,
     };
   }, [order, items, urlStatus, confirmation.deliveryInfo]);
+
+  // Meta Pixel — evento Purchase. Sólo cuando el pago está confirmado
+  // (completed) y con el total real de la orden en UYU. Dedup por order.id
+  // (localStorage) para no doblar la conversión ante refresh/re-render. El
+  // eventId = order.id se reusará en la Conversions API server-side (fase 2)
+  // para que Meta deduplique el evento pixel vs. server.
+  useEffect(() => {
+    if (!order || !ui) return;
+    if (ui.paymentStatus !== 'completed') return;
+
+    const dedupeKey = `fb_purchase_${order.id}`;
+    try {
+      if (localStorage.getItem(dedupeKey)) return;
+    } catch {
+      // localStorage inaccesible (modo privado, etc.) — seguimos igual.
+    }
+
+    trackPurchase({
+      value: ui.total,
+      currency: STORE_CURRENCY,
+      orderNumber: ui.orderNumber,
+      eventId: order.id,
+      numItems: ui.items.reduce((n, it) => n + it.quantity, 0),
+      contents: ui.items.map((it) => ({
+        id: it.id,
+        quantity: it.quantity,
+        item_price: it.price,
+      })),
+    });
+
+    try {
+      localStorage.setItem(dedupeKey, '1');
+    } catch {
+      // idem: sin persistencia el evento igual se disparó.
+    }
+  }, [order, ui]);
 
   if (loading) {
     return (

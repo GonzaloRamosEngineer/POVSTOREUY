@@ -3,7 +3,8 @@ import type { Metadata, Viewport } from 'next';
 import '../styles/index.css';
 import Header from '@/components/common/Header';
 import Footer from '@/components/common/Footer';
-import WhatsAppButton from '@/components/common/WhatsAppButton'; 
+import WhatsAppButton from '@/components/common/WhatsAppButton';
+import MetaPixel from '@/components/analytics/MetaPixel';
 
 // <-- AGREGAMOS LA IMPORTACIÓN DEL TOASTER AQUÍ -->
 import { Toaster } from 'react-hot-toast';
@@ -47,6 +48,7 @@ export default function RootLayout({
   return (
     <html lang="es">
       <body className="bg-[#F9F9F9] text-gray-900 min-h-screen flex flex-col font-sans">
+        <MetaPixel />
         <Header />
         
         <main className="flex-grow pt-16">

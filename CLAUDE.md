@@ -1,6 +1,6 @@
 # CLAUDE.md — POV Store Uruguay
 
-Contexto persistente para sesiones futuras. Due Diligence Técnico inicial: 2026-05-21. Última actualización: 2026-05-23 (audit externo PF-XX **10/10 cerrados**; rate-limit Upstash activo; race condition en stock cerrada con RAISE EXCEPTION + locks).
+Contexto persistente para sesiones futuras. Due Diligence Técnico inicial: 2026-05-21. Última actualización: 2026-07-29 (Meta Pixel de conversión instalado: PageView + evento `Purchase` en order-confirmation, `eventId = order.id` para dedup con CAPI fase 2). Antes: 2026-05-23 (audit externo PF-XX **10/10 cerrados**; rate-limit Upstash activo; race condition en stock cerrada con RAISE EXCEPTION + locks).
 
 ---
 
@@ -311,6 +311,22 @@ Strings de UI/error viven en [src/messages/](src/messages/) (`apiErrorMessages`,
 ### Forzar dinámico
 Routes que leen/escriben DB usan `export const dynamic = 'force-dynamic'`. Mantenerlo en endpoints nuevos.
 
+### Meta Pixel (tracking de conversión)
+Instalado 2026-07-29. Pixel ID **1019557654415038** (público por diseño; se lee de `NEXT_PUBLIC_FB_PIXEL_ID`). **Fail-safe:** si la env var falta, `<MetaPixel />` no renderiza nada y el sitio funciona igual sin tracking.
+
+Piezas:
+- [src/lib/analytics/metaPixel.ts](src/lib/analytics/metaPixel.ts) — wrapper tipado sobre `window.fbq`. `FB_PIXEL_ID`, `pageview()`, `trackPurchase(params)`. Todos con guard `isReady()` (no-op si el pixel no cargó, ej. SSR o env var ausente).
+- [src/components/analytics/MetaPixel.tsx](src/components/analytics/MetaPixel.tsx) — pixel base vía `next/script` (`afterInteractive`): inyecta el snippet oficial (init + PageView del load inicial) + refire `PageView` en navegaciones client-side del App Router (usa `usePathname`, saltea el primer run para no doblar el load inicial) + `<noscript>` fallback. Montado en [src/app/layout.tsx](src/app/layout.tsx) al inicio del `<body>`.
+- Evento **`Purchase`** en [src/app/order-confirmation/components/OrderConfirmationInteractive.tsx](src/app/order-confirmation/components/OrderConfirmationInteractive.tsx): se dispara SOLO cuando `payment_status === 'completed'`, con `value = ui.total` (total real de la orden), `currency: 'UYU'` (constante `STORE_CURRENCY`, alineada con `currency_id` de mp-preference), más `num_items` y `contents`.
+
+**Reglas / convenciones (respetar en cambios futuros):**
+- **`eventId = order.id` (uuid) es la convención de deduplicación.** El pixel lo manda como `eventID`. Cuando se implemente la Conversions API server-side (fase 2, ver Próximos pasos), el evento server DEBE mandar el mismo valor como `event_id` para que Meta deduplique pixel vs. server. NO cambiar la fuente del eventId sin actualizar ambos lados.
+- **Dedup client-side por `localStorage` (`fb_purchase_<order.id>`).** Evita doble conteo ante refresh/re-render de la confirmación. El `try/catch` alrededor tolera modo privado (si falla, el evento igual se dispara).
+- **Moneda = `UYU`.** Si algún día se vende en otra moneda, `STORE_CURRENCY` y `currency_id` de mp-preference deben moverse juntos.
+- **Limitación conocida:** `contents[].id` hoy es el id de `order_items`, no el SKU del catálogo de Meta. El valor de conversión (`value` + `currency`) es correcto; si se sube un catálogo a Meta, mapear a product_id/SKU para habilitar catalog matching.
+
+**Verificado 2026-07-29 (local, dev en :4028):** PageView confirmado por captura de red real vía CDP (carga `fbevents.js` + request a `connect.facebook.net/signals/config/1019557654415038`). Purchase confirmado grabando las llamadas `fbq()` reales de la app con una orden sintética `completed` (shim de `window.fbq` inyectado pre-scripts, sin tráfico a Meta): `Purchase` con `value` real + `currency:'UYU'` + `eventID` + dedup por localStorage funcionando. Falta la verificación visual con Meta Pixel Helper / Test Events (requiere sesión Meta del usuario) y **setear `NEXT_PUBLIC_FB_PIXEL_ID` en Vercel + redeploy** (env var `NEXT_PUBLIC_` → se hornea en build).
+
 ### Webhook MercadoPago (verificación de firma HMAC)
 [src/app/api/mp-webhook/route.ts](src/app/api/mp-webhook/route.ts) valida cada notificación con HMAC-SHA256 antes de tocar DB o llamar a MP. La lógica está en [src/lib/mp/verifyWebhookSignature.ts](src/lib/mp/verifyWebhookSignature.ts) (con tests en `.test.ts`).
 
@@ -390,9 +406,13 @@ Esta lista cubre las tareas **fuera** de la tabla PF-XX (audit externo) — son 
 5. **🟡 Sync one-shot `products.stock_count` vs suma de variantes** — *Esfuerzo: ~5 min en Supabase Studio.*
    Detectado 2026-05-23: posibles desfasajes (caso MicroSD: variante Negro=9 pero `stock_count=8`). Impacto: el cálculo de stock de kits es conservador (sub-estima, no oversold-ea). SQL listo en sección "Deuda técnica" — bullet `products.stock_count puede desfasarse`. Correr con backup previo.
 
+6. **🟡 Meta Pixel fase 2 — Conversions API server-side** — *Esfuerzo: ~2-4 h. Impacto: alto (fidelidad de conversiones).*
+   El Pixel client-side ya está (ver "Meta Pixel" en Convenciones). El complemento server-side dispara el evento `Purchase` desde [mp-webhook](src/app/api/mp-webhook/route.ts) —donde el pago se confirma de verdad, no en la vuelta del navegador—, lo que recupera conversiones perdidas por ad-blockers / iOS / cierres de pestaña. **Clave para dedup:** mandar `event_id = order.id` (mismo valor que el pixel usa como `eventID`) para que Meta deduplique pixel vs. server. Requiere un access token de la CAPI (Events Manager → Configuración → Conversions API) como env var server-only. Disparar tras marcar `payment_status='completed'` en el webhook, idealmente con los mismos `value`/`currency`/`contents` que el pixel.
+
 **Nota:** los componentes-dios (`ProductForm.tsx` 1965 LOC, etc.) y la falta de tests E2E son deuda mayor pero no urgente. Se atacan cuando se necesite tocar esas zonas — refactor incremental, no big-bang.
 
 **Logros recientes** (referencia para futuras sesiones):
+- 2026-07-29: **Meta Pixel de conversión instalado** (era el bloqueante de negocio para optimizar campañas por compra, no por clicks/alcance). Pixel base + PageView vía `<MetaPixel />` en layout (`next/script` afterInteractive + PageView en navegación SPA + noscript), evento `Purchase` en order-confirmation (solo `completed`, `value` real, `currency:'UYU'`, dedup por localStorage, `eventId=order.id` para futura dedup con CAPI). Nuevos: `src/lib/analytics/metaPixel.ts` + `src/components/analytics/MetaPixel.tsx`. Env var `NEXT_PUBLIC_FB_PIXEL_ID` (público). type-check limpio en archivos tocados + suite 132/132. Verificado local por captura de red CDP (PageView → fbevents.js + signals/config con ID correcto) y grabación de llamadas `fbq()` reales (Purchase con params correctos, sin tráfico a Meta). Branch `feat/meta-pixel-conversion`. **Fase 2 pendiente y documentada:** Conversions API server-side vía mp-webhook (ver Próximos pasos #6). Ver "Meta Pixel" en Convenciones para detalle.
 - 2026-05-21: audit inicial.
 - 2026-05-22: cerrado admin orders auth (= **PF-02**) (commit + deploy verificado en prod).
 - 2026-05-22: cerrado MP webhook HMAC (= **PF-03**) (commit + deploy + smoke test 4/4 contra prod).
