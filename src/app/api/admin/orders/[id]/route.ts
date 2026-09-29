@@ -3,7 +3,11 @@ import { getSupabaseAdmin } from '@/lib/supabaseAdmin';
 import { applyOrderStockOnce } from '../../../../../lib/stock/applyOrderStockOnce';
 import { revertOrderStockOnce } from '../../../../../lib/stock/revertOrderStockOnce';
 import { isPickup } from '@/lib/orders/deliveryMethod';
-import { sendOrderStatusEmail, shouldNotifyCustomer } from '@/lib/email/sendOrderStatusEmail';
+import {
+  sendOrderConfirmationEmail,
+  sendOrderStatusEmail,
+  shouldNotifyCustomer,
+} from '@/lib/email/sendOrderStatusEmail';
 // IMPORTAMOS EL NUEVO DICCIONARIO
 import { adminOrderApiMessages } from '@/messages/adminOrderApiMessages';
 
@@ -105,8 +109,13 @@ export async function PATCH(
       tracking_number, 
       payment_status,
       cancel_payment, 
-      cancel_mp 
+      cancel_mp,
+      // Escotilla del panel: permite guardar sin avisarle al cliente
+      // (ej. ya se le comunicó por WhatsApp). Default: sí avisa.
+      notify_customer
     } = body;
+
+    const notify = notify_customer !== false;
 
     // ✅ Obtener la orden actual para validaciones
     const { data: currentOrder, error: fetchError } = await supabase
@@ -355,6 +364,16 @@ export async function PATCH(
       if (stockResult.no_op) {
         return NextResponse.json({ ...data, no_op: true, stock_reason: stockResult.reason });
       }
+
+      // Transferencia confirmada a mano = el pago se acreditó de verdad.
+      // Es el mismo momento en que el webhook de MP manda la confirmación.
+      const confirmationOutcome = await sendOrderConfirmationEmail({
+        supabase,
+        order: { ...currentOrder, ...data },
+        notify,
+      });
+
+      return NextResponse.json({ ...data, email: confirmationOutcome });
     }
 
     // PF-08: Compensación simétrica. Si la orden tenía stock aplicado y el PATCH
@@ -400,6 +419,7 @@ export async function PATCH(
         supabase,
         order: { ...currentOrder, ...data },
         status,
+        notify,
       });
     }
 

@@ -1,12 +1,13 @@
 // src/lib/email/sendOrderStatusEmail.ts
 //
-// Punto único donde se decide QUÉ mail dispara un cambio de estado de orden.
+// Punto único donde se decide QUÉ mail recibe el cliente y CUÁNDO.
 // Server-only (usa el client service-role para leer los items).
 //
 // Contrato: nunca lanza. Si el mail falla, la orden ya quedó actualizada y el
 // admin no debe ver un 500 por eso — queda el log y se puede reenviar.
 
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { isOrderNotifiable } from '@/config/admin';
 import { isPickup, PICKUP_ADDRESS } from '@/lib/orders/deliveryMethod';
 import { renderOrderEmail, type OrderEmailKind } from './renderOrderEmail';
 import type { OrderEmailItemRow } from './orderEmailData';
@@ -29,31 +30,62 @@ export type OrderRowForEmail = {
   shipping_cost?: number | null;
   total?: number | null;
   tracking_number?: string | null;
+  created_at?: string | null;
 };
 
 export type OrderEmailOutcome =
-  | { sent: false; reason: 'status_not_notifiable' | 'no_customer_email' | 'send_failed' }
+  | {
+      sent: false;
+      reason:
+        | 'status_not_notifiable'
+        | 'before_cutoff'
+        | 'muted_by_admin'
+        | 'no_customer_email'
+        | 'send_failed';
+    }
   | { sent: true; skipped: boolean };
 
-/** True si la transición de estado amerita avisarle al cliente. */
-export function shouldNotifyCustomer(previousStatus: string | null | undefined, nextStatus: string): boolean {
+/**
+ * True si la transición de estado amerita avisarle al cliente.
+ * Exige cambio REAL de estado: guardar dos veces, o tocar sólo el tracking,
+ * no reenvía el mail.
+ */
+export function shouldNotifyCustomer(
+  previousStatus: string | null | undefined,
+  nextStatus: string
+): boolean {
   if (!(nextStatus in STATUS_TO_EMAIL)) return false;
-  // Sin cambio real de estado no se reenvía: evita duplicados cuando el admin
-  // guarda dos veces o toca sólo el tracking.
   return previousStatus !== nextStatus;
 }
 
-export async function sendOrderStatusEmail({
+/**
+ * Envía un mail de orden. Acá viven los dos frenos:
+ *  - `notify`: el admin puede silenciar un envío puntual desde el panel.
+ *  - corte por fecha: las órdenes previas a ORDER_EMAIL_CUTOFF nunca notifican
+ *    (el histórico ya se comunicó a mano; ver src/config/admin.ts).
+ */
+export async function sendOrderEmail({
   supabase,
   order,
-  status,
+  kind,
+  notify = true,
 }: {
   supabase: SupabaseClient;
   order: OrderRowForEmail;
-  status: string;
+  kind: OrderEmailKind;
+  notify?: boolean;
 }): Promise<OrderEmailOutcome> {
-  const kind = STATUS_TO_EMAIL[status];
-  if (!kind) return { sent: false, reason: 'status_not_notifiable' };
+  if (!notify) {
+    console.log(`[email] Orden ${order.order_number}: aviso silenciado por el admin`);
+    return { sent: false, reason: 'muted_by_admin' };
+  }
+
+  if (!isOrderNotifiable(order.created_at)) {
+    console.log(
+      `[email] Orden ${order.order_number} es anterior al corte de mails — no se notifica`
+    );
+    return { sent: false, reason: 'before_cutoff' };
+  }
 
   const to = order.customer_email?.trim();
   if (!to) {
@@ -100,4 +132,38 @@ export async function sendOrderStatusEmail({
 
   if (!result.ok) return { sent: false, reason: 'send_failed' };
   return { sent: true, skipped: Boolean((result as any).skipped) };
+}
+
+/** Mail disparado por un cambio de estado de la orden (panel admin). */
+export async function sendOrderStatusEmail({
+  supabase,
+  order,
+  status,
+  notify = true,
+}: {
+  supabase: SupabaseClient;
+  order: OrderRowForEmail;
+  status: string;
+  notify?: boolean;
+}): Promise<OrderEmailOutcome> {
+  const kind = STATUS_TO_EMAIL[status];
+  if (!kind) return { sent: false, reason: 'status_not_notifiable' };
+  return sendOrderEmail({ supabase, order, kind, notify });
+}
+
+/**
+ * Mail de confirmación de compra. Se dispara cuando el pago se acredita de
+ * verdad (webhook de MP, o confirmación manual de una transferencia), NO al
+ * crear la orden: así no le llega nada a quien abandonó el checkout sin pagar.
+ */
+export async function sendOrderConfirmationEmail({
+  supabase,
+  order,
+  notify = true,
+}: {
+  supabase: SupabaseClient;
+  order: OrderRowForEmail;
+  notify?: boolean;
+}): Promise<OrderEmailOutcome> {
+  return sendOrderEmail({ supabase, order, kind: 'confirmed', notify });
 }

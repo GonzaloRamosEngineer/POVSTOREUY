@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { buildOrderEmailLines, formatUYU, type OrderEmailItemRow } from './orderEmailData';
 import { shouldNotifyCustomer } from './sendOrderStatusEmail';
+import { isOrderNotifiable } from '@/config/admin';
 
 const PACK_GROUP = 'e31ca4aa-0000-0000-0000-00000000a9f1';
 
@@ -90,5 +91,23 @@ describe('shouldNotifyCustomer', () => {
 
   it('no reenvía si el estado no cambió (doble guardado del admin)', () => {
     expect(shouldNotifyCustomer('processing', 'processing')).toBe(false);
+  });
+});
+
+describe('isOrderNotifiable (corte de mails)', () => {
+  it('no notifica órdenes anteriores al corte', () => {
+    expect(isOrderNotifiable('2026-09-29T10:00:00-03:00')).toBe(false);
+    expect(isOrderNotifiable('2026-06-14T20:02:00-03:00')).toBe(false);
+  });
+
+  it('notifica órdenes posteriores al corte', () => {
+    expect(isOrderNotifiable('2026-09-30T00:30:00-03:00')).toBe(true);
+    expect(isOrderNotifiable('2026-12-01T12:00:00-03:00')).toBe(true);
+  });
+
+  it('ante un created_at ausente o inválido, no notifica', () => {
+    expect(isOrderNotifiable(null)).toBe(false);
+    expect(isOrderNotifiable(undefined)).toBe(false);
+    expect(isOrderNotifiable('no-es-una-fecha')).toBe(false);
   });
 });

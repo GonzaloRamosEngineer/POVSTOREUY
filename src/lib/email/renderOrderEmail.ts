@@ -14,7 +14,7 @@ const MUTED = '#6b7280';
 const BORDER = '#e5e7eb';
 const ACCENT = '#0f172a';
 
-export type OrderEmailKind = 'processing' | 'shipped' | 'ready';
+export type OrderEmailKind = 'confirmed' | 'processing' | 'shipped' | 'ready';
 
 export type RenderOrderEmailInput = {
   kind: OrderEmailKind;
@@ -65,7 +65,7 @@ function bodyBlocks(input: RenderOrderEmailInput): { title: string; paragraphs: 
     };
   }
 
-  const m = emailMessages.processing;
+  const m = kind === 'confirmed' ? emailMessages.confirmed : emailMessages.processing;
   return {
     title: m.title,
     paragraphs: [m.body, input.isPickup ? m.nextStepPickup : m.nextStepDelivery],
@@ -76,12 +76,14 @@ function subjectFor(input: RenderOrderEmailInput): string {
   const { kind, orderNumber } = input;
   if (kind === 'shipped') return emailMessages.shipped.subject(orderNumber);
   if (kind === 'ready') return emailMessages.ready.subject(orderNumber);
+  if (kind === 'confirmed') return emailMessages.confirmed.subject(orderNumber);
   return emailMessages.processing.subject(orderNumber);
 }
 
 function preheaderFor(kind: OrderEmailKind): string {
   if (kind === 'shipped') return emailMessages.shipped.preheader;
   if (kind === 'ready') return emailMessages.ready.preheader;
+  if (kind === 'confirmed') return emailMessages.confirmed.preheader;
   return emailMessages.processing.preheader;
 }
 

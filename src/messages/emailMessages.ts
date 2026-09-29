@@ -26,6 +26,17 @@ export const emailMessages = {
     footerReply: 'Si necesitás cambiar algún dato, respondé este correo y lo resolvemos.',
   },
 
+  confirmed: {
+    subject: (orderNumber: string) => `Confirmamos tu compra — pedido ${orderNumber}`,
+    preheader: 'Recibimos tu pago. Tu pedido quedó confirmado.',
+    title: '¡Gracias por tu compra!',
+    body: 'Recibimos tu pago y tu pedido quedó confirmado. Esto es lo que compraste:',
+    nextStepDelivery:
+      'Ya lo estamos preparando. Cuando lo despachemos te enviamos el número de seguimiento por este mismo medio.',
+    nextStepPickup:
+      'Ya lo estamos preparando. Te avisamos por este medio apenas esté listo para que pases a retirarlo.',
+  },
+
   processing: {
     subject: (orderNumber: string) => `Tu pedido ${orderNumber} ya está en preparación`,
     preheader: 'Recibimos tu pedido y lo estamos preparando.',

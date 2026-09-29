@@ -17,6 +17,28 @@ export const ADMIN_CONFIG = {
 } as const;
 
 /**
+ * Fecha de corte para los mails transaccionales al cliente.
+ *
+ * NINGUNA orden creada antes de este instante notifica al cliente, sin
+ * importar qué se haga con su estado. Existe porque al encender los mails
+ * (2026-09-29) el histórico ya estaba comunicado a mano por WhatsApp: mover
+ * una orden vieja en el panel le habría mandado al cliente un aviso viejo y
+ * fuera de contexto.
+ *
+ * NO moverla "para probar": para probar, creá una orden nueva. Bajarla
+ * habilita de golpe todo el histórico.
+ */
+export const ORDER_EMAIL_CUTOFF = new Date('2026-09-29T23:59:59-03:00');
+
+/** True si la orden es posterior al corte y por lo tanto puede notificar. */
+export function isOrderNotifiable(createdAt: string | Date | null | undefined): boolean {
+  if (!createdAt) return false;
+  const created = createdAt instanceof Date ? createdAt : new Date(createdAt);
+  if (Number.isNaN(created.getTime())) return false;
+  return created > ORDER_EMAIL_CUTOFF;
+}
+
+/**
  * Heurística para identificar órdenes de prueba/QA por email.
  * Activable con el toggle "excluir test" en el filtro de historial.
  * Si necesitás invalidar más casos, sumalos acá (no en el componente).

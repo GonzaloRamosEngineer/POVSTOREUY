@@ -346,8 +346,12 @@ Piezas:
 - [src/lib/email/resendClient.ts](src/lib/email/resendClient.ts) — POST a la API de Resend vía `fetch` (sin SDK). **Nunca lanza** y es **NO-OP si falta `RESEND_API_KEY`** (fail-open, igual criterio que el rate-limit de Upstash: no se rompe una venta por infra de mails).
 - [src/lib/email/orderEmailData.ts](src/lib/email/orderEmailData.ts) — colapsa las filas de `order_items`: las líneas `pack_component` (unit_price 0) **no se listan como ítems al cliente**, se cuelgan del `pack_primary` de su `pack_group_id` como "Incluye". Un componente huérfano (sin primary) se muestra como línea propia antes que desaparecer.
 - [src/lib/email/renderOrderEmail.ts](src/lib/email/renderOrderEmail.ts) — HTML + texto plano. **Tablas y estilos inline a propósito**: los clientes de correo no soportan flex/grid ni el design system del sitio. Toda cadena interpolada pasa por `escapeHtml`.
-- [src/lib/email/sendOrderStatusEmail.ts](src/lib/email/sendOrderStatusEmail.ts) — mapa estado→plantilla. Hoy notifica `processing`, `ready` y `shipped`; `completed` y `cancelled` **no mandan mail** (decisión: son estados internos / se avisan a mano).
+- [src/lib/email/sendOrderStatusEmail.ts](src/lib/email/sendOrderStatusEmail.ts) — mapa estado→plantilla + los dos frenos de envío. Hoy notifica `processing`, `ready` y `shipped`; `completed` y `cancelled` **no mandan mail** (decisión: son estados internos / se avisan a mano). Expone además `sendOrderConfirmationEmail` (mail de compra confirmada).
 - [src/messages/emailMessages.ts](src/messages/emailMessages.ts) — copy centralizado (voseo, cara al cliente). No hardcodear texto en los templates.
+
+**Los dos frenos de envío (leer antes de tocar nada de mails):**
+1. **Corte por fecha** — `ORDER_EMAIL_CUTOFF` en [src/config/admin.ts](src/config/admin.ts). Ninguna orden creada antes de ese instante notifica, pase lo que pase con su estado. Existe porque al encender los mails el histórico ya estaba comunicado a mano por WhatsApp (incluido el tracking de DAC): mover una orden vieja en el panel le habría mandado al cliente un aviso viejo y fuera de contexto. **No bajar esa fecha para probar** — para probar se crea una orden nueva; bajarla habilita de golpe todo el histórico.
+2. **`notify_customer: false`** — checkbox "Avisar al cliente por mail" en el modal de la orden (default **tildado**). Silencia un envío puntual sin tocar código.
 
 **Reglas / convenciones:**
 - **El disparador es la transición, no la acción del admin.** `shouldNotifyCustomer(prev, next)` exige que el estado **cambie**: guardar dos veces, o tocar sólo el tracking, no reenvía el mail.
@@ -355,7 +359,7 @@ Piezas:
 - **Un fallo de mail nunca devuelve error al admin.** El resultado viaja en `data.email` de la respuesta del PATCH para que la UI pueda mostrarlo, pero el 200 se mantiene.
 - Si se agrega un estado notificable, sumarlo a `STATUS_TO_EMAIL` **y** al copy en `emailMessages` — no hacer plantillas sueltas.
 
-**Pendiente:** mail de **confirmación de compra** (al crear la orden en [create-order](src/app/api/create-order/route.ts) y/o al acreditarse el pago en [mp-webhook](src/app/api/mp-webhook/route.ts)). Hoy la confirmación es sólo la pantalla `/order-confirmation`.
+**Confirmación de compra:** se dispara **cuando el pago se acredita**, no al crear la orden — así no le llega nada a quien abandonó el checkout sin pagar. Dos caminos, ambos con el mismo template `confirmed`: el webhook de MP ([mp-webhook](src/app/api/mp-webhook/route.ts), sólo en la transición real a `completed`) y la confirmación manual de una transferencia en el PATCH del admin (después de aplicar stock).
 
 ### Webhook MercadoPago (verificación de firma HMAC)
 [src/app/api/mp-webhook/route.ts](src/app/api/mp-webhook/route.ts) valida cada notificación con HMAC-SHA256 antes de tocar DB o llamar a MP. La lógica está en [src/lib/mp/verifyWebhookSignature.ts](src/lib/mp/verifyWebhookSignature.ts) (con tests en `.test.ts`).
