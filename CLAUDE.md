@@ -332,7 +332,7 @@ Agregado 2026-09-29. Antes de esto el proyecto **no mandaba ningún mail**. Remi
 
 **Arquitectura del envío:** se manda por **Resend**, se recibe por **Spacemail**. El dominio `povstore.uy` se verifica en Resend sólo para *enviar* (DKIM + SPF + MX de bounces en el subdominio `send.`); el **MX raíz sigue apuntando a Spacemail**, así que las respuestas del cliente caen en la bandeja de siempre. No mover el MX raíz.
 
-⚠ **SPF: un solo registro TXT.** El dominio ya tiene `v=spf1 include:spf.spacemail.com ~all`. Al sumar Resend hay que **mergear**, nunca agregar un segundo TXT de SPF (dos registros invalidan los dos): `v=spf1 include:spf.spacemail.com include:amazonses.com ~all`.
+⚠ **SPF: mirar el HOST de cada registro antes de tocar nada.** La raíz ya tiene `v=spf1 include:spf.spacemail.com ~all` (Spacemail). Resend normalmente pide su SPF en el subdominio `send.povstore.uy` (su MAIL FROM para rebotes) → en ese caso son dos hosts distintos, **no se toca la raíz** y no hay conflicto. **Solo si Resend pidiera un SPF en la raíz (`@`)** hay que **mergear en un único TXT** (`v=spf1 include:spf.spacemail.com include:amazonses.com ~all`): dos registros SPF en el mismo host se invalidan entre sí.
 
 Piezas:
 - [src/lib/email/resendClient.ts](src/lib/email/resendClient.ts) — POST a la API de Resend vía `fetch` (sin SDK). **Nunca lanza** y es **NO-OP si falta `RESEND_API_KEY`** (fail-open, igual criterio que el rate-limit de Upstash: no se rompe una venta por infra de mails).
