@@ -330,9 +330,17 @@ Piezas:
 ### Mails transaccionales (Resend)
 Agregado 2026-09-29. Antes de esto el proyecto **no mandaba ningún mail**. Remitente: `info@povstore.uy` (casilla real en Spacemail).
 
-**Arquitectura del envío:** se manda por **Resend**, se recibe por **Spacemail**. El dominio `povstore.uy` se verifica en Resend sólo para *enviar* (DKIM + SPF + MX de bounces en el subdominio `send.`); el **MX raíz sigue apuntando a Spacemail**, así que las respuestas del cliente caen en la bandeja de siempre. No mover el MX raíz.
+**Arquitectura del envío:** se manda por **Resend**, se recibe por **Spacemail**. El dominio `povstore.uy` se verifica en Resend sólo para *enviar*; el **MX raíz sigue apuntando a Spacemail**, así que las respuestas del cliente caen en la bandeja de siempre. No mover el MX raíz.
 
-⚠ **SPF: mirar el HOST de cada registro antes de tocar nada.** La raíz ya tiene `v=spf1 include:spf.spacemail.com ~all` (Spacemail). Resend normalmente pide su SPF en el subdominio `send.povstore.uy` (su MAIL FROM para rebotes) → en ese caso son dos hosts distintos, **no se toca la raíz** y no hay conflicto. **Solo si Resend pidiera un SPF en la raíz (`@`)** hay que **mergear en un único TXT** (`v=spf1 include:spf.spacemail.com include:amazonses.com ~all`): dos registros SPF en el mismo host se invalidan entre sí.
+**Registros DNS en Spaceship (verificación del dominio, 2026-09-29):** Resend delega por CNAME, así que **no se toca ningún registro existente** — ni el MX raíz ni el SPF raíz de Spacemail (`v=spf1 include:spf.spacemail.com ~all` sigue igual).
+
+| Tipo | Host | Valor |
+|---|---|---|
+| TXT | `resend._domainkey` | `p=MIGfMA0GCSqGSIb3...` (DKIM, el valor largo del dashboard) |
+| CNAME | `send` | `send.forge.rmta.net` |
+| CNAME | `rsend` | `rsend.forge.rmta.net` |
+
+⚠ `rsend` **no** es un typo de `resend`: son dos hosts distintos y ambos son necesarios. Y ojo si algún día Resend pidiera un SPF en la raíz (`@`): habría que **mergear en un único TXT** con el de Spacemail, porque dos registros SPF en el mismo host se invalidan entre sí.
 
 Piezas:
 - [src/lib/email/resendClient.ts](src/lib/email/resendClient.ts) — POST a la API de Resend vía `fetch` (sin SDK). **Nunca lanza** y es **NO-OP si falta `RESEND_API_KEY`** (fail-open, igual criterio que el rate-limit de Upstash: no se rompe una venta por infra de mails).
