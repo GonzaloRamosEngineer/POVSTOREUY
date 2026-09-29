@@ -3,6 +3,7 @@ import { getSupabaseAdmin } from '@/lib/supabaseAdmin';
 import { applyOrderStockOnce } from '../../../../../lib/stock/applyOrderStockOnce';
 import { revertOrderStockOnce } from '../../../../../lib/stock/revertOrderStockOnce';
 import { isPickup } from '@/lib/orders/deliveryMethod';
+import { sendOrderStatusEmail, shouldNotifyCustomer } from '@/lib/email/sendOrderStatusEmail';
 // IMPORTAMOS EL NUEVO DICCIONARIO
 import { adminOrderApiMessages } from '@/messages/adminOrderApiMessages';
 
@@ -389,8 +390,21 @@ export async function PATCH(
       }
     }
 
+    // Aviso al cliente por cambio de estado (processing / ready / shipped).
+    // Va después de stock para no mandar un mail de una operación que después
+    // devuelve 409. No bloquea la respuesta si falla: sendOrderStatusEmail
+    // no lanza y el resultado viaja en `email` para que el admin lo vea.
+    let emailOutcome: Awaited<ReturnType<typeof sendOrderStatusEmail>> | null = null;
+    if (status !== undefined && shouldNotifyCustomer(currentOrder.order_status, status)) {
+      emailOutcome = await sendOrderStatusEmail({
+        supabase,
+        order: { ...currentOrder, ...data },
+        status,
+      });
+    }
+
     console.log(`✅ Orden ${orderIdentifier} actualizada exitosamente`);
-    return NextResponse.json(data);
+    return NextResponse.json(emailOutcome ? { ...data, email: emailOutcome } : data);
     
   } catch (error) {
     console.error('Error crítico en PATCH:', error);

@@ -327,6 +327,28 @@ Piezas:
 
 **Verificado 2026-07-29 (local, dev en :4028):** PageView confirmado por captura de red real vía CDP (carga `fbevents.js` + request a `connect.facebook.net/signals/config/1019557654415038`). Purchase confirmado grabando las llamadas `fbq()` reales de la app con una orden sintética `completed` (shim de `window.fbq` inyectado pre-scripts, sin tráfico a Meta): `Purchase` con `value` real + `currency:'UYU'` + `eventID` + dedup por localStorage funcionando. Falta la verificación visual con Meta Pixel Helper / Test Events (requiere sesión Meta del usuario) y **setear `NEXT_PUBLIC_FB_PIXEL_ID` en Vercel + redeploy** (env var `NEXT_PUBLIC_` → se hornea en build).
 
+### Mails transaccionales (Resend)
+Agregado 2026-09-29. Antes de esto el proyecto **no mandaba ningún mail**. Remitente: `info@povstore.uy` (casilla real en Spacemail).
+
+**Arquitectura del envío:** se manda por **Resend**, se recibe por **Spacemail**. El dominio `povstore.uy` se verifica en Resend sólo para *enviar* (DKIM + SPF + MX de bounces en el subdominio `send.`); el **MX raíz sigue apuntando a Spacemail**, así que las respuestas del cliente caen en la bandeja de siempre. No mover el MX raíz.
+
+⚠ **SPF: un solo registro TXT.** El dominio ya tiene `v=spf1 include:spf.spacemail.com ~all`. Al sumar Resend hay que **mergear**, nunca agregar un segundo TXT de SPF (dos registros invalidan los dos): `v=spf1 include:spf.spacemail.com include:amazonses.com ~all`.
+
+Piezas:
+- [src/lib/email/resendClient.ts](src/lib/email/resendClient.ts) — POST a la API de Resend vía `fetch` (sin SDK). **Nunca lanza** y es **NO-OP si falta `RESEND_API_KEY`** (fail-open, igual criterio que el rate-limit de Upstash: no se rompe una venta por infra de mails).
+- [src/lib/email/orderEmailData.ts](src/lib/email/orderEmailData.ts) — colapsa las filas de `order_items`: las líneas `pack_component` (unit_price 0) **no se listan como ítems al cliente**, se cuelgan del `pack_primary` de su `pack_group_id` como "Incluye". Un componente huérfano (sin primary) se muestra como línea propia antes que desaparecer.
+- [src/lib/email/renderOrderEmail.ts](src/lib/email/renderOrderEmail.ts) — HTML + texto plano. **Tablas y estilos inline a propósito**: los clientes de correo no soportan flex/grid ni el design system del sitio. Toda cadena interpolada pasa por `escapeHtml`.
+- [src/lib/email/sendOrderStatusEmail.ts](src/lib/email/sendOrderStatusEmail.ts) — mapa estado→plantilla. Hoy notifica `processing`, `ready` y `shipped`; `completed` y `cancelled` **no mandan mail** (decisión: son estados internos / se avisan a mano).
+- [src/messages/emailMessages.ts](src/messages/emailMessages.ts) — copy centralizado (voseo, cara al cliente). No hardcodear texto en los templates.
+
+**Reglas / convenciones:**
+- **El disparador es la transición, no la acción del admin.** `shouldNotifyCustomer(prev, next)` exige que el estado **cambie**: guardar dos veces, o tocar sólo el tracking, no reenvía el mail.
+- **El mail va después del stock** en [admin/orders/[id]/route.ts](src/app/api/admin/orders/[id]/route.ts): así no se avisa de una operación que después devuelve 409 por stock insuficiente.
+- **Un fallo de mail nunca devuelve error al admin.** El resultado viaja en `data.email` de la respuesta del PATCH para que la UI pueda mostrarlo, pero el 200 se mantiene.
+- Si se agrega un estado notificable, sumarlo a `STATUS_TO_EMAIL` **y** al copy en `emailMessages` — no hacer plantillas sueltas.
+
+**Pendiente:** mail de **confirmación de compra** (al crear la orden en [create-order](src/app/api/create-order/route.ts) y/o al acreditarse el pago en [mp-webhook](src/app/api/mp-webhook/route.ts)). Hoy la confirmación es sólo la pantalla `/order-confirmation`.
+
 ### Webhook MercadoPago (verificación de firma HMAC)
 [src/app/api/mp-webhook/route.ts](src/app/api/mp-webhook/route.ts) valida cada notificación con HMAC-SHA256 antes de tocar DB o llamar a MP. La lógica está en [src/lib/mp/verifyWebhookSignature.ts](src/lib/mp/verifyWebhookSignature.ts) (con tests en `.test.ts`).
 
