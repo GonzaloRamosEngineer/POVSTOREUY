@@ -74,7 +74,7 @@ export const adminOrderMessages = {
     readyPickup: 'Listo para Retiro',
     readyShipping: 'Listo para Envío',
     confirmPickup: 'Confirmar Retiro',
-    trackingPlaceholder: 'Nro Tracking (UES, Mirtrans...)',
+    trackingPlaceholder: 'Nro de rastreo DAC',
     dispatch: 'Despachar',
     confirmDelivery: 'Confirmar Entrega',
     currentFlow: 'Flujo actual:',

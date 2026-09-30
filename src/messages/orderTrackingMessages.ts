@@ -95,10 +95,11 @@ export const orderTrackingMessages = {
   } satisfies Record<ProgressStepKey, { delivery: string; pickup: string }>,
 
   tracking: {
-    label: 'Número de seguimiento',
+    // Corto a propósito: "Número de seguimiento DAC" se partía en 2 líneas en mobile.
+    label: (carrier: string) => `Nº de seguimiento ${carrier}`,
     copy: 'Copiar',
     copied: 'Copiado',
-    hint: 'Usalo en la web del correo para ver el recorrido del envío.',
+    open: (carrier: string) => `Ver recorrido en ${carrier}`,
   },
 
   emailNote: {

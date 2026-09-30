@@ -22,6 +22,7 @@ import {
   SURFACE,
   WHITE,
 } from './brand';
+import { CARRIER_NAME, carrierTrackingUrl } from '@/config/shipping';
 
 export type OrderEmailKind = 'confirmed' | 'processing' | 'shipped' | 'ready';
 
@@ -60,7 +61,11 @@ function escapeHtml(value: string): string {
 }
 
 /** Bloque variable según el tipo de mail: [título, párrafos...] */
-function bodyBlocks(input: RenderOrderEmailInput): { title: string; paragraphs: string[]; highlight?: { label: string; value: string } } {
+function bodyBlocks(input: RenderOrderEmailInput): {
+  title: string;
+  paragraphs: string[];
+  highlight?: { label: string; value: string; link?: { href: string; label: string } };
+} {
   const { kind } = input;
 
   if (kind === 'shipped') {
@@ -69,7 +74,11 @@ function bodyBlocks(input: RenderOrderEmailInput): { title: string; paragraphs: 
       title: m.title,
       paragraphs: [m.body, m.estimate],
       highlight: input.trackingNumber
-        ? { label: m.trackingLabel, value: input.trackingNumber }
+        ? {
+            label: m.trackingLabel(CARRIER_NAME),
+            value: input.trackingNumber,
+            link: { href: carrierTrackingUrl(input.trackingNumber), label: m.trackingOpen(CARRIER_NAME) },
+          }
         : undefined,
     };
   }
@@ -122,7 +131,10 @@ export function renderOrderEmail(input: RenderOrderEmailInput): RenderedEmail {
     c.orderLabel(input.orderNumber),
   ];
 
-  if (highlight) textParts.push(`${highlight.label}: ${highlight.value}`);
+  if (highlight) {
+    textParts.push(`${highlight.label}: ${highlight.value}`);
+    if (highlight.link) textParts.push(`${highlight.link.label} ${highlight.link.href}`);
+  }
   textParts.push('');
 
   const withPrices = showsPrices(input.kind);
@@ -216,6 +228,11 @@ export function renderOrderEmail(input: RenderOrderEmailInput): RenderedEmail {
          <tr><td style="padding:16px 20px;">
            <div style="color:${MUTED};font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;">${escapeHtml(highlight.label)}</div>
            <div style="color:${INK};font-size:19px;font-weight:800;font-family:${FONT_HEADING};margin-top:5px;letter-spacing:-.01em;">${escapeHtml(highlight.value)}</div>
+           ${
+             highlight.link
+               ? `<a href="${escapeHtml(highlight.link.href)}" style="display:inline-block;margin-top:10px;color:${BRAND_RED};font-size:14px;font-weight:700;text-decoration:none;font-family:${FONT_HEADING};">${escapeHtml(highlight.link.label)}</a>`
+               : ''
+           }
          </td></tr>
        </table>`
     : '';

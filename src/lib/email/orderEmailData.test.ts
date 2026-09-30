@@ -147,3 +147,25 @@ describe('precios por tipo de mail', () => {
     expect(text).toContain('SJCAM C100+ - Kit POV Base');
   });
 });
+
+describe('link de rastreo DAC en el mail de despacho', () => {
+  const base = {
+    orderNumber: 'POV-000001',
+    customerName: 'Cliente',
+    items: packRows,
+    isPickup: false,
+  } as const;
+
+  it('el mail de despacho linkea al rastreo de DAC con el número del envío', () => {
+    const { html, text } = renderOrderEmail({ ...base, kind: 'shipped', trackingNumber: '8821561510815' });
+    const url = 'https://www.dac.com.uy/envios/rastreo/Codigo_Rastreo/8821561510815';
+    expect(html).toContain(url);
+    expect(text).toContain(url);
+    expect(html).toContain('Número de seguimiento DAC');
+  });
+
+  it('sin número de seguimiento no hay link', () => {
+    const { html } = renderOrderEmail({ ...base, kind: 'shipped', trackingNumber: null });
+    expect(html).not.toContain('dac.com.uy');
+  });
+});

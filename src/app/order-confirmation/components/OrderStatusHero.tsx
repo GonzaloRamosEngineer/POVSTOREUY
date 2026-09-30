@@ -4,6 +4,7 @@ import Icon from '@/components/ui/AppIcon';
 import type { OrderProgress, ProgressKind } from '@/lib/orders/orderProgress';
 import { orderTrackingMessages } from '@/messages/orderTrackingMessages';
 import { WHATSAPP_NUMBER } from '@/config/contact';
+import { CARRIER_NAME, carrierTrackingUrl } from '@/config/shipping';
 import ProgressStepper from './ProgressStepper';
 import CopyButton from './CopyButton';
 import { TONE } from './tones';
@@ -101,17 +102,29 @@ export default function OrderStatusHero({
         )}
 
         {showTracking && (
-          <div className="mt-8">
-            <div className="flex items-center justify-between gap-3 rounded-xl bg-muted px-4 py-3.5">
-              <div className="min-w-0">
+          <div className="mt-8 rounded-xl bg-muted p-4">
+            {/* flex-wrap: en mobile el botón de DAC baja a su propia línea a lo
+                ancho; en desktop queda en la misma fila que el número. */}
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="min-w-0 flex-1">
                 <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-                  {m.tracking.label}
+                  {m.tracking.label(CARRIER_NAME)}
                 </p>
                 <p className="mt-0.5 truncate font-mono text-lg text-foreground">{trackingNumber}</p>
               </div>
               <CopyButton value={trackingNumber!} label={m.tracking.copy} copiedLabel={m.tracking.copied} />
+              {/* El historial vive en DAC (detrás de reCAPTCHA): se linkea, no se replica. */}
+              <a
+                href={carrierTrackingUrl(trackingNumber!)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex w-full items-center justify-center gap-2 rounded-lg bg-red-600 px-4 py-2.5 text-sm font-medium text-white transition-transform duration-150 ease-out hover:bg-red-700 active:scale-[0.97] sm:w-auto"
+              >
+                <Icon name="TruckIcon" size={18} className="text-white" />
+                {m.tracking.open(CARRIER_NAME)}
+                <Icon name="ArrowTopRightOnSquareIcon" size={14} className="text-white/80" />
+              </a>
             </div>
-            <p className="mt-2 text-xs text-muted-foreground">{m.tracking.hint}</p>
           </div>
         )}
 

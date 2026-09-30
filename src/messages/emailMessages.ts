@@ -57,7 +57,8 @@ export const emailMessages = {
     preheader: 'Tu pedido salió. Acá va el número de seguimiento.',
     title: 'Tu pedido va en camino',
     body: 'Ya despachamos tu pedido. Podés seguirlo con este número:',
-    trackingLabel: 'Número de seguimiento',
+    trackingLabel: (carrier: string) => `Número de seguimiento ${carrier}`,
+    trackingOpen: (carrier: string) => `Ver recorrido en ${carrier} →`,
     estimate: 'La entrega estimada es de 24 a 72 horas hábiles.',
   },
 
