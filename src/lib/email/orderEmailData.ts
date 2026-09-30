@@ -7,6 +7,8 @@
 // `pack_primary` de su mismo `pack_group_id` como "Incluye". Ver el CHECK
 // de line_type en migrations/20260313_stage2a_order_items_pack_lines.sql.
 
+import { groupOrderLines } from '@/lib/orders/groupOrderLines';
+
 export type OrderEmailItemRow = {
   product_name: string;
   quantity: number;
@@ -26,59 +28,14 @@ export type OrderEmailLine = {
 
 /** Agrupa las filas crudas en las líneas visibles del mail. */
 export function buildOrderEmailLines(rows: OrderEmailItemRow[]): OrderEmailLine[] {
-  const lines: OrderEmailLine[] = [];
-  const byGroup = new Map<string, OrderEmailLine>();
-  const orphanComponents: OrderEmailItemRow[] = [];
-
-  for (const row of rows) {
-    if (row.line_type === 'pack_component') continue;
-
-    const line: OrderEmailLine = {
-      name: row.product_name,
-      quantity: row.quantity,
-      totalPrice: row.total_price,
-      includes: [],
-    };
-    lines.push(line);
-
-    if (row.line_type === 'pack_primary' && row.pack_group_id) {
-      byGroup.set(row.pack_group_id, line);
-    }
-  }
-
-  for (const row of rows) {
-    if (row.line_type !== 'pack_component') continue;
-
-    const parent = row.pack_group_id ? byGroup.get(row.pack_group_id) : undefined;
-    if (parent) {
-      parent.includes.push(
-        row.quantity > 1 ? `${row.product_name} (x${row.quantity})` : row.product_name
-      );
-    } else {
-      // Componente sin primary: dato inconsistente. Lo mostramos igual como
-      // línea propia antes que hacerlo desaparecer del mail del cliente.
-      orphanComponents.push(row);
-    }
-  }
-
-  for (const row of orphanComponents) {
-    lines.push({
-      name: row.product_name,
-      quantity: row.quantity,
-      totalPrice: row.total_price,
-      includes: [],
-    });
-  }
-
-  return lines;
+  return groupOrderLines(rows).map(({ row, components }) => ({
+    name: row.product_name,
+    quantity: row.quantity,
+    totalPrice: row.total_price,
+    includes: components.map((c) =>
+      c.quantity > 1 ? `${c.product_name} (x${c.quantity})` : c.product_name
+    ),
+  }));
 }
 
-/**
- * Moneda del sitio. Se muestra el código ISO `UYU` en vez del símbolo `$`:
- * en un mail no hay contexto de sitio uruguayo alrededor y `$` solo es
- * ambiguo (peso argentino, dólar). Mismo código que usa el pixel de Meta y
- * el `currency_id` de MercadoPago.
- */
-export function formatUYU(amount: number): string {
-  return `UYU ${Math.round(amount).toLocaleString('es-UY')}`;
-}
+export { formatUYU } from '@/lib/format/currency';

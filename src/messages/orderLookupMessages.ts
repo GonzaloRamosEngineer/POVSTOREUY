@@ -1,7 +1,7 @@
 // src/messages/orderLookupMessages.ts
 //
 // Copy del seguimiento público de pedidos (/seguimiento) y su endpoint.
-// Cara al cliente: voseo, igual que orderMessages.
+// Cara al cliente: voseo, igual que orderTrackingMessages.
 
 export const orderLookupMessages = {
   page: {

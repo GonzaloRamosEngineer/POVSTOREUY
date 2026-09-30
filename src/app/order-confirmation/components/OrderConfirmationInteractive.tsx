@@ -5,22 +5,21 @@ import Link from 'next/link';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Icon from '@/components/ui/AppIcon';
 
-import OrderSummaryCard from './OrderSummaryCard';
-import CustomerInfoCard from './CustomerInfoCard';
-import PaymentStatusCard from './PaymentStatusCard';
-import DeliveryInfoCard from './DeliveryInfoCard';
-import NextStepsCard from './NextStepsCard';
-import EmailConfirmationCard from './EmailConfirmationCard';
-import SocialShareCard from './SocialShareCard';
+import OrderStatusHero from './OrderStatusHero';
+import OrderItemsCard, { type OrderLineView } from './OrderItemsCard';
+import DeliveryCard from './DeliveryCard';
+import PaymentCard from './PaymentCard';
+import HelpCard from './HelpCard';
 
-// IMPORTAMOS EL NUEVO DICCIONARIO
-import { orderMessages } from '@/messages/orderMessages';
-import { SUPPORT_EMAIL, WHATSAPP_DISPLAY } from '@/config/contact';
+import { orderTrackingMessages } from '@/messages/orderTrackingMessages';
 import { isPickup, PICKUP_ADDRESS, type DeliveryMethod } from '@/lib/orders/deliveryMethod';
+import { getOrderProgress } from '@/lib/orders/orderProgress';
+import { groupOrderLines } from '@/lib/orders/groupOrderLines';
+import { isOrderNotifiable } from '@/config/admin';
 import { trackPurchase } from '@/lib/analytics/metaPixel';
+// Alineado con currency_id en mp-preference.
+import { STORE_CURRENCY } from '@/lib/format/currency';
 
-// Moneda de la tienda (MercadoPago UY). Alineado con currency_id en mp-preference.
-const STORE_CURRENCY = 'UYU';
 
 type PaymentStatus = 'completed' | 'pending' | 'failed' | 'refunded';
 
@@ -32,6 +31,8 @@ interface ApiOrderItem {
   quantity: number;
   unit_price: number;
   total_price: number;
+  line_type?: 'simple' | 'pack_primary' | 'pack_component' | null;
+  pack_group_id?: string | null;
 }
 
 interface ApiOrder {
@@ -71,8 +72,11 @@ interface ApiResponse {
 }
 
 function formatUY(dateIso: string) {
-  const d = new Date(dateIso);
-  return d.toLocaleDateString('es-UY');
+  return new Date(dateIso).toLocaleDateString('es-UY', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  });
 }
 
 function toNumber(n: any) {
@@ -101,7 +105,7 @@ const OrderConfirmationInteractive: React.FC = () => {
   const [order, setOrder] = useState<ApiOrder | null>(null);
   const [items, setItems] = useState<ApiOrderItem[]>([]);
 
-  const { confirmation } = orderMessages;
+  const m = orderTrackingMessages;
 
   useEffect(() => {
     let alive = true;
@@ -112,7 +116,7 @@ const OrderConfirmationInteractive: React.FC = () => {
         setErrorMsg(null);
 
         if (!orderId) {
-          setErrorMsg(confirmation.errors.missingOrderId);
+          setErrorMsg(m.errors.body);
           setLoading(false);
           return;
         }
@@ -128,7 +132,7 @@ const OrderConfirmationInteractive: React.FC = () => {
         const data = (await res.json().catch(() => null)) as ApiResponse | null;
 
         if (!res.ok || !data?.ok) {
-          throw new Error((data as any)?.error || confirmation.errors.fetchFailed);
+          throw new Error(m.errors.body);
         }
 
         if (!alive) return;
@@ -137,7 +141,7 @@ const OrderConfirmationInteractive: React.FC = () => {
         setLoading(false);
       } catch (e: any) {
         if (!alive) return;
-        setErrorMsg(e?.message || confirmation.errors.generic);
+        setErrorMsg(e?.message || m.errors.body);
         setLoading(false);
       }
     }
@@ -146,7 +150,7 @@ const OrderConfirmationInteractive: React.FC = () => {
     return () => {
       alive = false;
     };
-  }, [orderId, token, confirmation.errors]);
+  }, [orderId, token, m.errors.body]);
 
   const ui = useMemo(() => {
     if (!order) return null;
@@ -156,22 +160,39 @@ const OrderConfirmationInteractive: React.FC = () => {
     const total = toNumber(order.total);
 
     const paymentStatus = computeUIStatus(urlStatus, order.payment_status);
-
     const pickup = isPickup(order);
-    const pickupAddress = pickup ? PICKUP_ADDRESS : null;
 
-    const shippingMethod = pickup ? confirmation.deliveryInfo.methodPickup : confirmation.deliveryInfo.methodDelivery;
-    const estimatedDelivery = pickup ? confirmation.deliveryInfo.estimatePickup : confirmation.deliveryInfo.estimateDelivery;
+    const progress = getOrderProgress({
+      paymentStatus,
+      orderStatus: order.order_status,
+      isPickup: pickup,
+    });
 
-    const mappedItems = items.map((it) => ({
-      id: it.id,
-      name: it.product_name,
-      model: it.product_model || '',
-      quantity: toNumber(it.quantity),
-      price: toNumber(it.unit_price),
-      image: it.product_image_url || '',
-      alt: `${it.product_name}${it.product_model ? ` - ${it.product_model}` : ''}`,
+    // Lo que ve el cliente: packs armados (primary + "Incluye"), sin las
+    // filas internas en $0. Misma regla que los mails.
+    const lines: OrderLineView[] = groupOrderLines(items).map(({ row, components }) => ({
+      key: row.id,
+      name: row.product_name,
+      image: row.product_image_url || '',
+      quantity: toNumber(row.quantity),
+      totalPrice: toNumber(row.total_price),
+      components: components.map((c) => ({
+        key: c.id,
+        name: c.product_name,
+        quantity: toNumber(c.quantity),
+      })),
     }));
+
+    // La nota de email sólo aparece si es VERDAD: las órdenes anteriores al
+    // corte de mails nunca recibieron uno (ver ORDER_EMAIL_CUTOFF).
+    const notifiable = isOrderNotifiable(order.created_at);
+    const emailNote = !notifiable || !order.customer_email
+      ? null
+      : paymentStatus === 'completed'
+        ? m.emailNote.sent(order.customer_email)
+        : progress.kind === 'awaiting_payment'
+          ? m.emailNote.willSend(order.customer_email)
+          : null;
 
     return {
       orderNumber: order.order_number,
@@ -179,29 +200,23 @@ const OrderConfirmationInteractive: React.FC = () => {
       subtotal,
       shipping,
       total,
-
-      paymentMethod: order.payment_method === 'mercadopago' ? 'MercadoPago' : 'Transferencia Bancaria',
+      paymentMethod: order.payment_method,
       paymentStatus,
-      transactionId: order.payment_id || '-',
+      transactionId: order.payment_id,
+      progress,
+      lines,
+      emailNote,
+      pickup,
 
-      customerName: order.customer_name,
-      customerEmail: order.customer_email,
-      customerPhone: order.customer_phone,
-
-      shippingAddress: pickup ? (pickupAddress || '') : (order.shipping_address || ''),
-      shippingCity: pickup ? 'Montevideo' : (order.shipping_city || ''),
-      shippingDepartment: pickup ? 'Montevideo' : (order.shipping_department || ''),
-      shippingPostalCode: pickup ? '' : (order.shipping_postal_code || ''),
-
-      shippingMethod,
-      estimatedDelivery,
-      trackingNumber: order.tracking_number || undefined,
-
-      items: mappedItems,
-      isPickup: pickup,
-      pickupAddress: pickupAddress || null,
+      // Filas crudas: SÓLO para el evento Purchase del pixel, que las
+      // reportaba así antes del rediseño. No cambiar sin revisar Meta.
+      items: items.map((it) => ({
+        id: it.id,
+        quantity: toNumber(it.quantity),
+        price: toNumber(it.unit_price),
+      })),
     };
-  }, [order, items, urlStatus, confirmation.deliveryInfo]);
+  }, [order, items, urlStatus, m]);
 
   // Meta Pixel — evento Purchase. Sólo cuando el pago está confirmado
   // (completed) y con el total real de la orden en UYU. Dedup por order.id
@@ -241,39 +256,39 @@ const OrderConfirmationInteractive: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background">
-        <div className="max-w-[1400px] mx-auto px-4 py-8 lg:px-6">
-          <div className="h-96 bg-card animate-pulse rounded-lg" />
+      <div className="min-h-screen bg-muted">
+        <div className="mx-auto max-w-5xl px-4 py-6 sm:px-6 sm:py-10" aria-busy="true">
+          <div className="h-72 animate-pulse rounded-2xl border border-border bg-background" />
+          <div className="mt-4 grid gap-4 sm:mt-6 sm:gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
+            <div className="h-80 animate-pulse rounded-2xl border border-border bg-background" />
+            <div className="h-56 animate-pulse rounded-2xl border border-border bg-background" />
+          </div>
         </div>
       </div>
     );
   }
 
-  if (errorMsg || !ui) {
+  if (errorMsg || !ui || !order) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center p-6">
-        <div className="max-w-lg w-full bg-card border border-border rounded-lg p-6 text-center space-y-4">
-          <div className="inline-flex items-center justify-center w-14 h-14 bg-error/10 rounded-full">
-            <Icon name="XCircleIcon" size={34} className="text-error" variant="solid" />
-          </div>
-          <h1 className="text-2xl font-heading font-bold text-foreground">{confirmation.errors.notFoundTitle}</h1>
-          <p className="text-sm text-muted-foreground">{errorMsg || confirmation.errors.notFoundDesc}</p>
-
-          <div className="flex flex-col sm:flex-row gap-3 justify-center pt-2">
-            <button
-              onClick={() => router.push('/shopping-cart')}
-              className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-primary text-primary-foreground rounded-md font-medium"
-            >
-              <Icon name="ShoppingCartIcon" size={18} className="text-primary-foreground" />
-              {confirmation.buttons.backToCart}
-            </button>
-
+      <div className="flex min-h-[70vh] items-center justify-center bg-muted p-4">
+        <div className="w-full max-w-md rounded-2xl border border-border bg-background p-6 text-center sm:p-8">
+          <span className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-zinc-500/10">
+            <Icon name="MagnifyingGlassIcon" size={24} className="text-zinc-600" />
+          </span>
+          <h1 className="mt-4 font-heading text-xl font-bold tracking-tight text-foreground">{m.errors.title}</h1>
+          <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{m.errors.body}</p>
+          <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-center">
             <Link
-              href="/homepage"
-              className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-muted text-foreground rounded-md font-medium"
+              href="/seguimiento"
+              className="inline-flex items-center justify-center rounded-xl bg-red-600 px-5 py-3 text-sm font-medium text-white transition-transform duration-150 ease-out hover:bg-red-700 active:scale-[0.97]"
             >
-              <Icon name="HomeIcon" size={18} className="text-foreground" />
-              {confirmation.buttons.goHome}
+              {m.errors.lookup}
+            </Link>
+            <Link
+              href="/"
+              className="inline-flex items-center justify-center rounded-xl border border-border px-5 py-3 text-sm font-medium text-foreground transition-transform duration-150 ease-out active:scale-[0.97]"
+            >
+              {m.errors.home}
             </Link>
           </div>
         </div>
@@ -281,121 +296,66 @@ const OrderConfirmationInteractive: React.FC = () => {
     );
   }
 
-  const isSuccess = ui.paymentStatus === 'completed';
-  const isPending = ui.paymentStatus === 'pending';
+  const { progress } = ui;
+  const arrived = progress.kind === 'delivered';
+  const closed = progress.kind === 'cancelled' || progress.kind === 'refunded' || progress.kind === 'payment_failed';
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="max-w-[1400px] mx-auto px-4 py-8 lg:px-6 lg:py-12">
-        {/* Header */}
-        <div className="text-center mb-8 lg:mb-12">
-          <div className={`inline-flex items-center justify-center w-16 h-16 rounded-full mb-4 ${
-            isSuccess ? 'bg-success/10' : isPending ? 'bg-warning/10' : 'bg-error/10'
-          }`}>
-            <Icon
-              name={isSuccess ? 'CheckCircleIcon' : isPending ? 'ClockIcon' : 'XCircleIcon'}
-              size={40}
-              className={isSuccess ? 'text-success' : isPending ? 'text-warning' : 'text-error'}
-              variant="solid"
+    <div className="min-h-screen bg-muted">
+      <div className="mx-auto max-w-5xl px-4 py-6 sm:px-6 sm:py-10">
+        <OrderStatusHero
+          progress={progress}
+          orderNumber={ui.orderNumber}
+          orderDate={ui.orderDate}
+          paymentMethod={ui.paymentMethod}
+          trackingNumber={order.tracking_number}
+          emailNote={ui.emailNote}
+        />
+
+        <div className="mt-4 grid items-start gap-4 sm:mt-6 sm:gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
+          <div className="space-y-4 sm:space-y-6">
+            <OrderItemsCard lines={ui.lines} subtotal={ui.subtotal} shipping={ui.shipping} total={ui.total} />
+            <DeliveryCard
+              isPickup={ui.pickup}
+              pickupAddress={ui.pickup ? PICKUP_ADDRESS : null}
+              address={order.shipping_address || ''}
+              city={order.shipping_city || ''}
+              department={order.shipping_department || ''}
+              postalCode={order.shipping_postal_code || ''}
+              customerName={order.customer_name}
+              customerPhone={order.customer_phone}
+              customerEmail={order.customer_email}
+              // En camino, el hero ya dice la estimación: no repetirla acá.
+              showEstimate={!arrived && !closed && progress.kind !== 'in_transit'}
             />
           </div>
 
-          <h1 className="text-3xl lg:text-4xl font-heading font-bold text-foreground mb-2">
-            {isSuccess ? confirmation.states.completed.title : isPending ? confirmation.states.pending.title : confirmation.states.failed.title}
-          </h1>
-
-          <p className="text-base lg:text-lg text-muted-foreground max-w-2xl mx-auto">
-            {isSuccess
-              ? (ui.isPickup
-                  ? confirmation.states.completed.subtitlePickup
-                  : confirmation.states.completed.subtitleDelivery)
-              : isPending
-                ? confirmation.states.pending.desc
-                : confirmation.states.failed.desc}
-          </p>
-        </div>
-
-        {/* Main grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-          <div className="lg:col-span-2 space-y-6">
-            <OrderSummaryCard
-              orderNumber={ui.orderNumber}
-              orderDate={ui.orderDate}
-              items={ui.items}
-              subtotal={ui.subtotal}
-              shipping={ui.shipping}
+          <div className="space-y-4 sm:space-y-6 lg:sticky lg:top-24">
+            <PaymentCard
+              method={ui.paymentMethod}
+              status={ui.paymentStatus}
               total={ui.total}
-              paymentMethod={ui.paymentMethod}
-            />
-
-            <NextStepsCard />
-
-            <SocialShareCard orderNumber={ui.orderNumber} />
-          </div>
-
-          <div className="space-y-6">
-            <PaymentStatusCard
-              status={ui.paymentStatus === 'completed' ? 'completed' : ui.paymentStatus === 'pending' ? 'pending' : 'failed'}
               transactionId={ui.transactionId}
-              paymentMethod={ui.paymentMethod}
-              referenceNumber={ui.orderNumber}
             />
-
-            <CustomerInfoCard
-              name={ui.customerName}
-              email={ui.customerEmail}
-              phone={ui.customerPhone}
-              address={ui.shippingAddress}
-              city={ui.shippingCity}
-              department={ui.shippingDepartment}
-              postalCode={ui.shippingPostalCode}
-            />
-
-            <DeliveryInfoCard
-              estimatedDelivery={ui.estimatedDelivery}
-              trackingNumber={ui.trackingNumber}
-              shippingMethod={ui.shippingMethod}
-            />
-
-            <EmailConfirmationCard
-              email={ui.customerEmail}
-              supportEmail={SUPPORT_EMAIL}
-              supportPhone={WHATSAPP_DISPLAY}
-              paymentCompleted={ui.paymentStatus === 'completed'}
-            />
+            <HelpCard orderNumber={ui.orderNumber} />
           </div>
         </div>
 
-        {/* Actions */}
-        <div className="flex flex-col sm:flex-row gap-4 justify-center">
-          <Link
-            href="/homepage"
-            className="inline-flex items-center justify-center gap-2 px-8 py-3 bg-primary hover:bg-primary/90 text-primary-foreground font-medium rounded-md transition-smooth focus-ring"
-          >
-            <Icon name="HomeIcon" size={20} className="text-primary-foreground" />
-            {confirmation.buttons.goHome}
-          </Link>
-
+        <div className="mt-8 flex flex-col-reverse items-stretch gap-3 print:hidden sm:flex-row sm:justify-center">
           <button
+            type="button"
             onClick={() => window.print()}
-            className="inline-flex items-center justify-center gap-2 px-8 py-3 bg-muted hover:bg-muted/80 text-foreground font-medium rounded-md transition-smooth focus-ring"
+            className="inline-flex items-center justify-center gap-2 rounded-xl border border-border bg-background px-6 py-3 text-sm font-medium text-foreground transition-transform duration-150 ease-out active:scale-[0.97]"
           >
-            <Icon name="PrinterIcon" size={20} className="text-foreground" />
-            {confirmation.buttons.print}
+            <Icon name="PrinterIcon" size={18} className="text-muted-foreground" />
+            {m.actions.print}
           </button>
-        </div>
-
-        {/* Help */}
-        <div className="mt-12 text-center">
-          <p className="text-sm text-muted-foreground mb-4">
-            {confirmation.footerHelp}
-          </p>
           <Link
-            href="/homepage"
-            className="inline-flex items-center gap-2 text-sm font-medium text-primary hover:text-primary/80 transition-smooth"
+            href="/"
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-red-600 px-6 py-3 text-sm font-medium text-white transition-transform duration-150 ease-out hover:bg-red-700 active:scale-[0.97]"
           >
-            {confirmation.buttons.contactSupport}
-            <Icon name="ArrowRightIcon" size={16} className="text-primary" />
+            <Icon name="ShoppingBagIcon" size={18} className="text-white" />
+            {m.actions.keepShopping}
           </Link>
         </div>
       </div>

@@ -1,20 +1,21 @@
 import type { Metadata } from 'next';
 import { Suspense } from 'react';
-import Header from '@/components/common/Header';
 import OrderConfirmationInteractive from './components/OrderConfirmationInteractive';
 
 export const metadata: Metadata = {
-  title: 'Confirmación de Pedido - POV Store Uruguay',
-  description: 'Confirmación de tu compra de cámara POV 4K. Revisa los detalles de tu pedido, información de envío y estado del pago en POV Store Uruguay.',
+  title: 'Tu pedido | POV Store Uruguay',
+  description: 'Estado de tu pedido en POV Store Uruguay: preparación, envío y seguimiento.',
+  // Página con datos personales detrás de un token: nunca indexable.
+  robots: { index: false, follow: false },
 };
 
 export default function OrderConfirmationPage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen bg-background">
-          <div className="max-w-[1400px] mx-auto px-4 py-8 lg:px-6">
-            <div className="h-96 bg-card animate-pulse rounded-lg" />
+        <div className="min-h-screen bg-muted">
+          <div className="mx-auto max-w-5xl px-4 py-6 sm:px-6 sm:py-10">
+            <div className="h-72 animate-pulse rounded-2xl border border-border bg-background" />
           </div>
         </div>
       }

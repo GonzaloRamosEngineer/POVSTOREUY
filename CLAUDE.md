@@ -370,6 +370,31 @@ Piezas:
 
 **Confirmación de compra:** se dispara **cuando el pago se acredita**, no al crear la orden — así no le llega nada a quien abandonó el checkout sin pagar. Dos caminos, ambos con el mismo template `confirmed`: el webhook de MP ([mp-webhook](src/app/api/mp-webhook/route.ts), sólo en la transición real a `completed`) y la confirmación manual de una transferencia en el PATCH del admin (después de aplicar stock).
 
+### Página de pedido (`/order-confirmation`) — rediseño 2026-09-29
+Es **a la vez** la confirmación post-checkout y la pantalla de seguimiento (a ella llevan el link de los mails y `/seguimiento`). Antes ignoraba `order_status`: le decía "¡Pedido Confirmado! Tu pedido está siendo preparado" incluso a un pedido despachado con tracking, y mostraba los packs desarmados con componentes a $0.
+
+**La regla de la página: cada texto describe el estado REAL del pedido.** Nada de promesas genéricas.
+
+Piezas:
+- [src/lib/orders/orderProgress.ts](src/lib/orders/orderProgress.ts) — máquina de estados pura (`payment_status` + `order_status` + `delivery_method` → etapa, tono, índice del stepper). **Toda decisión de "en qué estado está" vive acá, no en los componentes.** Tests en `orderProgress.test.ts`. Los terminales (cancelado, pago rechazado, reintegrado) van primero y **no muestran stepper**: una barra a medio llenar en un pedido cancelado confunde.
+- [src/lib/orders/groupOrderLines.ts](src/lib/orders/groupOrderLines.ts) — agrupación de packs (primary + componentes). **Fuente única**: la usan esta página y los mails (`buildOrderEmailLines` delega acá).
+- [src/lib/format/currency.ts](src/lib/format/currency.ts) — `formatUYU` + `STORE_CURRENCY`. Misma moneda en web, mails y pixel.
+- [src/messages/orderTrackingMessages.ts](src/messages/orderTrackingMessages.ts) — todo el copy, con variantes envío/retiro y, para "esperando pago", MercadoPago/transferencia.
+- Componentes en [src/app/order-confirmation/components/](src/app/order-confirmation/components/): `OrderStatusHero` (titular + stepper + tracking copiable), `OrderItemsCard`, `DeliveryCard`, `PaymentCard`, `HelpCard`.
+
+**Reglas:**
+- ⚠ **Colores translúcidos: paleta de Tailwind, no tokens del tema.** Los tokens están como `var(--color-x)` sin canal alfa, y en Tailwind 3 `bg-primary/10` **falla en silencio** (no genera la clase). `red-600` = `#DC2626` (primary), `green-600` = success, `orange-600` = warning: mismos hex. Ver [tones.ts](src/app/order-confirmation/components/tones.ts).
+- **Negritas en Outfit, no en Inter.** Inter está cargada sólo en 400/500: un `font-semibold` en cuerpo es negrita simulada por el navegador.
+- **La nota "Te enviamos la confirmación a…" sólo aparece si es verdad**: pago acreditado **y** orden posterior a `ORDER_EMAIL_CUTOFF`. Las órdenes viejas nunca recibieron mail.
+- **Transferencia pendiente → botón "Enviar comprobante por WhatsApp" en el hero.** Es el estado más común de la base y esa es la acción que destraba el pedido. Los datos bancarios **no están en el código** (se pasan por WhatsApp): no mostrarlos ni inventarlos acá.
+- **El tracking no lleva link al correo**: el transportista no se guarda (el placeholder del admin dice "UES, Mirtrans…"), así que no hay URL confiable a la cual mandar. Va número + botón Copiar.
+- **Las tres promesas de confianza** (envíos a todo el país, garantía oficial, pagos seguros) son las mismas que muestra la home. No sumar garantías nuevas en esta página.
+- El evento `Purchase` del pixel **sigue usando las filas crudas** (`ui.items`), no las líneas agrupadas: es lo que reportaba antes y cambiarlo altera Meta.
+- `robots: noindex, nofollow` — página con datos personales detrás de un token.
+- `/api/order-details` ahora trae `line_type` + `pack_group_id` y ordena por `created_at, id` (antes por `id`, uuid aleatorio).
+
+**Se sacó a propósito** (no reintroducir sin pedirlo): "Creá tu cuenta" (el sitio no tiene cuentas de cliente; el botón no llevaba a ningún lado), "Compartí tu compra" en redes, la tarjeta "Confirmación por Email" (reemplazada por la nota condicional) y los datos de contacto duplicados.
+
 ### Seguimiento público de pedidos (`/seguimiento`)
 Agregado 2026-09-29. El checkout es 100% invitado (ninguna orden tiene `user_id`), así que no hay cuentas ni login. El cliente prueba que el pedido es suyo con **dos datos que sólo él tiene: número de pedido + email de la compra**.
 

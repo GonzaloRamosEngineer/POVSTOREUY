@@ -72,9 +72,16 @@ export async function GET(request: Request) {
         product_image_url,
         quantity,
         unit_price,
-        total_price
+        total_price,
+        line_type,
+        pack_group_id
       `)
       .eq('order_id', orderId)
+      // Antes ordenaba por `id` (uuid aleatorio): el pack salía desarmado y
+      // el primary en cualquier posición. created_at es igual para todas las
+      // filas de una misma orden (se insertan en una transacción), así que
+      // `id` queda como desempate para que el orden sea al menos estable.
+      .order('created_at', { ascending: true })
       .order('id', { ascending: true });
 
     if (iErr) {

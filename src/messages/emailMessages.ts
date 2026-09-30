@@ -4,7 +4,7 @@
 // Misma convención que el resto de src/messages: NO hardcodear strings en
 // los templates ni en los route handlers.
 //
-// Voseo rioplatense, igual que orderMessages (cara visible al cliente).
+// Voseo rioplatense, igual que orderTrackingMessages (cara visible al cliente).
 
 import { SITE_DOMAIN, SUPPORT_EMAIL as CONTACT_EMAIL } from '@/config/contact';
 
