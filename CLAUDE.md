@@ -355,6 +355,7 @@ Piezas:
 2. **`notify_customer: false`** — checkbox "Avisar al cliente por mail" en el modal de la orden (default **tildado**). Silencia un envío puntual sin tocar código.
 
 **Reglas / convenciones:**
+- **Los importes se muestran SÓLO en el mail de compra confirmada** (`showsPrices()`). En preparación / listo / despachado van los ítems sin precios ni totales: ahí el monto no aporta y repetirlo en cada aviso se lee como un cobro nuevo. Decisión de producto (Conti, 2026-09-29) — no "restaurarlo" por prolijidad.
 - **Moneda: se muestra `UYU 7.690`, no `$U`.** En un mail no hay contexto de sitio uruguayo alrededor y el `$` solo es ambiguo. Mismo código que el pixel de Meta y el `currency_id` de MP. Vive en `formatUYU()`.
 - **El disparador es la transición, no la acción del admin.** `shouldNotifyCustomer(prev, next)` exige que el estado **cambie**: guardar dos veces, o tocar sólo el tracking, no reenvía el mail.
 - **El mail va después del stock** en [admin/orders/[id]/route.ts](src/app/api/admin/orders/[id]/route.ts): así no se avisa de una operación que después devuelve 409 por stock insuficiente.

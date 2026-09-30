@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { buildOrderEmailLines, formatUYU, type OrderEmailItemRow } from './orderEmailData';
 import { shouldNotifyCustomer } from './sendOrderStatusEmail';
 import { isOrderNotifiable } from '@/config/admin';
+import { renderOrderEmail } from './renderOrderEmail';
 
 const PACK_GROUP = 'e31ca4aa-0000-0000-0000-00000000a9f1';
 
@@ -109,5 +110,40 @@ describe('isOrderNotifiable (corte de mails)', () => {
     expect(isOrderNotifiable(null)).toBe(false);
     expect(isOrderNotifiable(undefined)).toBe(false);
     expect(isOrderNotifiable('no-es-una-fecha')).toBe(false);
+  });
+});
+
+describe('precios por tipo de mail', () => {
+  const base = {
+    orderNumber: 'POV-000001',
+    customerName: 'Cliente',
+    items: packRows,
+    subtotal: 7690,
+    shippingCost: 0,
+    total: 7690,
+    isPickup: false,
+  } as const;
+
+  it('el mail de compra confirmada muestra importes', () => {
+    const { html, text } = renderOrderEmail({ ...base, kind: 'confirmed' });
+    expect(html).toContain('UYU 7.690');
+    expect(html).toContain('Total');
+    expect(text).toContain('UYU 7.690');
+  });
+
+  it('preparación, listo y despachado NO muestran importes', () => {
+    for (const kind of ['processing', 'ready', 'shipped'] as const) {
+      const { html, text } = renderOrderEmail({ ...base, kind });
+      expect(html, kind).not.toContain('UYU');
+      expect(text, kind).not.toContain('UYU');
+      expect(html, kind).not.toContain('Subtotal');
+    }
+  });
+
+  it('sin importes los ítems se siguen viendo', () => {
+    const { html, text } = renderOrderEmail({ ...base, kind: 'shipped' });
+    expect(html).toContain('SJCAM C100+ - Kit POV Base');
+    expect(html).toContain('MicroSD LEXAR 64GB SILVER PLUS');
+    expect(text).toContain('SJCAM C100+ - Kit POV Base');
   });
 });

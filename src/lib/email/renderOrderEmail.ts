@@ -42,6 +42,15 @@ export type RenderOrderEmailInput = {
 
 export type RenderedEmail = { subject: string; html: string; text: string };
 
+/**
+ * Los importes se muestran SÓLO en el mail de compra confirmada: ahí el mail
+ * hace de comprobante. En preparación / listo / despachado el precio no
+ * aporta nada y repetir el monto en cada aviso se lee como un cobro nuevo.
+ */
+function showsPrices(kind: OrderEmailKind): boolean {
+  return kind === 'confirmed';
+}
+
 function escapeHtml(value: string): string {
   return value
     .replace(/&/g, '&amp;')
@@ -116,16 +125,19 @@ export function renderOrderEmail(input: RenderOrderEmailInput): RenderedEmail {
   if (highlight) textParts.push(`${highlight.label}: ${highlight.value}`);
   textParts.push('');
 
+  const withPrices = showsPrices(input.kind);
+
   for (const line of lines) {
     const qty = line.quantity > 1 ? `${line.quantity} x ` : '';
-    textParts.push(`  ${qty}${line.name} — ${formatUYU(line.totalPrice)}`);
+    const price = withPrices ? ` — ${formatUYU(line.totalPrice)}` : '';
+    textParts.push(`  ${qty}${line.name}${price}`);
     if (line.includes.length) {
       textParts.push(`  ${c.includesLabel}`);
       for (const inc of line.includes) textParts.push(`    · ${inc}`);
     }
   }
 
-  if (typeof input.total === 'number') {
+  if (withPrices && typeof input.total === 'number') {
     textParts.push('', `  ${c.totalLabel}: ${formatUYU(input.total)}`);
   }
 
@@ -149,21 +161,24 @@ export function renderOrderEmail(input: RenderOrderEmailInput): RenderedEmail {
              ${line.includes.map((inc) => `${escapeHtml(inc)}`).join('<br>')}
            </div>`
         : '';
+      const priceCell = withPrices
+        ? `<td style="padding:16px 0;${topBorder}text-align:right;vertical-align:top;color:${INK};font-size:15px;font-weight:600;white-space:nowrap;">
+             ${escapeHtml(formatUYU(line.totalPrice))}
+           </td>`
+        : '';
       return `
         <tr>
           <td style="padding:16px 0;${topBorder}vertical-align:top;">
             <div style="color:${INK};font-size:15px;font-weight:700;font-family:${FONT_HEADING};letter-spacing:-.01em;">${escapeHtml(qty + line.name)}</div>
             ${includes}
           </td>
-          <td style="padding:16px 0;${topBorder}text-align:right;vertical-align:top;color:${INK};font-size:15px;font-weight:600;white-space:nowrap;">
-            ${escapeHtml(formatUYU(line.totalPrice))}
-          </td>
+          ${priceCell}
         </tr>`;
     })
     .join('');
 
   const totalsRows: string[] = [];
-  if (typeof input.subtotal === 'number' && typeof input.total === 'number') {
+  if (withPrices && typeof input.subtotal === 'number' && typeof input.total === 'number') {
     totalsRows.push(
       `<tr><td style="padding:5px 0;color:${MUTED};font-size:14px;">${escapeHtml(c.subtotalLabel)}</td>
            <td style="padding:5px 0;text-align:right;color:${BODY_TEXT};font-size:14px;">${escapeHtml(formatUYU(input.subtotal))}</td></tr>`
@@ -176,7 +191,7 @@ export function renderOrderEmail(input: RenderOrderEmailInput): RenderedEmail {
            }</td></tr>`
     );
   }
-  if (typeof input.total === 'number') {
+  if (withPrices && typeof input.total === 'number') {
     totalsRows.push(
       `<tr>
          <td style="padding:12px 0 0;border-top:2px solid ${INK};color:${INK};font-size:17px;font-weight:800;font-family:${FONT_HEADING};">${escapeHtml(c.totalLabel)}</td>
@@ -242,7 +257,7 @@ export function renderOrderEmail(input: RenderOrderEmailInput): RenderedEmail {
         ${highlightBlock}
 
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:22px;border-top:2px solid ${INK};">${itemRows}</table>
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:14px;">${totalsRows.join('')}</table>
+        ${totalsRows.length ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:14px;">${totalsRows.join('')}</table>` : ''}
         ${ctaBlock}
 
         <p style="margin:26px 0 0;padding-top:20px;border-top:1px solid ${BORDER};color:${MUTED};font-size:13px;line-height:1.6;">${escapeHtml(c.footerReply)}</p>
