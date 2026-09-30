@@ -2,9 +2,27 @@ import { describe, expect, it } from 'vitest';
 import { catalogQueryTokens, searchCatalogRows } from './catalogSearch';
 
 const rows = [
-  { id: '1', name: 'Cámara POV Action 4K', model: 'X200', description: 'Cámara deportiva' },
-  { id: '2', name: 'Tarjeta MicroSD 128GB', model: 'SD128', description: 'Memoria para cámara' },
-  { id: '3', name: 'Arnés de pecho', model: 'CHEST-1', description: 'Accesorio ajustable' },
+  {
+    id: '1',
+    name: 'Cámara POV Action 4K',
+    model: 'X200',
+    description: 'Cámara deportiva',
+    is_accessory: false,
+  },
+  {
+    id: '2',
+    name: 'Tarjeta MicroSD 128GB',
+    model: 'SD128',
+    description: 'Memoria para cámara',
+    is_accessory: true,
+  },
+  {
+    id: '3',
+    name: 'Arnés de pecho',
+    model: 'CHEST-1',
+    description: 'Accesorio ajustable',
+    is_accessory: true,
+  },
 ];
 
 describe('búsqueda de catálogo para MatchBot', () => {
@@ -20,6 +38,10 @@ describe('búsqueda de catálogo para MatchBot', () => {
 
     expect(results.map((product) => product.id)).toEqual(['1', '2']);
     expect(results[0]?.name).toContain('Cámara');
+  });
+
+  it('prioriza accesorios cuando el cliente los pide explícitamente', () => {
+    expect(searchCatalogRows('¿Qué accesorios tienen?', rows)[0]?.id).toBe('3');
   });
 
   it('prioriza coincidencias de modelo y nombre', () => {

@@ -9,6 +9,7 @@ export type CatalogProductRow = {
   card_price?: number | string | null;
   stock_count?: number | null;
   stock_status?: string | null;
+  is_accessory?: boolean | null;
 };
 
 const STOP_WORDS = new Set([
@@ -96,6 +97,11 @@ export function scoreCatalogProduct(query: string, product: CatalogProductRow): 
   const description = normalizeCatalogText(product.description);
   const searchable = `${name} ${model} ${description}`.trim();
   let score = 0;
+
+  const asksForCamera = tokens.some((token) => tokenVariants(token).includes('camara'));
+  const asksForAccessory = tokens.some((token) => tokenVariants(token).includes('accesorio'));
+  if (asksForCamera && product.is_accessory === false) score += 10;
+  if (asksForAccessory && product.is_accessory === true) score += 10;
 
   for (const token of tokens) {
     const variants = tokenVariants(token);

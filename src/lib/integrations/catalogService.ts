@@ -106,6 +106,7 @@ function searchableRows(products: CatalogSourceRow[], siteUrl: string): Searchab
         card_price: optionalNumber(pack.card_price),
         stock_count: stock,
         stock_status: stock === 0 ? 'out_of_stock' : stock <= 5 ? 'low_stock' : 'in_stock',
+        is_accessory: product.is_accessory,
         catalog_url: `${productUrl}?pack=${encodeURIComponent(packId)}`,
       });
     }
@@ -122,7 +123,7 @@ export async function queryLiveCatalog(
   const { data, error } = await supabase
     .from('products')
     .select(
-      'id, slug, name, model, description, price, cash_price, card_price, stock_count, stock_status, is_active, packs'
+      'id, slug, name, model, description, price, cash_price, card_price, stock_count, stock_status, is_active, is_accessory, packs'
     )
     .eq('is_active', true)
     .limit(250);
