@@ -370,6 +370,29 @@ Piezas:
 
 **Confirmación de compra:** se dispara **cuando el pago se acredita**, no al crear la orden — así no le llega nada a quien abandonó el checkout sin pagar. Dos caminos, ambos con el mismo template `confirmed`: el webhook de MP ([mp-webhook](src/app/api/mp-webhook/route.ts), sólo en la transición real a `completed`) y la confirmación manual de una transferencia en el PATCH del admin (después de aplicar stock).
 
+### Seguimiento público de pedidos (`/seguimiento`)
+Agregado 2026-09-29. El checkout es 100% invitado (ninguna orden tiene `user_id`), así que no hay cuentas ni login. El cliente prueba que el pedido es suyo con **dos datos que sólo él tiene: número de pedido + email de la compra**.
+
+Flujo: [/seguimiento](src/app/seguimiento/SeguimientoContent.tsx) (formulario) → `POST` [/api/order-lookup](src/app/api/order-lookup/route.ts) → si coinciden devuelve `{ orderId, token }` → el cliente navega a `/order-confirmation?orderId=...&token=...`, **la misma pantalla y el mismo token HMAC** que usan el checkout y los mails. No se duplicó ninguna vista ni se agregó una segunda forma de leer órdenes.
+
+**Reglas de seguridad (no relajar sin pensarlo):**
+- **`/api/order-lookup` NO devuelve PII.** Sólo `orderId` + `token`; los datos del pedido siguen saliendo por `order-details`, que ya valida el token. Hay un test que falla si la respuesta crece.
+- **Mismo 404 para "no existe" y "el email no coincide"** (`orderLookupMessages.errors.notFound`). Si se diferenciaran, el endpoint serviría para enumerar qué números de pedido existen.
+- **El rate-limit va ANTES de tocar la DB** y es la defensa real contra fuerza bruta: 5/min + 30/h por IP (`getOrderLookupLimiters`). Más estricto que el resto de los endpoints porque acá el atacante no busca spamear sino adivinar el par (nro, email).
+- La página lleva `robots: { index: false }`: es una utilidad para clientes, no una landing, y no queremos a Google indexando una consulta de datos personales.
+- Normalización tolerante del número (`919687`, `pov919687`, `POV-919687` son lo mismo) — el cliente lo copia de donde puede.
+
+⚠ **Este endpoint depende del rate-limit, y el rate-limit está caído** — ver abajo.
+
+### 🔴 Rate-limit Upstash CAÍDO (detectado 2026-09-29)
+La base `smart-earwig-134962.upstash.io` **ya no existe**: el DNS no resuelve (`ENOTFOUND`). El módulo hace **fail-open** por diseño (no bloquea ventas por un glitch de infra), así que nada se rompió — pero **ningún endpoint público está protegido** desde hace tiempo: `create-order`, `mp-preference`, `newsletter/subscribe` y ahora `order-lookup`.
+
+Verificado en prod 2026-09-29: 5 POST seguidos a `/api/newsletter/subscribe` (limiter 3/min) → 5× `400`, ningún `429`. En local, el log muestra `[rateLimit] limiter error, failing open: getaddrinfo ENOTFOUND`.
+
+**Fix (~10 min):** crear una Redis nueva en Upstash (free tier alcanza, region us-east-1) y actualizar `UPSTASH_REDIS_REST_URL` + `UPSTASH_REDIS_REST_TOKEN` en Vercel + `.env` local. El código no se toca. Re-verificar con el mismo smoke de 5 POSTs.
+
+**Nota para el futuro:** las bases free de Upstash se borran por inactividad. Esto se cayó solo y nadie se enteró porque el fail-open es silencioso salvo en logs. Si importa, vale un alerta o un healthcheck.
+
 ### Webhook MercadoPago (verificación de firma HMAC)
 [src/app/api/mp-webhook/route.ts](src/app/api/mp-webhook/route.ts) valida cada notificación con HMAC-SHA256 antes de tocar DB o llamar a MP. La lógica está en [src/lib/mp/verifyWebhookSignature.ts](src/lib/mp/verifyWebhookSignature.ts) (con tests en `.test.ts`).
 

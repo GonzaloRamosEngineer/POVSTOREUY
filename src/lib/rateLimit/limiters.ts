@@ -14,7 +14,9 @@ type LimiterKey =
   | 'createOrder:hour'
   | 'mpPreference:min'
   | 'newsletter:min'
-  | 'newsletter:day';
+  | 'newsletter:day'
+  | 'orderLookup:min'
+  | 'orderLookup:hour';
 
 const cache = new Map<LimiterKey, Ratelimit>();
 
@@ -44,6 +46,19 @@ export function getCreateOrderLimiters() {
 
 export function getMpPreferenceLimiter() {
   return build('mpPreference:min', 20, '1 m');
+}
+
+/**
+ * Seguimiento público de pedidos. Más restrictivo que el resto: acá el
+ * atacante no busca spamear sino ADIVINAR (nro de pedido + email de otro
+ * comprador). Un cliente legítimo hace 1 o 2 intentos; 5 por minuto ya es
+ * generoso y vuelve inviable la fuerza bruta.
+ */
+export function getOrderLookupLimiters() {
+  return {
+    perMinute: build('orderLookup:min', 5, '1 m'),
+    perHour: build('orderLookup:hour', 30, '1 h'),
+  };
 }
 
 export function getNewsletterLimiters() {
