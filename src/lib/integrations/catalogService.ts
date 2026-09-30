@@ -1,4 +1,9 @@
 import { getSupabaseAdmin } from '@/lib/supabaseAdmin';
+import {
+  buildProductsLookup,
+  computePackEffectiveStock,
+  type PackComponentLike,
+} from '@/lib/packs/computePackStock';
 import { searchCatalogRows, type CatalogProductRow } from './catalogSearch';
 
 export type MatchbotCatalogProduct = {
@@ -13,18 +18,124 @@ export type MatchbotCatalogProduct = {
   url: string;
 };
 
-export async function queryLiveCatalog(query: string, limit = 5): Promise<MatchbotCatalogProduct[]> {
+type CatalogPack = {
+  id?: unknown;
+  name?: unknown;
+  tagline?: unknown;
+  price?: unknown;
+  cash_price?: unknown;
+  card_price?: unknown;
+  includes?: unknown;
+  components?: unknown;
+  badge?: { text?: unknown } | null;
+};
+
+type CatalogSourceRow = CatalogProductRow & {
+  is_active?: boolean;
+  packs?: unknown;
+};
+
+type SearchableCatalogRow = CatalogProductRow & {
+  catalog_url: string;
+};
+
+function parsePacks(value: unknown): CatalogPack[] {
+  if (Array.isArray(value)) return value as CatalogPack[];
+  if (typeof value !== 'string') return [];
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? (parsed as CatalogPack[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+function optionalNumber(value: unknown): number | null {
+  if (value === null || value === undefined || value === '') return null;
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
+}
+
+function packDescription(product: CatalogSourceRow, pack: CatalogPack): string {
+  const includes = Array.isArray(pack.includes) ? pack.includes : [];
+  return [product.description, pack.tagline, pack.badge?.text, ...includes]
+    .map((value) => String(value ?? '').trim())
+    .filter(Boolean)
+    .join(' ');
+}
+
+function searchableRows(products: CatalogSourceRow[], siteUrl: string): SearchableCatalogRow[] {
+  const productLookup = buildProductsLookup(
+    products.map((product) => ({
+      id: product.id,
+      name: product.name ?? undefined,
+      stock_count: product.stock_count,
+      is_active: product.is_active,
+    }))
+  );
+  const rows: SearchableCatalogRow[] = [];
+
+  for (const product of products) {
+    const productUrl = `${siteUrl}/products/${product.slug || product.id}`;
+    rows.push({ ...product, catalog_url: productUrl });
+
+    for (const pack of parsePacks(product.packs)) {
+      const packId = String(pack.id ?? '').trim();
+      const packName = String(pack.name ?? '').trim();
+      const price = optionalNumber(pack.price);
+      if (!packId || !packName || price === null) continue;
+
+      const stock = computePackEffectiveStock(
+        {
+          id: packId,
+          components: Array.isArray(pack.components)
+            ? (pack.components as PackComponentLike[])
+            : [],
+        },
+        productLookup
+      ).stock;
+
+      rows.push({
+        id: `${product.id}::${packId}`,
+        slug: product.slug,
+        name: `${String(product.name ?? '').trim()} — ${packName}`,
+        model: product.model,
+        description: packDescription(product, pack),
+        price,
+        cash_price: optionalNumber(pack.cash_price),
+        card_price: optionalNumber(pack.card_price),
+        stock_count: stock,
+        stock_status: stock === 0 ? 'out_of_stock' : stock <= 5 ? 'low_stock' : 'in_stock',
+        catalog_url: `${productUrl}?pack=${encodeURIComponent(packId)}`,
+      });
+    }
+  }
+
+  return rows;
+}
+
+export async function queryLiveCatalog(
+  query: string,
+  limit = 5
+): Promise<MatchbotCatalogProduct[]> {
   const supabase = getSupabaseAdmin();
   const { data, error } = await supabase
     .from('products')
-    .select('id, slug, name, model, description, price, cash_price, card_price, stock_count, stock_status')
+    .select(
+      'id, slug, name, model, description, price, cash_price, card_price, stock_count, stock_status, is_active, packs'
+    )
     .eq('is_active', true)
     .limit(250);
 
   if (error) throw new Error('catalog_unavailable');
 
-  const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || process.env.SITE_URL || 'https://povstore.uy').replace(/\/$/, '');
-  return searchCatalogRows(query, (data ?? []) as CatalogProductRow[], limit).map((product) => ({
+  const siteUrl = (
+    process.env.NEXT_PUBLIC_SITE_URL ||
+    process.env.SITE_URL ||
+    'https://povstore.uy'
+  ).replace(/\/$/, '');
+  const candidates = searchableRows((data ?? []) as CatalogSourceRow[], siteUrl);
+  return searchCatalogRows(query, candidates, limit).map((product) => ({
     id: product.id,
     name: String(product.name ?? ''),
     model: product.model ? String(product.model) : null,
@@ -33,6 +144,6 @@ export async function queryLiveCatalog(query: string, limit = 5): Promise<Matchb
     card_price: product.card_price == null ? null : Number(product.card_price),
     stock_count: Math.max(0, Number(product.stock_count ?? 0)),
     stock_status: product.stock_status ?? null,
-    url: `${siteUrl}/products/${product.slug || product.id}`,
+    url: (product as SearchableCatalogRow).catalog_url,
   }));
 }
