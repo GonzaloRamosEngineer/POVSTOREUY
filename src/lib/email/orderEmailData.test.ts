@@ -72,7 +72,7 @@ describe('buildOrderEmailLines', () => {
 
 describe('formatUYU', () => {
   it('usa el formato del sitio', () => {
-    expect(formatUYU(7690)).toBe('$U 7.690');
+    expect(formatUYU(7690)).toBe('UYU 7.690');
   });
 });
 

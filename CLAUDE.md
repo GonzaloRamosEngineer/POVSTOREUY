@@ -345,7 +345,8 @@ Agregado 2026-09-29. Antes de esto el proyecto **no mandaba ningún mail**. Remi
 Piezas:
 - [src/lib/email/resendClient.ts](src/lib/email/resendClient.ts) — POST a la API de Resend vía `fetch` (sin SDK). **Nunca lanza** y es **NO-OP si falta `RESEND_API_KEY`** (fail-open, igual criterio que el rate-limit de Upstash: no se rompe una venta por infra de mails).
 - [src/lib/email/orderEmailData.ts](src/lib/email/orderEmailData.ts) — colapsa las filas de `order_items`: las líneas `pack_component` (unit_price 0) **no se listan como ítems al cliente**, se cuelgan del `pack_primary` de su `pack_group_id` como "Incluye". Un componente huérfano (sin primary) se muestra como línea propia antes que desaparecer.
-- [src/lib/email/renderOrderEmail.ts](src/lib/email/renderOrderEmail.ts) — HTML + texto plano. **Tablas y estilos inline a propósito**: los clientes de correo no soportan flex/grid ni el design system del sitio. Toda cadena interpolada pasa por `escapeHtml`.
+- [src/lib/email/renderOrderEmail.ts](src/lib/email/renderOrderEmail.ts) — HTML + texto plano. **Tablas y estilos inline a propósito**: los clientes de correo no soportan flex/grid ni clases de Tailwind. Toda cadena interpolada pasa por `escapeHtml`.
+- [src/lib/email/brand.ts](src/lib/email/brand.ts) — tokens de marca para el mail (rojo `#DC2626`, Zinc 950/700/500/200, Outfit + Inter con fallback completo, logo desde `povstore.uy/images/logo-pov.png`). **Están duplicados de `src/styles/tailwind.css` a propósito** — un mail no lee variables CSS. Si cambia la paleta del sitio, cambiar acá también; es el único lugar de los mails donde viven los colores.
 - [src/lib/email/sendOrderStatusEmail.ts](src/lib/email/sendOrderStatusEmail.ts) — mapa estado→plantilla + los dos frenos de envío. Hoy notifica `processing`, `ready` y `shipped`; `completed` y `cancelled` **no mandan mail** (decisión: son estados internos / se avisan a mano). Expone además `sendOrderConfirmationEmail` (mail de compra confirmada).
 - [src/messages/emailMessages.ts](src/messages/emailMessages.ts) — copy centralizado (voseo, cara al cliente). No hardcodear texto en los templates.
 
@@ -354,6 +355,7 @@ Piezas:
 2. **`notify_customer: false`** — checkbox "Avisar al cliente por mail" en el modal de la orden (default **tildado**). Silencia un envío puntual sin tocar código.
 
 **Reglas / convenciones:**
+- **Moneda: se muestra `UYU 7.690`, no `$U`.** En un mail no hay contexto de sitio uruguayo alrededor y el `$` solo es ambiguo. Mismo código que el pixel de Meta y el `currency_id` de MP. Vive en `formatUYU()`.
 - **El disparador es la transición, no la acción del admin.** `shouldNotifyCustomer(prev, next)` exige que el estado **cambie**: guardar dos veces, o tocar sólo el tracking, no reenvía el mail.
 - **El mail va después del stock** en [admin/orders/[id]/route.ts](src/app/api/admin/orders/[id]/route.ts): así no se avisa de una operación que después devuelve 409 por stock insuficiente.
 - **Un fallo de mail nunca devuelve error al admin.** El resultado viaja en `data.email` de la respuesta del PATCH para que la UI pueda mostrarlo, pero el 200 se mantiene.

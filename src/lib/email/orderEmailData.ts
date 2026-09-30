@@ -73,7 +73,12 @@ export function buildOrderEmailLines(rows: OrderEmailItemRow[]): OrderEmailLine[
   return lines;
 }
 
-/** Formato de moneda del sitio: $U con separador de miles es-UY. */
+/**
+ * Moneda del sitio. Se muestra el código ISO `UYU` en vez del símbolo `$`:
+ * en un mail no hay contexto de sitio uruguayo alrededor y `$` solo es
+ * ambiguo (peso argentino, dólar). Mismo código que usa el pixel de Meta y
+ * el `currency_id` de MercadoPago.
+ */
 export function formatUYU(amount: number): string {
-  return `$U ${Math.round(amount).toLocaleString('es-UY')}`;
+  return `UYU ${Math.round(amount).toLocaleString('es-UY')}`;
 }

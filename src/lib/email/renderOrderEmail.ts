@@ -8,11 +8,20 @@
 
 import { emailMessages, SITE_LABEL, SUPPORT_EMAIL } from '@/messages/emailMessages';
 import { buildOrderEmailLines, formatUYU, type OrderEmailItemRow } from './orderEmailData';
-
-const INK = '#111827';
-const MUTED = '#6b7280';
-const BORDER = '#e5e7eb';
-const ACCENT = '#0f172a';
+import {
+  BODY_TEXT,
+  BORDER,
+  BRAND_RED,
+  FONT_BODY,
+  FONT_HEADING,
+  INK,
+  LOGO_URL,
+  MUTED,
+  RADIUS_BOX,
+  RADIUS_CARD,
+  SURFACE,
+  WHITE,
+} from './brand';
 
 export type OrderEmailKind = 'confirmed' | 'processing' | 'shipped' | 'ready';
 
@@ -128,22 +137,25 @@ export function renderOrderEmail(input: RenderOrderEmailInput): RenderedEmail {
   const text = textParts.join('\n');
 
   // ---------- HTML ----------
+  // Paleta y tipografías espejadas del sitio (./brand.ts). Todo inline y en
+  // tablas: los clientes de correo no soportan flex/grid ni hojas de estilo.
   const itemRows = lines
-    .map((line) => {
+    .map((line, i) => {
       const qty = line.quantity > 1 ? `${line.quantity} × ` : '';
+      const topBorder = i === 0 ? '' : `border-top:1px solid ${BORDER};`;
       const includes = line.includes.length
-        ? `<div style="margin-top:6px;color:${MUTED};font-size:13px;line-height:1.6;">
-             ${escapeHtml(c.includesLabel)}<br>
-             ${line.includes.map((i) => `· ${escapeHtml(i)}`).join('<br>')}
+        ? `<div style="margin-top:8px;color:${MUTED};font-size:13px;line-height:1.7;">
+             <span style="color:${INK};font-weight:600;">${escapeHtml(c.includesLabel)}</span><br>
+             ${line.includes.map((inc) => `${escapeHtml(inc)}`).join('<br>')}
            </div>`
         : '';
       return `
         <tr>
-          <td style="padding:12px 0;border-bottom:1px solid ${BORDER};vertical-align:top;">
-            <div style="color:${INK};font-size:15px;font-weight:600;">${escapeHtml(qty + line.name)}</div>
+          <td style="padding:16px 0;${topBorder}vertical-align:top;">
+            <div style="color:${INK};font-size:15px;font-weight:700;font-family:${FONT_HEADING};letter-spacing:-.01em;">${escapeHtml(qty + line.name)}</div>
             ${includes}
           </td>
-          <td style="padding:12px 0;border-bottom:1px solid ${BORDER};text-align:right;vertical-align:top;color:${INK};font-size:15px;white-space:nowrap;">
+          <td style="padding:16px 0;${topBorder}text-align:right;vertical-align:top;color:${INK};font-size:15px;font-weight:600;white-space:nowrap;">
             ${escapeHtml(formatUYU(line.totalPrice))}
           </td>
         </tr>`;
@@ -153,38 +165,42 @@ export function renderOrderEmail(input: RenderOrderEmailInput): RenderedEmail {
   const totalsRows: string[] = [];
   if (typeof input.subtotal === 'number' && typeof input.total === 'number') {
     totalsRows.push(
-      `<tr><td style="padding:6px 0;color:${MUTED};font-size:14px;">${escapeHtml(c.subtotalLabel)}</td>
-           <td style="padding:6px 0;text-align:right;color:${MUTED};font-size:14px;">${escapeHtml(formatUYU(input.subtotal))}</td></tr>`
+      `<tr><td style="padding:5px 0;color:${MUTED};font-size:14px;">${escapeHtml(c.subtotalLabel)}</td>
+           <td style="padding:5px 0;text-align:right;color:${BODY_TEXT};font-size:14px;">${escapeHtml(formatUYU(input.subtotal))}</td></tr>`
     );
     const shipping = input.shippingCost ?? 0;
     totalsRows.push(
-      `<tr><td style="padding:6px 0;color:${MUTED};font-size:14px;">${escapeHtml(c.shippingLabel)}</td>
-           <td style="padding:6px 0;text-align:right;color:${MUTED};font-size:14px;">${
+      `<tr><td style="padding:5px 0;color:${MUTED};font-size:14px;">${escapeHtml(c.shippingLabel)}</td>
+           <td style="padding:5px 0;text-align:right;color:${BODY_TEXT};font-size:14px;">${
              shipping > 0 ? escapeHtml(formatUYU(shipping)) : escapeHtml(c.shippingFree)
            }</td></tr>`
     );
   }
   if (typeof input.total === 'number') {
     totalsRows.push(
-      `<tr><td style="padding:10px 0 0;color:${INK};font-size:16px;font-weight:700;">${escapeHtml(c.totalLabel)}</td>
-           <td style="padding:10px 0 0;text-align:right;color:${INK};font-size:16px;font-weight:700;">${escapeHtml(formatUYU(input.total))}</td></tr>`
+      `<tr>
+         <td style="padding:12px 0 0;border-top:2px solid ${INK};color:${INK};font-size:17px;font-weight:800;font-family:${FONT_HEADING};">${escapeHtml(c.totalLabel)}</td>
+         <td style="padding:12px 0 0;border-top:2px solid ${INK};text-align:right;color:${INK};font-size:17px;font-weight:800;font-family:${FONT_HEADING};">${escapeHtml(formatUYU(input.total))}</td>
+       </tr>`
     );
   }
 
   const ctaBlock = input.statusUrl
-    ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:24px 0 6px;">
+    ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:28px 0 4px;">
          <tr><td align="center">
-           <a href="${escapeHtml(input.statusUrl)}" style="display:inline-block;background:${ACCENT};color:#ffffff;text-decoration:none;font-size:15px;font-weight:600;padding:13px 26px;border-radius:9px;">${escapeHtml(c.trackCta)}</a>
+           <a href="${escapeHtml(input.statusUrl)}" style="display:inline-block;background:${BRAND_RED};color:${WHITE};text-decoration:none;font-size:15px;font-weight:700;font-family:${FONT_HEADING};letter-spacing:.01em;padding:15px 34px;border-radius:${RADIUS_BOX};">${escapeHtml(c.trackCta)}</a>
          </td></tr>
-         <tr><td align="center" style="padding-top:10px;color:${MUTED};font-size:12px;line-height:1.5;">${escapeHtml(c.trackHint)}</td></tr>
+         <tr><td align="center" style="padding-top:12px;color:${MUTED};font-size:12px;line-height:1.6;">${escapeHtml(c.trackHint)}</td></tr>
        </table>`
     : '';
 
+  // Caja destacada (tracking o dirección de retiro): filete rojo a la
+  // izquierda, el mismo recurso que el sitio usa para destacar.
   const highlightBlock = highlight
-    ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:20px 0;background:#f8fafc;border:1px solid ${BORDER};border-radius:10px;">
-         <tr><td style="padding:16px 18px;">
-           <div style="color:${MUTED};font-size:12px;letter-spacing:.04em;text-transform:uppercase;">${escapeHtml(highlight.label)}</div>
-           <div style="color:${INK};font-size:18px;font-weight:700;margin-top:4px;">${escapeHtml(highlight.value)}</div>
+    ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:22px 0;background:${SURFACE};border-left:4px solid ${BRAND_RED};border-radius:${RADIUS_BOX};">
+         <tr><td style="padding:16px 20px;">
+           <div style="color:${MUTED};font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;">${escapeHtml(highlight.label)}</div>
+           <div style="color:${INK};font-size:19px;font-weight:800;font-family:${FONT_HEADING};margin-top:5px;letter-spacing:-.01em;">${escapeHtml(highlight.value)}</div>
          </td></tr>
        </table>`
     : '';
@@ -194,34 +210,51 @@ export function renderOrderEmail(input: RenderOrderEmailInput): RenderedEmail {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light only">
+<meta name="supported-color-schemes" content="light only">
 <title>${escapeHtml(subject)}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@600;700;800&family=Inter:wght@400;600&display=swap" rel="stylesheet">
 </head>
-<body style="margin:0;padding:0;background:#f3f4f6;">
+<body style="margin:0;padding:0;background:${SURFACE};font-family:${FONT_BODY};">
 <div style="display:none;max-height:0;overflow:hidden;opacity:0;">${escapeHtml(preheaderFor(input.kind))}</div>
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f3f4f6;padding:24px 12px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${SURFACE};padding:32px 12px;">
   <tr><td align="center">
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border-radius:14px;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;">
-      <tr><td style="background:${ACCENT};padding:20px 28px;">
-        <div style="color:#ffffff;font-size:17px;font-weight:700;letter-spacing:.02em;">POV STORE</div>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:580px;background:${WHITE};border:1px solid ${BORDER};border-radius:${RADIUS_CARD};overflow:hidden;font-family:${FONT_BODY};">
+
+      <!-- Filete de marca -->
+      <tr><td style="background:${BRAND_RED};height:5px;line-height:5px;font-size:0;">&nbsp;</td></tr>
+
+      <!-- Logo -->
+      <tr><td align="center" style="padding:30px 28px 6px;">
+        <img src="${LOGO_URL}" width="132" alt="POV Store" style="display:block;width:132px;max-width:60%;height:auto;border:0;">
       </td></tr>
-      <tr><td style="padding:28px;">
-        <h1 style="margin:0 0 6px;color:${INK};font-size:21px;line-height:1.3;">${escapeHtml(title)}</h1>
-        <p style="margin:0 0 18px;color:${MUTED};font-size:14px;">${escapeHtml(c.orderLabel(input.orderNumber))}</p>
-        <p style="margin:0 0 12px;color:${INK};font-size:15px;line-height:1.6;">${escapeHtml(c.greeting(input.customerName))}</p>
+
+      <!-- Contenido -->
+      <tr><td style="padding:14px 34px 30px;">
+        <h1 style="margin:0 0 4px;color:${INK};font-size:24px;line-height:1.25;font-family:${FONT_HEADING};font-weight:800;letter-spacing:-.02em;text-align:center;">${escapeHtml(title)}</h1>
+        <p style="margin:0 0 26px;color:${MUTED};font-size:13px;text-align:center;letter-spacing:.02em;">${escapeHtml(c.orderLabel(input.orderNumber))}</p>
+
+        <p style="margin:0 0 14px;color:${INK};font-size:15px;line-height:1.65;font-weight:600;">${escapeHtml(c.greeting(input.customerName))}</p>
         ${paragraphs
-          .map((p) => `<p style="margin:0 0 12px;color:${INK};font-size:15px;line-height:1.6;">${escapeHtml(p)}</p>`)
+          .map((p) => `<p style="margin:0 0 14px;color:${BODY_TEXT};font-size:15px;line-height:1.65;">${escapeHtml(p)}</p>`)
           .join('')}
         ${highlightBlock}
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:14px;">${itemRows}</table>
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:10px;">${totalsRows.join('')}</table>
+
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:22px;border-top:2px solid ${INK};">${itemRows}</table>
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:14px;">${totalsRows.join('')}</table>
         ${ctaBlock}
-        <p style="margin:22px 0 0;color:${MUTED};font-size:14px;line-height:1.6;">${escapeHtml(c.footerReply)}</p>
+
+        <p style="margin:26px 0 0;padding-top:20px;border-top:1px solid ${BORDER};color:${MUTED};font-size:13px;line-height:1.6;">${escapeHtml(c.footerReply)}</p>
       </td></tr>
-      <tr><td style="padding:18px 28px 26px;border-top:1px solid ${BORDER};">
-        <div style="color:${INK};font-size:14px;font-weight:600;">${escapeHtml(c.signature)}</div>
-        <div style="color:${MUTED};font-size:13px;margin-top:4px;">
-          <a href="mailto:${SUPPORT_EMAIL}" style="color:${MUTED};text-decoration:none;">${SUPPORT_EMAIL}</a> ·
-          <a href="https://${SITE_LABEL}" style="color:${MUTED};text-decoration:none;">${SITE_LABEL}</a>
+
+      <!-- Pie -->
+      <tr><td style="padding:22px 34px 28px;background:${SURFACE};border-top:1px solid ${BORDER};">
+        <div style="color:${INK};font-size:14px;font-weight:700;font-family:${FONT_HEADING};">${escapeHtml(c.signature)}</div>
+        <div style="color:${MUTED};font-size:13px;margin-top:5px;">
+          <a href="mailto:${SUPPORT_EMAIL}" style="color:${MUTED};text-decoration:none;">${SUPPORT_EMAIL}</a>
+          <span style="color:${BORDER};"> &nbsp;|&nbsp; </span>
+          <a href="https://${SITE_LABEL}" style="color:${BRAND_RED};text-decoration:none;font-weight:600;">${SITE_LABEL}</a>
         </div>
       </td></tr>
     </table>
