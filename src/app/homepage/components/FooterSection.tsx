@@ -70,11 +70,6 @@ const FooterSection = () => {
             <h4 className="text-sm font-semibold text-foreground mb-4">Soporte</h4>
             <ul className="space-y-2">
               <li>
-                <Link href="/seguimiento" className="text-sm text-muted-foreground hover:text-primary transition-smooth">
-                  Seguí tu pedido
-                </Link>
-              </li>
-              <li>
                 <Link href="/homepage" className="text-sm text-muted-foreground hover:text-primary transition-smooth">
                   Contacto
                 </Link>

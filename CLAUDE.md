@@ -373,6 +373,8 @@ Piezas:
 ### Seguimiento público de pedidos (`/seguimiento`)
 Agregado 2026-09-29. El checkout es 100% invitado (ninguna orden tiene `user_id`), así que no hay cuentas ni login. El cliente prueba que el pedido es suyo con **dos datos que sólo él tiene: número de pedido + email de la compra**.
 
+⚠ **El footer del sitio es [src/components/common/Footer.tsx](src/components/common/Footer.tsx)** (montado en `layout.tsx`, aparece en todas las páginas). [src/app/homepage/components/FooterSection.tsx](src/app/homepage/components/FooterSection.tsx) es **código muerto** — no lo importa nadie y sus links apuntan a `/homepage`. El 2026-09-29 se editó el muerto por error y el cambio no se vio en producción. Candidato a borrar.
+
 Flujo: [/seguimiento](src/app/seguimiento/SeguimientoContent.tsx) (formulario) → `POST` [/api/order-lookup](src/app/api/order-lookup/route.ts) → si coinciden devuelve `{ orderId, token }` → el cliente navega a `/order-confirmation?orderId=...&token=...`, **la misma pantalla y el mismo token HMAC** que usan el checkout y los mails. No se duplicó ninguna vista ni se agregó una segunda forma de leer órdenes.
 
 **Reglas de seguridad (no relajar sin pensarlo):**

@@ -81,6 +81,11 @@ const Footer = () => {
             <h4 className="text-sm font-bold text-white uppercase tracking-wider mb-4">Soporte</h4>
             <ul className="space-y-3 text-sm">
               <li>
+                <Link href="/seguimiento" className="text-neutral-400 hover:text-red-500 transition-colors">
+                  Seguí tu pedido
+                </Link>
+              </li>
+              <li>
                 <Link href="/contact" className="text-neutral-400 hover:text-red-500 transition-colors">
                   Contacto
                 </Link>
