@@ -78,6 +78,8 @@ export const adminOrderMessages = {
     dispatch: 'Despachar',
     confirmDelivery: 'Confirmar Entrega',
     currentFlow: 'Flujo actual:',
+    notifyCustomer: 'Avisar al cliente por mail',
+    notifyCustomerHint: 'Destildá si ya le avisaste por WhatsApp o no querés que reciba el correo de este cambio.',
   },
   cancelledState: {
     title: 'Orden Cancelada',

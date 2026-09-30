@@ -15,6 +15,7 @@ import SocialShareCard from './SocialShareCard';
 
 // IMPORTAMOS EL NUEVO DICCIONARIO
 import { orderMessages } from '@/messages/orderMessages';
+import { SUPPORT_EMAIL, WHATSAPP_DISPLAY } from '@/config/contact';
 import { isPickup, PICKUP_ADDRESS, type DeliveryMethod } from '@/lib/orders/deliveryMethod';
 import { trackPurchase } from '@/lib/analytics/metaPixel';
 
@@ -43,6 +44,7 @@ interface ApiOrder {
   total: string | number;
 
   order_status: string;
+  tracking_number?: string | null;
   payment_method: string;
   payment_status: PaymentStatus;
 
@@ -193,6 +195,7 @@ const OrderConfirmationInteractive: React.FC = () => {
 
       shippingMethod,
       estimatedDelivery,
+      trackingNumber: order.tracking_number || undefined,
 
       items: mappedItems,
       isPickup: pickup,
@@ -350,14 +353,15 @@ const OrderConfirmationInteractive: React.FC = () => {
 
             <DeliveryInfoCard
               estimatedDelivery={ui.estimatedDelivery}
-              trackingNumber={undefined}
+              trackingNumber={ui.trackingNumber}
               shippingMethod={ui.shippingMethod}
             />
 
             <EmailConfirmationCard
               email={ui.customerEmail}
-              supportEmail="soporte@povstoreuruguay.com"
-              supportPhone="+598 2 123 4567"
+              supportEmail={SUPPORT_EMAIL}
+              supportPhone={WHATSAPP_DISPLAY}
+              paymentCompleted={ui.paymentStatus === 'completed'}
             />
           </div>
         </div>

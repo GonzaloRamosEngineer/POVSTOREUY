@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabaseAdmin';
 import { applyOrderStockOnce } from '../../../lib/stock/applyOrderStockOnce';
+import { sendOrderConfirmationEmail } from '@/lib/email/sendOrderStatusEmail';
 import { verifyMpWebhookSignature } from '@/lib/mp/verifyWebhookSignature';
 import { logWebhookEvent } from '@/lib/logging/webhookLogger';
 // IMPORTAMOS EL DICCIONARIO
@@ -117,6 +118,21 @@ export async function POST(request: Request) {
     const sameStatus = existingOrder.payment_status === payment_status;
     const mustRecoverStock = targetIsCompleted && sameStatus && !existingOrder.stock_applied_at;
 
+    // El pago se acredita ACÁ, no al crear la orden: éste es el único momento
+    // en que corresponde mandarle la confirmación de compra al cliente.
+    const justConfirmed = targetIsCompleted && !sameStatus;
+
+    const sendConfirmation = async () => {
+      if (!justConfirmed) return;
+      const { data: fullOrder } = await supabase
+        .from('orders')
+        .select('*')
+        .eq('id', orderId)
+        .single();
+      if (!fullOrder) return;
+      await sendOrderConfirmationEmail({ supabase, order: fullOrder });
+    };
+
     if (!sameStatus) {
       const { error: upErr } = await supabase
         .from('orders')
@@ -190,10 +206,12 @@ export async function POST(request: Request) {
       }
 
       if (stockResult.no_op) {
+        await sendConfirmation();
         return NextResponse.json({ ok: true, no_op: true, reason: stockResult.reason });
       }
     }
 
+    await sendConfirmation();
     return NextResponse.json({ ok: true });
   } catch (e: any) {
     // Excepción no manejada — algo se rompió de nuestro lado. Devolvemos 500 para que MP reintente.

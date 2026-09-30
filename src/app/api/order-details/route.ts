@@ -49,6 +49,7 @@ export async function GET(request: Request) {
         shipping_department,
         shipping_postal_code,
         delivery_method,
+        tracking_number,
         notes,
         mp_status,
         mp_status_detail

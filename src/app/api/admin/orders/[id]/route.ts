@@ -3,6 +3,11 @@ import { getSupabaseAdmin } from '@/lib/supabaseAdmin';
 import { applyOrderStockOnce } from '../../../../../lib/stock/applyOrderStockOnce';
 import { revertOrderStockOnce } from '../../../../../lib/stock/revertOrderStockOnce';
 import { isPickup } from '@/lib/orders/deliveryMethod';
+import {
+  sendOrderConfirmationEmail,
+  sendOrderStatusEmail,
+  shouldNotifyCustomer,
+} from '@/lib/email/sendOrderStatusEmail';
 // IMPORTAMOS EL NUEVO DICCIONARIO
 import { adminOrderApiMessages } from '@/messages/adminOrderApiMessages';
 
@@ -104,8 +109,13 @@ export async function PATCH(
       tracking_number, 
       payment_status,
       cancel_payment, 
-      cancel_mp 
+      cancel_mp,
+      // Escotilla del panel: permite guardar sin avisarle al cliente
+      // (ej. ya se le comunicó por WhatsApp). Default: sí avisa.
+      notify_customer
     } = body;
+
+    const notify = notify_customer !== false;
 
     // ✅ Obtener la orden actual para validaciones
     const { data: currentOrder, error: fetchError } = await supabase
@@ -354,6 +364,16 @@ export async function PATCH(
       if (stockResult.no_op) {
         return NextResponse.json({ ...data, no_op: true, stock_reason: stockResult.reason });
       }
+
+      // Transferencia confirmada a mano = el pago se acreditó de verdad.
+      // Es el mismo momento en que el webhook de MP manda la confirmación.
+      const confirmationOutcome = await sendOrderConfirmationEmail({
+        supabase,
+        order: { ...currentOrder, ...data },
+        notify,
+      });
+
+      return NextResponse.json({ ...data, email: confirmationOutcome });
     }
 
     // PF-08: Compensación simétrica. Si la orden tenía stock aplicado y el PATCH
@@ -389,8 +409,22 @@ export async function PATCH(
       }
     }
 
+    // Aviso al cliente por cambio de estado (processing / ready / shipped).
+    // Va después de stock para no mandar un mail de una operación que después
+    // devuelve 409. No bloquea la respuesta si falla: sendOrderStatusEmail
+    // no lanza y el resultado viaja en `email` para que el admin lo vea.
+    let emailOutcome: Awaited<ReturnType<typeof sendOrderStatusEmail>> | null = null;
+    if (status !== undefined && shouldNotifyCustomer(currentOrder.order_status, status)) {
+      emailOutcome = await sendOrderStatusEmail({
+        supabase,
+        order: { ...currentOrder, ...data },
+        status,
+        notify,
+      });
+    }
+
     console.log(`✅ Orden ${orderIdentifier} actualizada exitosamente`);
-    return NextResponse.json(data);
+    return NextResponse.json(emailOutcome ? { ...data, email: emailOutcome } : data);
     
   } catch (error) {
     console.error('Error crítico en PATCH:', error);

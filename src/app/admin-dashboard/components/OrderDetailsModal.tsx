@@ -97,6 +97,9 @@ export default function OrderDetailsModal({ orderId, isOpen, onClose }: OrderDet
   const [trackingInput, setTrackingInput] = useState('');
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const [showCancelMPConfirm, setShowCancelMPConfirm] = useState(false);
+  // Default true: el caso normal es avisarle al cliente. Se destilda para
+  // guardar en silencio (ej. ya se le avisó por WhatsApp).
+  const [notifyCustomer, setNotifyCustomer] = useState(true);
 
   const { toasts, payment, fulfillment, modal, items: msgItems, cancelledState, summary, mpStatuses } = adminOrderMessages;
 
@@ -131,7 +134,7 @@ export default function OrderDetailsModal({ orderId, isOpen, onClose }: OrderDet
     try {
       await adminFetch(`/api/admin/orders/${orderId}`, {
         method: 'PATCH',
-        body: JSON.stringify({ payment_status: newPaymentStatus }),
+        body: JSON.stringify({ payment_status: newPaymentStatus, notify_customer: notifyCustomer }),
       });
       toast.success(toasts.paymentUpdateSuccess);
       await fetchOrderDetails();
@@ -192,7 +195,7 @@ export default function OrderDetailsModal({ orderId, isOpen, onClose }: OrderDet
     setUpdating(true);
     try {
       const pickup = isPickup(orderDetails);
-      const payload: any = { status: newStatus };
+      const payload: any = { status: newStatus, notify_customer: notifyCustomer };
 
       if (!pickup) {
         const trackingValue = (newTracking ?? trackingInput).trim();
@@ -662,6 +665,19 @@ export default function OrderDetailsModal({ orderId, isOpen, onClose }: OrderDet
                     </div>
 
                     <div className="mt-4 pt-4 border-t border-border">
+                      <label className="flex items-start gap-2 mb-4 cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={notifyCustomer}
+                          onChange={(e) => setNotifyCustomer(e.target.checked)}
+                          className="mt-0.5 rounded border-border text-primary focus:ring-primary"
+                        />
+                        <span className="text-[10px] leading-tight">
+                          <span className="font-bold uppercase">{fulfillment.notifyCustomer}</span>
+                          <span className="block text-muted-foreground normal-case">{fulfillment.notifyCustomerHint}</span>
+                        </span>
+                      </label>
+
                       <p className="text-[9px] text-muted-foreground uppercase font-bold mb-2">{fulfillment.currentFlow}</p>
                       <div className="flex items-center gap-2 text-[9px] font-mono">
                         {pickup ? (
