@@ -13,6 +13,7 @@ import { readCart, clearCart, type CartItem as CartItemType } from '@/lib/cart';
 import { checkoutMessages } from '@/messages/checkoutMessages';
 // IMPORTAMOS LA LIBRERÍA DE TOASTS
 import { toast } from 'react-hot-toast';
+import { WHATSAPP_NUMBER } from '@/config/contact';
 
 // ... (Interfaces OrderItem, PaymentMethod, CustomerInfo se mantienen igual)
 interface OrderItem {
@@ -308,7 +309,7 @@ export default function CheckoutPaymentInteractive() {
       const created = await createOrder();
       clearCart();
 
-      const whatsappNumber = '59896482949';
+      const whatsappNumber = WHATSAPP_NUMBER;
       const message = checkoutMessages.whatsapp.template(created.orderNumber);
       const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(message)}`;
 

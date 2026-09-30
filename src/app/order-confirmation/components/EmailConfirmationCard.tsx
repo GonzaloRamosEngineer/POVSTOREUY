@@ -5,12 +5,20 @@ interface EmailConfirmationCardProps {
   email: string;
   supportEmail: string;
   supportPhone: string;
+  /**
+   * El mail de confirmación sale cuando el pago se acredita, no al generar
+   * la orden. Con el pago pendiente (típico en transferencia) hay que
+   * prometerlo a futuro, no darlo por enviado: hasta 2026-09-29 esta tarjeta
+   * afirmaba haber mandado un mail que no existía.
+   */
+  paymentCompleted: boolean;
 }
 
 const EmailConfirmationCard: React.FC<EmailConfirmationCardProps> = ({
   email,
   supportEmail,
   supportPhone,
+  paymentCompleted,
 }) => {
   return (
     <div className="bg-card rounded-lg p-6 space-y-6 card-elevation">
@@ -22,10 +30,12 @@ const EmailConfirmationCard: React.FC<EmailConfirmationCardProps> = ({
         <Icon name="EnvelopeIcon" size={24} className="text-primary mt-0.5" variant="solid" />
         <div>
           <p className="text-base font-medium text-foreground mb-1">
-            Email de Confirmación Enviado
+            {paymentCompleted ? 'Email de Confirmación Enviado' : 'Te Avisamos por Email'}
           </p>
           <p className="text-sm text-muted-foreground mb-2">
-            Hemos enviado los detalles de tu pedido a:
+            {paymentCompleted
+              ? 'Enviamos los detalles de tu pedido a:'
+              : 'Apenas confirmemos tu pago te enviamos los detalles del pedido a:'}
           </p>
           <p className="text-sm font-mono font-medium text-foreground break-all">
             {email}
@@ -35,7 +45,9 @@ const EmailConfirmationCard: React.FC<EmailConfirmationCardProps> = ({
 
       <div className="space-y-3">
         <p className="text-sm text-muted-foreground">
-          Si no recibes el email en los próximos 10 minutos, revisa tu carpeta de spam o correo no deseado.
+          {paymentCompleted
+            ? 'Si no lo ves en los próximos 10 minutos, revisá tu carpeta de spam o correo no deseado.'
+            : 'Guardá esta página: podés volver a este enlace cuando quieras para ver el estado de tu pedido.'}
         </p>
       </div>
 

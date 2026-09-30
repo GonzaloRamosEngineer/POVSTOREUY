@@ -6,10 +6,12 @@
 //
 // Voseo rioplatense, igual que orderMessages (cara visible al cliente).
 
+import { SITE_DOMAIN, SUPPORT_EMAIL as CONTACT_EMAIL } from '@/config/contact';
+
 export const SENDER_NAME = 'POV Store';
-export const SENDER_EMAIL = 'info@povstore.uy';
-export const SUPPORT_EMAIL = 'info@povstore.uy';
-export const SITE_LABEL = 'povstore.uy';
+export const SENDER_EMAIL = CONTACT_EMAIL;
+export const SUPPORT_EMAIL = CONTACT_EMAIL;
+export const SITE_LABEL = SITE_DOMAIN;
 
 export const emailMessages = {
   common: {
@@ -24,6 +26,8 @@ export const emailMessages = {
     signature: 'Equipo POV Store',
     footerContact: `${SUPPORT_EMAIL} · ${SITE_LABEL}`,
     footerReply: 'Si necesitás cambiar algún dato, respondé este correo y lo resolvemos.',
+    trackCta: 'Ver el estado de mi pedido',
+    trackHint: 'Guardá este correo: el enlace te muestra el estado de tu pedido actualizado en cualquier momento.',
   },
 
   confirmed: {

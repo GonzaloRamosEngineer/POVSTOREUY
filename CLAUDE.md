@@ -359,6 +359,12 @@ Piezas:
 - **Un fallo de mail nunca devuelve error al admin.** El resultado viaja en `data.email` de la respuesta del PATCH para que la UI pueda mostrarlo, pero el 200 se mantiene.
 - Si se agrega un estado notificable, sumarlo a `STATUS_TO_EMAIL` **y** al copy en `emailMessages` — no hacer plantillas sueltas.
 
+**Seguimiento para el cliente:** cada mail lleva un botón **"Ver el estado de mi pedido"** a `/order-confirmation?orderId=...&token=...`. Es la misma pantalla y el mismo token HMAC (`ORDER_LOOKUP_SECRET`) que ya usaba el checkout — no se agregó ningún endpoint ni sesión de cliente. La URL se arma en `buildStatusUrl()`; si falta el secret o `SITE_URL`, el mail sale **sin botón** antes que con un link roto. La pantalla ahora sí muestra el `tracking_number` (la API no lo traía y el componente lo recibía como `undefined`).
+
+⚠ **Datos de contacto: [src/config/contact.ts](src/config/contact.ts) es la fuente de verdad.** Antes estaban duplicados y en parte inventados: la tarjeta de confirmación mostraba `soporte@povstoreuruguay.com` y el teléfono `+598 2 123 4567`, ninguno real, y el WhatsApp estaba hardcodeado en 3 archivos. No volver a escribirlos a mano.
+
+⚠ **La tarjeta de confirmación afirmaba haber enviado un mail que no existía** ("Email de Confirmación Enviado… revisá tu spam"). Ahora el texto depende de `paymentCompleted`: con el pago pendiente promete el mail a futuro en vez de darlo por enviado. Si se cambia cuándo sale la confirmación, actualizar también esa copy.
+
 **Confirmación de compra:** se dispara **cuando el pago se acredita**, no al crear la orden — así no le llega nada a quien abandonó el checkout sin pagar. Dos caminos, ambos con el mismo template `confirmed`: el webhook de MP ([mp-webhook](src/app/api/mp-webhook/route.ts), sólo en la transición real a `completed`) y la confirmación manual de una transferencia en el PATCH del admin (después de aplicar stock).
 
 ### Webhook MercadoPago (verificación de firma HMAC)

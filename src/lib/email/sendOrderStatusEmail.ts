@@ -12,6 +12,27 @@ import { isPickup, PICKUP_ADDRESS } from '@/lib/orders/deliveryMethod';
 import { renderOrderEmail, type OrderEmailKind } from './renderOrderEmail';
 import type { OrderEmailItemRow } from './orderEmailData';
 import { sendEmail, type SendEmailResult } from './resendClient';
+import { signOrderLookupToken } from '@/lib/orders/orderLookupToken';
+
+/**
+ * URL firmada a la pantalla de seguimiento. Es la MISMA que ve el cliente al
+ * terminar el checkout: token HMAC sobre el id de la orden, verificado en
+ * /api/order-details. Sin secret o sin SITE_URL, el mail sale sin botón
+ * (mejor un mail sin CTA que un link roto).
+ */
+function buildStatusUrl(orderId: string): string | null {
+  const secret = process.env.ORDER_LOOKUP_SECRET;
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || process.env.SITE_URL;
+
+  if (!secret || !siteUrl) {
+    console.warn('[email] Sin ORDER_LOOKUP_SECRET o SITE_URL — mail sin link de seguimiento');
+    return null;
+  }
+
+  const token = signOrderLookupToken(orderId, secret);
+  const base = siteUrl.replace(/\/+$/, '');
+  return `${base}/order-confirmation?orderId=${encodeURIComponent(orderId)}&token=${encodeURIComponent(token)}`;
+}
 
 /** Estados de orden que le avisan algo al cliente. El resto no manda mail. */
 const STATUS_TO_EMAIL: Record<string, OrderEmailKind> = {
@@ -120,6 +141,7 @@ export async function sendOrderEmail({
     isPickup: pickup,
     trackingNumber: order.tracking_number,
     pickupAddress: pickup ? PICKUP_ADDRESS : null,
+    statusUrl: buildStatusUrl(order.id),
   });
 
   const result: SendEmailResult = await sendEmail({

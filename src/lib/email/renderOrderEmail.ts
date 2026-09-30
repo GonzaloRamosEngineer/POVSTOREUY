@@ -27,6 +27,8 @@ export type RenderOrderEmailInput = {
   isPickup: boolean;
   trackingNumber?: string | null;
   pickupAddress?: string | null;
+  /** URL firmada a /order-confirmation. Si falta, el mail va sin botón. */
+  statusUrl?: string | null;
 };
 
 export type RenderedEmail = { subject: string; html: string; text: string };
@@ -118,6 +120,10 @@ export function renderOrderEmail(input: RenderOrderEmailInput): RenderedEmail {
     textParts.push('', `  ${c.totalLabel}: ${formatUYU(input.total)}`);
   }
 
+  if (input.statusUrl) {
+    textParts.push('', `${c.trackCta}: ${input.statusUrl}`, c.trackHint);
+  }
+
   textParts.push('', c.footerReply, '', c.signature, c.footerContact);
   const text = textParts.join('\n');
 
@@ -165,6 +171,15 @@ export function renderOrderEmail(input: RenderOrderEmailInput): RenderedEmail {
     );
   }
 
+  const ctaBlock = input.statusUrl
+    ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:24px 0 6px;">
+         <tr><td align="center">
+           <a href="${escapeHtml(input.statusUrl)}" style="display:inline-block;background:${ACCENT};color:#ffffff;text-decoration:none;font-size:15px;font-weight:600;padding:13px 26px;border-radius:9px;">${escapeHtml(c.trackCta)}</a>
+         </td></tr>
+         <tr><td align="center" style="padding-top:10px;color:${MUTED};font-size:12px;line-height:1.5;">${escapeHtml(c.trackHint)}</td></tr>
+       </table>`
+    : '';
+
   const highlightBlock = highlight
     ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:20px 0;background:#f8fafc;border:1px solid ${BORDER};border-radius:10px;">
          <tr><td style="padding:16px 18px;">
@@ -199,6 +214,7 @@ export function renderOrderEmail(input: RenderOrderEmailInput): RenderedEmail {
         ${highlightBlock}
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:14px;">${itemRows}</table>
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:10px;">${totalsRows.join('')}</table>
+        ${ctaBlock}
         <p style="margin:22px 0 0;color:${MUTED};font-size:14px;line-height:1.6;">${escapeHtml(c.footerReply)}</p>
       </td></tr>
       <tr><td style="padding:18px 28px 26px;border-top:1px solid ${BORDER};">
