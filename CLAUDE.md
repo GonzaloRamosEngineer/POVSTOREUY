@@ -382,16 +382,28 @@ Flujo: [/seguimiento](src/app/seguimiento/SeguimientoContent.tsx) (formulario) �
 - La página lleva `robots: { index: false }`: es una utilidad para clientes, no una landing, y no queremos a Google indexando una consulta de datos personales.
 - Normalización tolerante del número (`919687`, `pov919687`, `POV-919687` son lo mismo) — el cliente lo copia de donde puede.
 
-⚠ **Este endpoint depende del rate-limit, y el rate-limit está caído** — ver abajo.
+⚠ **Este endpoint depende del rate-limit** para ser seguro: sin él, alguien que conozca el email de un cliente puede probar números de pedido por fuerza bruta. Ver la sección siguiente.
 
-### 🔴 Rate-limit Upstash CAÍDO (detectado 2026-09-29)
-La base `smart-earwig-134962.upstash.io` **ya no existe**: el DNS no resuelve (`ENOTFOUND`). El módulo hace **fail-open** por diseño (no bloquea ventas por un glitch de infra), así que nada se rompió — pero **ningún endpoint público está protegido** desde hace tiempo: `create-order`, `mp-preference`, `newsletter/subscribe` y ahora `order-lookup`.
+### Rate-limit Upstash — caída y restauración (2026-09-29)
+La base original (`smart-earwig-134962.upstash.io`) **desapareció**: el DNS dejó de resolver. Como el módulo hace **fail-open** por diseño, nadie se enteró — ningún endpoint público estuvo protegido durante un tiempo indeterminado. Detectado por casualidad al probar `/api/order-lookup`.
 
-Verificado en prod 2026-09-29: 5 POST seguidos a `/api/newsletter/subscribe` (limiter 3/min) → 5× `400`, ningún `429`. En local, el log muestra `[rateLimit] limiter error, failing open: getaddrinfo ENOTFOUND`.
+Base actual: **`literate-monkey-320965.upstash.io`** (`povstore-prod`, free tier, AWS us-east-1).
 
-**Fix (~10 min):** crear una Redis nueva en Upstash (free tier alcanza, region us-east-1) y actualizar `UPSTASH_REDIS_REST_URL` + `UPSTASH_REDIS_REST_TOKEN` en Vercel + `.env` local. El código no se toca. Re-verificar con el mismo smoke de 5 POSTs.
+⚠ **El token REST tiene que ser el de escritura, NO el read-only.** El panel Connect de Upstash trae tildada la casilla **"Read-Only Token"** y te muestra ese token; si se copia así, el limiter no puede escribir sus contadores, Upstash responde `403 NOPERM`, el módulo hace fail-open y **todo parece funcionar mientras no protege nada**. Costó una hora de diagnóstico el 2026-09-29: las pruebas de conexión daban `PONG` porque las lecturas sí funcionan.
 
-**Nota para el futuro:** las bases free de Upstash se borran por inactividad. Esto se cayó solo y nadie se enteró porque el fail-open es silencioso salvo en logs. Si importa, vale un alerta o un healthcheck.
+**Cómo verificar que está vivo** (no escribe nada en la DB, el email inválido se rechaza después del limiter):
+```bash
+for i in 1 2 3 4 5; do
+  curl -s -o /dev/null -D - -X POST https://povstore.uy/api/newsletter/subscribe \
+    -H "Content-Type: application/json" -d '{"email":"sin-arroba"}' \
+    | grep -iE "HTTP|x-ratelimit"
+done
+```
+Esperado: los 3 primeros `400`, el 4º **`429`** con `x-ratelimit-limit: 3` + `retry-after`. Si los 5 dan `400`, el rate-limit está caído otra vez.
+
+Verificado así el 2026-09-29 tras la restauración (4º y 5º → 429), y confirmado en la base con `SCAN` (claves `povstore:rl:newsletter:{min,day}:<ip>`).
+
+**Nota:** las bases free de Upstash se borran por inactividad y el fail-open es silencioso salvo en logs. Si esto importa, vale un healthcheck.
 
 ### Webhook MercadoPago (verificación de firma HMAC)
 [src/app/api/mp-webhook/route.ts](src/app/api/mp-webhook/route.ts) valida cada notificación con HMAC-SHA256 antes de tocar DB o llamar a MP. La lógica está en [src/lib/mp/verifyWebhookSignature.ts](src/lib/mp/verifyWebhookSignature.ts) (con tests en `.test.ts`).
