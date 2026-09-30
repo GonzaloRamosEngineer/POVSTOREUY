@@ -12,11 +12,61 @@ export type CatalogProductRow = {
 };
 
 const STOP_WORDS = new Set([
-  'a', 'al', 'algo', 'con', 'cuanto', 'cuesta', 'de', 'del', 'el', 'en', 'es', 'esta', 'hay',
-  'la', 'las', 'lo', 'los', 'me', 'modelo', 'para', 'por', 'precio', 'que', 'queda', 'quedan',
-  'stock', 'tenes', 'tienen', 'un', 'una', 'y',
-  'available', 'do', 'have', 'how', 'in', 'is', 'much', 'of', 'price', 'the', 'you',
+  'a',
+  'al',
+  'algo',
+  'buenas',
+  'con',
+  'cuanto',
+  'cuesta',
+  'de',
+  'del',
+  'disponible',
+  'disponibles',
+  'el',
+  'en',
+  'es',
+  'esta',
+  'hay',
+  'hola',
+  'la',
+  'las',
+  'lo',
+  'los',
+  'me',
+  'modelo',
+  'necesito',
+  'para',
+  'por',
+  'precio',
+  'que',
+  'queda',
+  'quedan',
+  'quiero',
+  'quisiera',
+  'stock',
+  'tenes',
+  'tienen',
+  'un',
+  'una',
+  'y',
+  'available',
+  'do',
+  'have',
+  'how',
+  'in',
+  'is',
+  'much',
+  'of',
+  'price',
+  'the',
+  'you',
 ]);
+
+function tokenVariants(token: string): string[] {
+  if (/^[a-z]+s$/.test(token) && token.length > 3) return [token, token.slice(0, -1)];
+  return [token];
+}
 
 export function normalizeCatalogText(value: unknown): string {
   return String(value ?? '')
@@ -28,9 +78,13 @@ export function normalizeCatalogText(value: unknown): string {
 }
 
 export function catalogQueryTokens(query: string): string[] {
-  return [...new Set(normalizeCatalogText(query).split(' ')
-    .filter((token) => token.length >= 2 && !STOP_WORDS.has(token)))]
-    .slice(0, 12);
+  return [
+    ...new Set(
+      normalizeCatalogText(query)
+        .split(' ')
+        .filter((token) => token.length >= 2 && !STOP_WORDS.has(token))
+    ),
+  ].slice(0, 12);
 }
 
 export function scoreCatalogProduct(query: string, product: CatalogProductRow): number {
@@ -44,14 +98,18 @@ export function scoreCatalogProduct(query: string, product: CatalogProductRow): 
   let score = 0;
 
   for (const token of tokens) {
-    if (model === token) score += 12;
-    else if (model.split(' ').includes(token)) score += 8;
-    else if (model.includes(token)) score += 5;
+    const variants = tokenVariants(token);
+    const modelWords = model.split(' ');
+    const nameWords = name.split(' ');
 
-    if (name.split(' ').includes(token)) score += 6;
-    else if (name.includes(token)) score += 3;
+    if (variants.some((variant) => model === variant)) score += 12;
+    else if (variants.some((variant) => modelWords.includes(variant))) score += 8;
+    else if (variants.some((variant) => model.includes(variant))) score += 5;
 
-    if (description.includes(token)) score += 1;
+    if (variants.some((variant) => nameWords.includes(variant))) score += 6;
+    else if (variants.some((variant) => name.includes(variant))) score += 3;
+
+    if (variants.some((variant) => description.includes(variant))) score += 1;
   }
 
   const phrase = tokens.join(' ');
@@ -59,11 +117,17 @@ export function scoreCatalogProduct(query: string, product: CatalogProductRow): 
   return score;
 }
 
-export function searchCatalogRows(query: string, rows: CatalogProductRow[], limit = 5): CatalogProductRow[] {
+export function searchCatalogRows(
+  query: string,
+  rows: CatalogProductRow[],
+  limit = 5
+): CatalogProductRow[] {
   return rows
     .map((product) => ({ product, score: scoreCatalogProduct(query, product) }))
     .filter(({ score }) => score > 0)
-    .sort((a, b) => b.score - a.score || String(a.product.name).localeCompare(String(b.product.name)))
+    .sort(
+      (a, b) => b.score - a.score || String(a.product.name).localeCompare(String(b.product.name))
+    )
     .slice(0, Math.min(Math.max(limit, 1), 10))
     .map(({ product }) => product);
 }
