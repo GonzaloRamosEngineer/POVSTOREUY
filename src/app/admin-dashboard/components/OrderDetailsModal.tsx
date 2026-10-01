@@ -31,9 +31,11 @@ interface OrderDetails {
   customer_email: string;
   customer_name: string;
   customer_phone: string;
+  customer_document?: string | null;
   shipping_address: string;
   shipping_city: string;
   shipping_department: string;
+  shipping_neighborhood?: string | null;
   shipping_postal_code: string;
   delivery_method?: DeliveryMethod | null;
   subtotal: number;
@@ -777,6 +779,10 @@ export default function OrderDetailsModal({ orderId, isOpen, onClose }: OrderDet
                       <Icon name="PhoneIcon" size={14} className="text-primary" />
                       <span className="text-xs font-mono font-bold">{orderDetails.customer_phone}</span>
                     </div>
+                    <p className="text-[10px] text-muted-foreground mt-2">{orderDetails.customer_email}</p>
+                    {orderDetails.customer_document && (
+                      <p className="text-[10px] text-muted-foreground mt-1">CI/RUT: {orderDetails.customer_document}</p>
+                    )}
                   </section>
                   <section className="pt-4 border-t border-border">
                     <h4 className="text-[10px] font-black text-muted-foreground uppercase mb-2">
@@ -792,7 +798,9 @@ export default function OrderDetailsModal({ orderId, isOpen, onClose }: OrderDet
                     ) : (
                       <>
                         <p className="text-[10px] font-bold leading-relaxed">{orderDetails.shipping_address}</p>
-                        <p className="text-[10px] text-muted-foreground uppercase mt-1">{orderDetails.shipping_city}, {orderDetails.shipping_department}</p>
+                        <p className="text-[10px] text-muted-foreground uppercase mt-1">
+                          {[orderDetails.shipping_neighborhood, orderDetails.shipping_city, orderDetails.shipping_department].filter(Boolean).join(', ')}
+                        </p>
                         {orderDetails.tracking_number && (
                           <div className="mt-3 p-2 bg-blue-500/10 border border-blue-500/20 rounded-lg">
                             <p className="text-[9px] text-muted-foreground uppercase font-bold mb-1">{summary.tracking}</p>

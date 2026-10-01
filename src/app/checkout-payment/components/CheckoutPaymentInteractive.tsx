@@ -81,9 +81,11 @@ interface CustomerInfo {
   email: string;
   fullName: string;
   phone: string;
+  document: string;
   address: string;
   city: string;
   department: string;
+  neighborhood: string;
   postalCode: string;
 }
 
@@ -93,10 +95,13 @@ const PICKUP_ADDRESS =
   'José Enrique Rodó 2219, 11200 Montevideo, Departamento de Montevideo';
 
 function isCustomerInfoValid(ci: CustomerInfo, method: DeliveryMethod) {
-  const baseOk = Boolean(ci.email && ci.fullName && ci.phone);
+  const baseOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(ci.email.trim())
+    && ci.fullName.trim().length >= 3
+    && ci.phone.trim().length >= 8;
   if (!baseOk) return false;
   if (method === 'pickup') return true;
-  return Boolean(ci.address && ci.city && ci.department);
+  return ci.address.trim().length >= 5
+    && Boolean(ci.city.trim() && ci.department.trim() && ci.neighborhood.trim());
 }
 
 function normalizeCustomerInfoForIdempotency(ci: CustomerInfo, deliveryMethod: DeliveryMethod) {
@@ -104,9 +109,11 @@ function normalizeCustomerInfoForIdempotency(ci: CustomerInfo, deliveryMethod: D
     email: String(ci?.email || '').trim().toLowerCase(),
     fullName: String(ci?.fullName || '').trim(),
     phone: String(ci?.phone || '').trim(),
+    document: String(ci?.document || '').trim(),
     address: deliveryMethod === 'pickup' ? '' : String(ci?.address || '').trim(),
     city: deliveryMethod === 'pickup' ? '' : String(ci?.city || '').trim(),
     department: deliveryMethod === 'pickup' ? '' : String(ci?.department || '').trim(),
+    neighborhood: deliveryMethod === 'pickup' ? '' : String(ci?.neighborhood || '').trim(),
     postalCode: deliveryMethod === 'pickup' ? '' : String(ci?.postalCode || '').trim(),
   };
 }
@@ -141,9 +148,11 @@ export default function CheckoutPaymentInteractive() {
     email: '',
     fullName: '',
     phone: '',
+    document: '',
     address: '',
     city: '',
     department: 'Montevideo',
+    neighborhood: '',
     postalCode: '',
   });
 

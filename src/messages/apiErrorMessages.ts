@@ -22,6 +22,7 @@ export const apiErrorMessages = {
     missingIdempotency: 'Falta la clave de seguridad de la transacción o es inválida.',
     missingCustomerOrItems: 'Faltan los datos del cliente o los productos del carrito.',
     missingField: (field: string) => `Falta información obligatoria: ${field}`,
+    invalidEmail: 'El email ingresado no es válido.',
     invalidDepartment: (dept: string) => `El departamento ingresado no es válido: ${dept}`,
     invalidPaymentMethod: 'El método de pago seleccionado no es válido.',
     idempotencyConflict: 'Esta transacción ya fue procesada previamente.',

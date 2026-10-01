@@ -8,6 +8,7 @@ type Props = {
   address: string;
   city: string;
   department: string;
+  neighborhood: string;
   postalCode: string;
   customerName: string;
   customerPhone: string;
@@ -20,7 +21,7 @@ export default function DeliveryCard(props: Props) {
   const m = orderTrackingMessages.delivery;
   const { isPickup } = props;
 
-  const locality = [props.city, props.department].filter(Boolean).join(', ');
+  const locality = [props.neighborhood, props.city, props.department].filter(Boolean).join(', ');
   const mapsUrl = props.pickupAddress
     ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(props.pickupAddress)}`
     : null;

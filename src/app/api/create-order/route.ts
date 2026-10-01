@@ -15,6 +15,7 @@ const URUGUAY_DEPARTMENTS = new Set([
 ]);
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function parseMaybeJson(value: any) {
   if (Array.isArray(value)) return value;
@@ -119,9 +120,11 @@ function normalizeCustomerForIdempotency(customerInfo: any, deliveryMethod: 'pic
     email: String(customerInfo?.email || '').trim().toLowerCase(),
     fullName: String(customerInfo?.fullName || '').trim(),
     phone: String(customerInfo?.phone || '').trim(),
+    document: String(customerInfo?.document || '').trim(),
     address: deliveryMethod === 'pickup' ? '' : String(customerInfo?.address || '').trim(),
     city: deliveryMethod === 'pickup' ? '' : String(customerInfo?.city || '').trim(),
     department: deliveryMethod === 'pickup' ? '' : String(customerInfo?.department || '').trim(),
+    neighborhood: deliveryMethod === 'pickup' ? '' : String(customerInfo?.neighborhood || '').trim(),
     postalCode: deliveryMethod === 'pickup' ? '' : String(customerInfo?.postalCode || '').trim(),
   };
 }
@@ -210,14 +213,17 @@ export async function POST(request: Request) {
     const requiredBaseFields = ['email', 'fullName', 'phone'];
     for (const f of requiredBaseFields) {
       // @ts-ignore
-      if (!customerInfo[f]) return NextResponse.json({ error: msgs.missingField(f) }, { status: 400 });
+      if (!String(customerInfo[f] || '').trim()) return NextResponse.json({ error: msgs.missingField(f) }, { status: 400 });
+    }
+    if (!EMAIL_RE.test(String(customerInfo.email).trim())) {
+      return NextResponse.json({ error: msgs.invalidEmail }, { status: 400 });
     }
 
     if (dm === 'delivery') {
-      const requiredDeliveryFields = ['address', 'city', 'department'];
+      const requiredDeliveryFields = ['address', 'city', 'department', 'neighborhood'];
       for (const f of requiredDeliveryFields) {
         // @ts-ignore
-        if (!customerInfo[f]) return NextResponse.json({ error: msgs.missingField(f) }, { status: 400 });
+        if (!String(customerInfo[f] || '').trim()) return NextResponse.json({ error: msgs.missingField(f) }, { status: 400 });
       }
       if (!URUGUAY_DEPARTMENTS.has(customerInfo.department)) {
         return NextResponse.json({ error: msgs.invalidDepartment(customerInfo.department) }, { status: 400 });
@@ -481,12 +487,14 @@ export async function POST(request: Request) {
     // Si falla cualquiera de los dos inserts, la transacción de la función revierte ambos.
     const { data: rpcResult, error: rpcErr } = await supabase.rpc('create_order_transactional', {
       p_order_number:             orderNumber,
-      p_customer_email:           customerInfo.email,
-      p_customer_name:            customerInfo.fullName,
-      p_customer_phone:           customerInfo.phone,
+      p_customer_email:           String(customerInfo.email).trim().toLowerCase(),
+      p_customer_name:            String(customerInfo.fullName).trim(),
+      p_customer_phone:           String(customerInfo.phone).trim(),
+      p_customer_document:        String(customerInfo.document || '').trim() || null,
       p_shipping_address:         dm === 'pickup' ? '' : (customerInfo.address || ''),
       p_shipping_city:            dm === 'pickup' ? '' : (customerInfo.city || ''),
       p_shipping_department:      dm === 'pickup' ? 'Montevideo' : (customerInfo.department || 'Montevideo'),
+      p_shipping_neighborhood:    dm === 'pickup' ? '' : (customerInfo.neighborhood || ''),
       p_shipping_postal_code:     dm === 'pickup' ? '' : (customerInfo.postalCode || ''),
       p_subtotal:                 subtotal,
       p_shipping_cost:            shipping_cost,

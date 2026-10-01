@@ -58,6 +58,7 @@ interface ApiOrder {
   shipping_address: string;
   shipping_city: string;
   shipping_department: string;
+  shipping_neighborhood?: string | null;
   shipping_postal_code: string;
 
   delivery_method?: DeliveryMethod | null;
@@ -321,6 +322,7 @@ const OrderConfirmationInteractive: React.FC = () => {
               address={order.shipping_address || ''}
               city={order.shipping_city || ''}
               department={order.shipping_department || ''}
+              neighborhood={order.shipping_neighborhood || ''}
               postalCode={order.shipping_postal_code || ''}
               customerName={order.customer_name}
               customerPhone={order.customer_phone}

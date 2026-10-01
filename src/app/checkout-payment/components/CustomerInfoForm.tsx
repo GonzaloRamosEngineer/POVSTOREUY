@@ -11,9 +11,11 @@ interface CustomerInfo {
   email: string;
   fullName: string;
   phone: string;
+  document: string;
   address: string;
   city: string;
   department: string;
+  neighborhood: string;
   postalCode: string;
 }
 
@@ -36,9 +38,11 @@ export default function CustomerInfoForm({
     email: initialData?.email || '',
     fullName: initialData?.fullName || '',
     phone: initialData?.phone || '',
+    document: initialData?.document || '',
     address: initialData?.address || '',
     city: initialData?.city || '',
     department: initialData?.department || 'Montevideo',
+    neighborhood: initialData?.neighborhood || '',
     postalCode: initialData?.postalCode || '',
   });
 
@@ -63,6 +67,7 @@ export default function CustomerInfoForm({
         delete next.address;
         delete next.city;
         delete next.department;
+        delete next.neighborhood;
         delete next.postalCode;
         return next;
       });
@@ -118,6 +123,22 @@ export default function CustomerInfoForm({
         }
         if (!formData.city) newErrors.city = validation.cityRequired;
         else delete newErrors.city;
+        break;
+      case 'department':
+        if (deliveryMethod === 'pickup') {
+          delete newErrors.department;
+          break;
+        }
+        if (!formData.department) newErrors.department = validation.departmentRequired;
+        else delete newErrors.department;
+        break;
+      case 'neighborhood':
+        if (deliveryMethod === 'pickup') {
+          delete newErrors.neighborhood;
+          break;
+        }
+        if (!formData.neighborhood) newErrors.neighborhood = validation.neighborhoodRequired;
+        else delete newErrors.neighborhood;
         break;
     }
     setErrors(newErrors);
@@ -211,6 +232,24 @@ export default function CustomerInfoForm({
                 {errors.phone}
               </p>
             )}
+          </div>
+
+          {/* CI/RUT: DAC lo acepta opcional y POV no lo exige. */}
+          <div>
+            <label htmlFor="document" className="block text-sm font-medium text-foreground mb-2">
+              {customerForm.labels.document}{' '}
+              <span className="text-xs font-normal text-muted-foreground">(opcional)</span>
+            </label>
+            <input
+              type="text"
+              id="document"
+              name="document"
+              value={formData.document}
+              onChange={handleChange}
+              placeholder={customerForm.placeholders.document}
+              autoComplete="off"
+              className="w-full px-4 py-3 bg-input border border-border rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary transition-smooth"
+            />
           </div>
         </div>
       </div>
@@ -320,7 +359,10 @@ export default function CustomerInfoForm({
                 name="department"
                 value={formData.department}
                 onChange={handleChange}
-                className="w-full px-4 py-3 bg-input border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary transition-smooth"
+                onBlur={() => handleBlur('department')}
+                className={`w-full px-4 py-3 bg-input border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary transition-smooth ${
+                  errors.department ? 'border-error' : 'border-border'
+                }`}
               >
                 {departments.map((dept) => (
                   <option key={dept} value={dept}>
@@ -328,13 +370,39 @@ export default function CustomerInfoForm({
                   </option>
                 ))}
               </select>
+              {errors.department && (
+                <p className="text-xs text-error mt-1">{errors.department}</p>
+              )}
             </div>
+          </div>
+
+          {/* Neighborhood */}
+          <div>
+            <label htmlFor="neighborhood" className="block text-sm font-medium text-foreground mb-2">
+              {customerForm.labels.neighborhood} <span className="text-error">*</span>
+            </label>
+            <input
+              type="text"
+              id="neighborhood"
+              name="neighborhood"
+              value={formData.neighborhood}
+              onChange={handleChange}
+              onBlur={() => handleBlur('neighborhood')}
+              placeholder={customerForm.placeholders.neighborhood}
+              className={`w-full px-4 py-3 bg-input border rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary transition-smooth ${
+                errors.neighborhood ? 'border-error' : 'border-border'
+              }`}
+            />
+            {errors.neighborhood && (
+              <p className="text-xs text-error mt-1">{errors.neighborhood}</p>
+            )}
           </div>
 
           {/* Postal Code */}
           <div>
             <label htmlFor="postalCode" className="block text-sm font-medium text-foreground mb-2">
-              {customerForm.labels.postalCode}
+              {customerForm.labels.postalCode}{' '}
+              <span className="text-xs font-normal text-muted-foreground">(opcional)</span>
             </label>
             <input
               type="text"

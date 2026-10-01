@@ -122,9 +122,11 @@ function makeSupabaseMock(params: {
         customer_email: args.p_customer_email,
         customer_name: args.p_customer_name,
         customer_phone: args.p_customer_phone,
+        customer_document: args.p_customer_document,
         shipping_address: args.p_shipping_address,
         shipping_city: args.p_shipping_city,
         shipping_department: args.p_shipping_department,
+        shipping_neighborhood: args.p_shipping_neighborhood,
         shipping_postal_code: args.p_shipping_postal_code,
         subtotal: args.p_subtotal,
         shipping_cost: args.p_shipping_cost,
@@ -829,8 +831,55 @@ describe('create-order pack expansion + idempotency', () => {
       address: 'Calle Falsa 123',
       city: 'Montevideo',
       department: 'Montevideo',
+      neighborhood: 'Cordón',
       postalCode: '11200',
     };
+
+    it('requires neighborhood for home delivery but keeps CI/RUT optional', async () => {
+      const { supabase } = makeSupabaseMock({ baseProducts: [simpleProductRow] });
+      currentSupabase = supabase;
+
+      const withoutNeighborhood: any = await POST(
+        buildRequest({
+          idempotencyKey: 'idem-dac-missing-neighborhood',
+          items: [{ type: 'product', product_id: simpleProductId, quantity: 1 }],
+          deliveryMethod: 'delivery',
+          customerInfo: { ...deliveryCustomerInfo, neighborhood: '' },
+        }),
+      );
+      expect(withoutNeighborhood.status).toBe(400);
+
+      const withoutDocument: any = await POST(
+        buildRequest({
+          idempotencyKey: 'idem-dac-optional-document',
+          items: [{ type: 'product', product_id: simpleProductId, quantity: 1 }],
+          deliveryMethod: 'delivery',
+          customerInfo: deliveryCustomerInfo,
+        }),
+      );
+      expect(withoutDocument.status).toBe(200);
+    });
+
+    it('persists the optional CI/RUT and required DAC destination fields', async () => {
+      const { supabase, captures } = makeSupabaseMock({ baseProducts: [simpleProductRow] });
+      currentSupabase = supabase;
+
+      const res: any = await POST(
+        buildRequest({
+          idempotencyKey: 'idem-dac-fields',
+          items: [{ type: 'product', product_id: simpleProductId, quantity: 1 }],
+          deliveryMethod: 'delivery',
+          customerInfo: { ...deliveryCustomerInfo, document: '4.567.890-1' },
+        }),
+      );
+
+      expect(res.status).toBe(200);
+      expect(captures.orderInsertPayload).toMatchObject({
+        customer_document: '4.567.890-1',
+        shipping_city: 'Montevideo',
+        shipping_neighborhood: 'Cordón',
+      });
+    });
 
     it('passes p_delivery_method="delivery" when deliveryMethod=delivery', async () => {
       const { supabase, captures } = makeSupabaseMock({ baseProducts: [simpleProductRow] });
