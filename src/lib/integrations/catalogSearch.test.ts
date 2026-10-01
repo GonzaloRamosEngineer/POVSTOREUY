@@ -44,6 +44,39 @@ describe('búsqueda de catálogo para MatchBot', () => {
     expect(searchCatalogRows('¿Qué accesorios tienen?', rows)[0]?.id).toBe('3');
   });
 
+  it('para correr prioriza C200 con estabilizador y sus kits', () => {
+    const movementRows = [
+      {
+        id: 'c100-kit',
+        name: 'SJCAM C100+ — Kit Esencial',
+        model: 'C100+',
+        description: 'Cámara compacta',
+        is_accessory: false,
+        is_pack: true,
+      },
+      {
+        id: 'c200',
+        name: 'SJCAM C200',
+        model: 'C200',
+        description: 'Cámara con estabilizador gyro de 6 ejes',
+        is_accessory: false,
+        is_pack: false,
+      },
+      {
+        id: 'c200-kit',
+        name: 'SJCAM C200 — Kit Esencial',
+        model: 'C200',
+        description: 'Cámara con estabilizador gyro de 6 ejes',
+        is_accessory: false,
+        is_pack: true,
+      },
+    ];
+
+    expect(
+      searchCatalogRows('¿Cámaras para correr tienen?', movementRows).map(({ id }) => id)
+    ).toEqual(['c200-kit', 'c200', 'c100-kit']);
+  });
+
   it('prioriza coincidencias de modelo y nombre', () => {
     expect(searchCatalogRows('¿Cuánto cuesta la X200?', rows)[0]?.id).toBe('1');
     expect(searchCatalogRows('Necesito una microSD 128GB', rows)[0]?.id).toBe('2');

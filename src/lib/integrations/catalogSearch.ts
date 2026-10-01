@@ -10,7 +10,26 @@ export type CatalogProductRow = {
   stock_count?: number | null;
   stock_status?: string | null;
   is_accessory?: boolean | null;
+  is_pack?: boolean | null;
 };
+
+const MOVEMENT_INTENT = new Set([
+  'caballo',
+  'correr',
+  'cuatri',
+  'deporte',
+  'downhill',
+  'esqui',
+  'gimnasio',
+  'moto',
+  'motocross',
+  'mtb',
+  'natacion',
+  'patin',
+  'running',
+  'trekking',
+  'trotar',
+]);
 
 const STOP_WORDS = new Set([
   'a',
@@ -100,8 +119,15 @@ export function scoreCatalogProduct(query: string, product: CatalogProductRow): 
 
   const asksForCamera = tokens.some((token) => tokenVariants(token).includes('camara'));
   const asksForAccessory = tokens.some((token) => tokenVariants(token).includes('accesorio'));
+  const asksForMovement = tokens.some((token) => MOVEMENT_INTENT.has(token));
+  const supportsMovement =
+    model.includes('c200') ||
+    searchable.includes('estabilizador') ||
+    searchable.includes('gyro') ||
+    searchable.includes('6 ejes');
   if (asksForCamera && product.is_accessory === false) score += 10;
   if (asksForAccessory && product.is_accessory === true) score += 10;
+  if (asksForMovement && supportsMovement) score += 24;
 
   for (const token of tokens) {
     const variants = tokenVariants(token);
@@ -120,6 +146,7 @@ export function scoreCatalogProduct(query: string, product: CatalogProductRow): 
 
   const phrase = tokens.join(' ');
   if (phrase.length >= 3 && searchable.includes(phrase)) score += 8;
+  if (score > 0 && product.is_pack) score += 2;
   return score;
 }
 

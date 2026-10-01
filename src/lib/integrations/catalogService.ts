@@ -77,7 +77,7 @@ function searchableRows(products: CatalogSourceRow[], siteUrl: string): Searchab
 
   for (const product of products) {
     const productUrl = `${siteUrl}/products/${product.slug || product.id}`;
-    rows.push({ ...product, catalog_url: productUrl });
+    rows.push({ ...product, is_pack: false, catalog_url: productUrl });
 
     for (const pack of parsePacks(product.packs)) {
       const packId = String(pack.id ?? '').trim();
@@ -107,6 +107,7 @@ function searchableRows(products: CatalogSourceRow[], siteUrl: string): Searchab
         stock_count: stock,
         stock_status: stock === 0 ? 'out_of_stock' : stock <= 5 ? 'low_stock' : 'in_stock',
         is_accessory: product.is_accessory,
+        is_pack: true,
         catalog_url: `${productUrl}?pack=${encodeURIComponent(packId)}`,
       });
     }
