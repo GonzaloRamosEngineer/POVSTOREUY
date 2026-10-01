@@ -4,7 +4,15 @@ import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { writeCart, type CartItem } from '@/lib/cart';
 
-export default function MatchbotCheckoutBootstrap({ item }: { item: CartItem }) {
+export default function MatchbotCheckoutBootstrap({
+  item,
+  token,
+  intentId,
+}: {
+  item: CartItem;
+  token: string;
+  intentId: string | null;
+}) {
   const router = useRouter();
 
   useEffect(() => {
@@ -13,8 +21,17 @@ export default function MatchbotCheckoutBootstrap({ item }: { item: CartItem }) 
     writeCart([item]);
     window.dispatchEvent(new Event('cart-updated'));
     window.sessionStorage.setItem('povstore_checkout_source', 'matchbot');
+    if (intentId) {
+      window.sessionStorage.setItem('povstore_matchbot_intent_token', token);
+      void fetch('/api/integrations/matchbot/checkout-event', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token, event: 'opened' }),
+        keepalive: true,
+      });
+    }
     router.replace('/checkout-payment?source=matchbot');
-  }, [item, router]);
+  }, [intentId, item, router, token]);
 
   return (
     <main className="min-h-[70vh] bg-background px-6 py-20 text-center">

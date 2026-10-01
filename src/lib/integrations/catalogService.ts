@@ -130,7 +130,8 @@ function searchableRows(products: CatalogSourceRow[], siteUrl: string): Searchab
 
 export async function queryLiveCatalog(
   query: string,
-  limit = 5
+  limit = 5,
+  intentId: string | null = null
 ): Promise<MatchbotCatalogProduct[]> {
   const supabase = getSupabaseAdmin();
   const { data, error } = await supabase
@@ -168,6 +169,7 @@ export async function queryLiveCatalog(
         secret: checkoutSecret,
         productId: row.checkout_product_id,
         packId: row.checkout_pack_id,
+        intentId,
       }),
     };
   });

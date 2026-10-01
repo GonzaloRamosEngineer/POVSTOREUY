@@ -10,6 +10,7 @@ import {
 } from '@/lib/email/sendOrderStatusEmail';
 // IMPORTAMOS EL NUEVO DICCIONARIO
 import { adminOrderApiMessages } from '@/messages/adminOrderApiMessages';
+import { notifyMatchbotCommerceEvent } from '@/lib/integrations/matchbotCommerce';
 
 function json(status: number, body: any) {
   return NextResponse.json(body, { status });
@@ -362,6 +363,13 @@ export async function PATCH(
       }
 
       if (stockResult.no_op) {
+        if (currentOrder.matchbot_intent_id) {
+          await notifyMatchbotCommerceEvent({
+            intentId: currentOrder.matchbot_intent_id,
+            event: 'paid',
+            orderReference: currentOrder.order_number,
+          });
+        }
         return NextResponse.json({ ...data, no_op: true, stock_reason: stockResult.reason });
       }
 
@@ -372,6 +380,14 @@ export async function PATCH(
         order: { ...currentOrder, ...data },
         notify,
       });
+
+      if (currentOrder.matchbot_intent_id) {
+        await notifyMatchbotCommerceEvent({
+          intentId: currentOrder.matchbot_intent_id,
+          event: 'paid',
+          orderReference: currentOrder.order_number,
+        });
+      }
 
       return NextResponse.json({ ...data, email: confirmationOutcome });
     }

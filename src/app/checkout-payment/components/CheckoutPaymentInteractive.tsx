@@ -159,6 +159,16 @@ export default function CheckoutPaymentInteractive() {
   useEffect(() => {
     setIsHydrated(true);
     setCart(readCart());
+    const matchbotToken = window.sessionStorage.getItem('povstore_matchbot_intent_token');
+    if (matchbotToken && !window.sessionStorage.getItem('povstore_matchbot_checkout_started')) {
+      window.sessionStorage.setItem('povstore_matchbot_checkout_started', '1');
+      void fetch('/api/integrations/matchbot/checkout-event', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: matchbotToken, event: 'checkout_started' }),
+        keepalive: true,
+      });
+    }
   }, []);
 
   const orderItems: OrderItem[] = useMemo(() => {
@@ -254,6 +264,7 @@ export default function CheckoutPaymentInteractive() {
         idempotency_key: createOrderIdempotencyKey,
         expectedTotal: total,
         strictPricing: true,
+        matchbotIntentToken: window.sessionStorage.getItem('povstore_matchbot_intent_token'),
       }),
     });
 

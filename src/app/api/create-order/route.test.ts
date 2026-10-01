@@ -127,6 +127,7 @@ function makeSupabaseMock(params: {
         shipping_city: args.p_shipping_city,
         shipping_department: args.p_shipping_department,
         shipping_neighborhood: args.p_shipping_neighborhood,
+        matchbot_intent_id: args.p_matchbot_intent_id,
         shipping_postal_code: args.p_shipping_postal_code,
         subtotal: args.p_subtotal,
         shipping_cost: args.p_shipping_cost,

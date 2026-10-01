@@ -6,7 +6,12 @@ BEGIN;
 
 ALTER TABLE public.orders
   ADD COLUMN IF NOT EXISTS customer_document text,
-  ADD COLUMN IF NOT EXISTS shipping_neighborhood text;
+  ADD COLUMN IF NOT EXISTS shipping_neighborhood text,
+  ADD COLUMN IF NOT EXISTS matchbot_intent_id uuid;
+
+CREATE INDEX IF NOT EXISTS orders_matchbot_intent_idx
+  ON public.orders (matchbot_intent_id)
+  WHERE matchbot_intent_id IS NOT NULL;
 
 -- Sobrecarga compatible: la firma anterior permanece operativa durante el
 -- despliegue y el handler nuevo selecciona esta firma por sus argumentos.
@@ -29,7 +34,8 @@ CREATE OR REPLACE FUNCTION public.create_order_transactional(
   p_items                    jsonb,
   p_delivery_method          delivery_method,
   p_customer_document        text,
-  p_shipping_neighborhood    text
+  p_shipping_neighborhood    text,
+  p_matchbot_intent_id       uuid
 )
 RETURNS TABLE(
   order_id     uuid,
@@ -53,14 +59,16 @@ BEGIN
       customer_document, shipping_address, shipping_city, shipping_department,
       shipping_neighborhood, shipping_postal_code, subtotal, shipping_cost,
       total, order_status, payment_method, payment_status, notes,
-      idempotency_key, idempotency_payload_hash, delivery_method
+      idempotency_key, idempotency_payload_hash, delivery_method,
+      matchbot_intent_id
     ) VALUES (
       NULL, p_order_number, p_customer_email, p_customer_name, p_customer_phone,
       NULLIF(BTRIM(p_customer_document), ''), p_shipping_address, p_shipping_city,
       p_shipping_department, NULLIF(BTRIM(p_shipping_neighborhood), ''),
       p_shipping_postal_code, p_subtotal, p_shipping_cost, p_total,
       'pending'::order_status, p_payment_method, 'pending'::payment_status,
-      p_notes, p_idempotency_key, p_idempotency_payload_hash, p_delivery_method
+      p_notes, p_idempotency_key, p_idempotency_payload_hash, p_delivery_method,
+      p_matchbot_intent_id
     )
     RETURNING orders.id, orders.order_number, orders.total
       INTO v_order_id, v_order_number, v_total;
@@ -106,19 +114,19 @@ $$;
 REVOKE ALL ON FUNCTION public.create_order_transactional(
   text, text, text, text, text, text, uruguay_department, text,
   numeric, numeric, numeric, payment_method, text, text, text, jsonb,
-  delivery_method, text, text
+  delivery_method, text, text, uuid
 ) FROM PUBLIC;
 
 REVOKE EXECUTE ON FUNCTION public.create_order_transactional(
   text, text, text, text, text, text, uruguay_department, text,
   numeric, numeric, numeric, payment_method, text, text, text, jsonb,
-  delivery_method, text, text
+  delivery_method, text, text, uuid
 ) FROM anon, authenticated;
 
 GRANT EXECUTE ON FUNCTION public.create_order_transactional(
   text, text, text, text, text, text, uruguay_department, text,
   numeric, numeric, numeric, payment_method, text, text, text, jsonb,
-  delivery_method, text, text
+  delivery_method, text, text, uuid
 ) TO service_role;
 
 COMMIT;

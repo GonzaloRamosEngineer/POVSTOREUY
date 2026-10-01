@@ -40,13 +40,17 @@ export async function POST(request: Request) {
   const action = (body as any)?.action;
   const query = typeof (body as any)?.query === 'string' ? (body as any).query.trim() : '';
   const requestedLimit = Number((body as any)?.limit ?? 5);
+  const rawIntentId = (body as any)?.context?.intent_id;
+  const intentId = typeof rawIntentId === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(rawIntentId)
+    ? rawIntentId
+    : null;
   const limit = Number.isInteger(requestedLimit) ? Math.min(Math.max(requestedLimit, 1), 10) : 5;
   if (action !== 'search') return json(400, { ok: false, error: 'unsupported_action' });
   if (!query || query.length > 500) return json(400, { ok: false, error: 'invalid_query' });
 
   let products;
   try {
-    products = await queryLiveCatalog(query, limit);
+    products = await queryLiveCatalog(query, limit, intentId);
   } catch {
     return json(500, { ok: false, error: 'catalog_unavailable' });
   }

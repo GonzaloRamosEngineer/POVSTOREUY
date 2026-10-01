@@ -6,6 +6,8 @@ import { getCreateOrderLimiters } from '@/lib/rateLimit/limiters';
 import { PICKUP_ADDRESS } from '@/lib/orders/deliveryMethod';
 // IMPORTAMOS EL NUEVO DICCIONARIO
 import { apiErrorMessages } from '@/messages/apiErrorMessages';
+import { verifyMatchbotCheckoutToken } from '@/lib/integrations/matchbotCheckout';
+import { notifyMatchbotCommerceEvent } from '@/lib/integrations/matchbotCommerce';
 
 const URUGUAY_DEPARTMENTS = new Set([
   'Montevideo', 'Canelones', 'Maldonado', 'Colonia', 'Salto',
@@ -197,7 +199,23 @@ export async function POST(request: Request) {
 
     const supabase = getSupabaseAdmin();
     const body = await request.json();
-    const { customerInfo, items, paymentMethod, deliveryMethod, idempotency_key, expectedTotal, strictPricing } = body;
+    const { customerInfo, items, paymentMethod, deliveryMethod, idempotency_key, expectedTotal, strictPricing, matchbotIntentToken } = body;
+
+    let matchbotIntentId: string | null = null;
+    if (matchbotIntentToken) {
+      const integrationSecret = process.env.MATCHBOT_CATALOG_SECRET;
+      if (!integrationSecret) {
+        return NextResponse.json({ error: 'Integración de compra no disponible.' }, { status: 503 });
+      }
+      const checkoutIntent = verifyMatchbotCheckoutToken({
+        secret: integrationSecret,
+        token: String(matchbotIntentToken),
+      });
+      if (checkoutIntent.ok === false || !checkoutIntent.intent.intent_id) {
+        return NextResponse.json({ error: 'El enlace de compra no es válido o venció.' }, { status: 400 });
+      }
+      matchbotIntentId = checkoutIntent.intent.intent_id;
+    }
 
     const idempotencyKey = String(idempotency_key || '').trim();
     if (!idempotencyKey || idempotencyKey.length > 128) {
@@ -251,6 +269,7 @@ export async function POST(request: Request) {
       paymentMethod,
       deliveryMethod: dm,
       customerInfo: normalizeCustomerForIdempotency(customerInfo, dm),
+      matchbotIntentId,
     };
     const idempotencyPayloadHash = getIdempotencyPayloadHash(idempotencyPayload);
 
@@ -267,6 +286,13 @@ export async function POST(request: Request) {
     if (existingByIdempotency) {
       if (String(existingByIdempotency.idempotency_payload_hash || '') !== idempotencyPayloadHash) {
         return NextResponse.json({ error: msgs.idempotencyConflict }, { status: 409 });
+      }
+      if (matchbotIntentId) {
+        await notifyMatchbotCommerceEvent({
+          intentId: matchbotIntentId,
+          event: 'order_created',
+          orderReference: existingByIdempotency.order_number,
+        });
       }
       return NextResponse.json({
         ok: true,
@@ -495,6 +521,7 @@ export async function POST(request: Request) {
       p_shipping_city:            dm === 'pickup' ? '' : (customerInfo.city || ''),
       p_shipping_department:      dm === 'pickup' ? 'Montevideo' : (customerInfo.department || 'Montevideo'),
       p_shipping_neighborhood:    dm === 'pickup' ? '' : (customerInfo.neighborhood || ''),
+      p_matchbot_intent_id:       matchbotIntentId,
       p_shipping_postal_code:     dm === 'pickup' ? '' : (customerInfo.postalCode || ''),
       p_subtotal:                 subtotal,
       p_shipping_cost:            shipping_cost,
@@ -521,6 +548,14 @@ export async function POST(request: Request) {
 
     if (row.status === 'payload_mismatch') {
       return NextResponse.json({ error: msgs.idempotencyConflict }, { status: 409 });
+    }
+
+    if (matchbotIntentId) {
+      await notifyMatchbotCommerceEvent({
+        intentId: matchbotIntentId,
+        event: 'order_created',
+        orderReference: row.order_number,
+      });
     }
 
     return NextResponse.json({

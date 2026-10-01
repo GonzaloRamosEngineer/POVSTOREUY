@@ -135,5 +135,5 @@ export default async function MatchbotCheckoutPage({ searchParams }: Props) {
     };
   }
 
-  return <MatchbotCheckoutBootstrap item={item} />;
+  return <MatchbotCheckoutBootstrap item={item} token={token} intentId={verified.intent.intent_id} />;
 }

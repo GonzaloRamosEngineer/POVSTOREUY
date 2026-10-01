@@ -6,6 +6,7 @@ import { verifyMpWebhookSignature } from '@/lib/mp/verifyWebhookSignature';
 import { logWebhookEvent } from '@/lib/logging/webhookLogger';
 // IMPORTAMOS EL DICCIONARIO
 import { apiErrorMessages } from '@/messages/apiErrorMessages';
+import { notifyMatchbotCommerceEvent } from '@/lib/integrations/matchbotCommerce';
 
 export const dynamic = 'force-dynamic';
 
@@ -88,7 +89,7 @@ export async function POST(request: Request) {
 
     const { data: existingOrder, error: getErr } = await supabase
       .from('orders')
-      .select('id, payment_status, stock_applied_at')
+      .select('id, order_number, payment_status, stock_applied_at, matchbot_intent_id')
       .eq('id', orderId)
       .single();
 
@@ -121,6 +122,14 @@ export async function POST(request: Request) {
     // El pago se acredita ACÁ, no al crear la orden: éste es el único momento
     // en que corresponde mandarle la confirmación de compra al cliente.
     const justConfirmed = targetIsCompleted && !sameStatus;
+    const notifyPaid = async () => {
+      if (!targetIsCompleted || !existingOrder.matchbot_intent_id) return;
+      await notifyMatchbotCommerceEvent({
+        intentId: existingOrder.matchbot_intent_id,
+        event: 'paid',
+        orderReference: existingOrder.order_number,
+      });
+    };
 
     const sendConfirmation = async () => {
       if (!justConfirmed) return;
@@ -159,6 +168,7 @@ export async function POST(request: Request) {
         );
       }
     } else if (!mustRecoverStock) {
+      await notifyPaid();
       return NextResponse.json({ ok: true, no_op: true, reason: 'same_payment_status' });
     }
 
@@ -207,11 +217,13 @@ export async function POST(request: Request) {
 
       if (stockResult.no_op) {
         await sendConfirmation();
+        await notifyPaid();
         return NextResponse.json({ ok: true, no_op: true, reason: stockResult.reason });
       }
     }
 
     await sendConfirmation();
+    await notifyPaid();
     return NextResponse.json({ ok: true });
   } catch (e: any) {
     // Excepción no manejada — algo se rompió de nuestro lado. Devolvemos 500 para que MP reintente.

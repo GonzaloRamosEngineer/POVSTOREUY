@@ -9,6 +9,7 @@ export type MatchbotCheckoutIntent = {
   pack_id: string | null;
   quantity: number;
   source: 'matchbot';
+  intent_id: string | null;
   exp: number;
 };
 
@@ -24,6 +25,7 @@ export function createMatchbotCheckoutToken(input: {
   packId?: string | null;
   quantity?: number;
   nowSeconds?: number;
+  intentId?: string | null;
 }): string {
   const nowSeconds = input.nowSeconds ?? Math.floor(Date.now() / 1000);
   const payload: MatchbotCheckoutIntent = {
@@ -32,6 +34,7 @@ export function createMatchbotCheckoutToken(input: {
     pack_id: input.packId || null,
     quantity: Math.min(Math.max(Math.trunc(input.quantity ?? 1), 1), 10),
     source: 'matchbot',
+    intent_id: input.intentId || null,
     exp: nowSeconds + TOKEN_TTL_SECONDS,
   };
   const encodedPayload = Buffer.from(JSON.stringify(payload), 'utf8').toString('base64url');
@@ -64,6 +67,7 @@ export function verifyMatchbotCheckoutToken(input: {
   if (
     payload?.v !== TOKEN_VERSION ||
     payload?.source !== 'matchbot' ||
+    (payload.intent_id !== null && (typeof payload.intent_id !== 'string' || !/^[0-9a-f-]{36}$/i.test(payload.intent_id))) ||
     typeof payload?.product_id !== 'string' ||
     !payload.product_id.trim() ||
     (payload.pack_id !== null && typeof payload.pack_id !== 'string') ||
@@ -86,6 +90,7 @@ export function createMatchbotCheckoutUrl(input: {
   productId: string;
   packId?: string | null;
   quantity?: number;
+  intentId?: string | null;
 }): string {
   const token = createMatchbotCheckoutToken(input);
   return `${input.siteUrl.replace(/\/$/, '')}/checkout/matchbot?intent=${encodeURIComponent(token)}`;

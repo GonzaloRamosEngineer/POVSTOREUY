@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { signMatchbotRequest } from '@/lib/integrations/matchbotAuth';
+import { verifyMatchbotCheckoutToken } from '@/lib/integrations/matchbotCheckout';
 
 const baseProducts = [
   {
@@ -56,7 +57,8 @@ describe('POST /api/integrations/matchbot/catalog', () => {
   });
 
   it('devuelve sólo el DTO permitido para una búsqueda firmada', async () => {
-    const rawBody = JSON.stringify({ action: 'search', query: '¿Tienen la X200?', limit: 5 });
+    const intentId = '11111111-1111-4111-8111-111111111111';
+    const rawBody = JSON.stringify({ action: 'search', query: '¿Tienen la X200?', limit: 5, context: { intent_id: intentId } });
     const timestamp = String(Math.floor(Date.now() / 1000));
     const signature = signMatchbotRequest('connector-secret', timestamp, rawBody);
     const response = await POST(
@@ -89,6 +91,9 @@ describe('POST /api/integrations/matchbot/catalog', () => {
       },
     ]);
     expect(body.products[0]).not.toHaveProperty('description');
+    const token = new URL(body.products[0].checkout_url).searchParams.get('intent') || '';
+    const verified = verifyMatchbotCheckoutToken({ secret: 'connector-secret', token });
+    expect(verified.ok && verified.intent.intent_id).toBe(intentId);
   });
 
   it('expone los packs como productos comprables con stock derivado y URL seleccionada', async () => {

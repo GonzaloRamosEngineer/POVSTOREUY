@@ -13,6 +13,7 @@ describe('matchbot checkout intent', () => {
       packId: 'kit-esencial',
       quantity: 2,
       nowSeconds: 100,
+      intentId: '11111111-1111-4111-8111-111111111111',
     });
     const result = verifyMatchbotCheckoutToken({ secret: 'secret', token, nowSeconds: 101 });
 
@@ -24,6 +25,7 @@ describe('matchbot checkout intent', () => {
         pack_id: 'kit-esencial',
         quantity: 2,
         source: 'matchbot',
+        intent_id: '11111111-1111-4111-8111-111111111111',
         exp: 3700,
       },
     });
