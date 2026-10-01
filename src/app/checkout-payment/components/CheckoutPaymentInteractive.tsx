@@ -7,7 +7,7 @@ import PaymentMethodSelector from './PaymentMethodSelector';
 import MercadoPagoForm from './MercadoPagoForm';
 import BankTransferForm from './BankTransferForm';
 import CustomerInfoForm from './CustomerInfoForm';
-import { readCart, clearCart, type CartItem as CartItemType } from '@/lib/cart';
+import { cartUnitPrice, readCart, clearCart, type CartItem as CartItemType } from '@/lib/cart';
 
 // IMPORTAMOS NUESTRO NUEVO DICCIONARIO
 import { checkoutMessages } from '@/messages/checkoutMessages';
@@ -157,12 +157,12 @@ export default function CheckoutPaymentInteractive() {
       id: it.id,
       name: it.name,
       model: it.model || '',
-      price: it.price,
+      price: cartUnitPrice(it, selectedPaymentMethod),
       quantity: it.quantity,
       image: it.image,
       alt: it.alt,
     }));
-  }, [cart]);
+  }, [cart, selectedPaymentMethod]);
 
   const subtotal = useMemo(
     () => orderItems.reduce((sum, item) => sum + item.price * item.quantity, 0),
@@ -243,6 +243,8 @@ export default function CheckoutPaymentInteractive() {
         paymentMethod: selectedPaymentMethod,
         deliveryMethod,
         idempotency_key: createOrderIdempotencyKey,
+        expectedTotal: total,
+        strictPricing: true,
       }),
     });
 

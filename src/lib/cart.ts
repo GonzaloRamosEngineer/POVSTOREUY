@@ -4,6 +4,8 @@ export type CartItem = {
   id: string;        // UUID real de products.id
   name: string;
   price: number;
+  cash_price?: number | null;
+  card_price?: number | null;
   quantity: number;
   image: string;
   alt: string;
@@ -17,6 +19,14 @@ export type CartItem = {
   pack_id?: string;
   price_preview?: number;
 };
+
+export type CartPaymentMethod = 'mercadopago' | 'bank_transfer';
+
+export function cartUnitPrice(item: CartItem, paymentMethod: CartPaymentMethod): number {
+  const preferred = paymentMethod === 'bank_transfer' ? item.cash_price : item.card_price;
+  const parsed = Number(preferred ?? item.price);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : 0;
+}
 
 const CART_KEY = 'povstore_cart'; // <-- importante: unificado
 
@@ -54,6 +64,8 @@ function normalizeCartItem(raw: any): CartItem | null {
     quantity,
     stock: raw.stock != null && Number.isFinite(Number(raw.stock)) ? Number(raw.stock) : undefined,
     model: raw.model != null ? String(raw.model) : undefined,
+    cash_price: raw.cash_price != null && Number.isFinite(Number(raw.cash_price)) ? Number(raw.cash_price) : null,
+    card_price: raw.card_price != null && Number.isFinite(Number(raw.card_price)) ? Number(raw.card_price) : null,
   };
 
   if (normalized.type === 'pack') {

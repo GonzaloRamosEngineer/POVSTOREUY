@@ -85,6 +85,7 @@ describe('POST /api/integrations/matchbot/catalog', () => {
         stock_count: 3,
         stock_status: 'in_stock',
         url: 'https://povstore.uy/products/x200',
+        checkout_url: expect.stringMatching(/^https:\/\/povstore\.uy\/checkout\/matchbot\?intent=/),
       },
     ]);
     expect(body.products[0]).not.toHaveProperty('description');
@@ -153,6 +154,7 @@ describe('POST /api/integrations/matchbot/catalog', () => {
         stock_count: 2,
         stock_status: 'low_stock',
         url: 'https://povstore.uy/products/x200?pack=x200-moto-pro',
+        checkout_url: expect.stringMatching(/^https:\/\/povstore\.uy\/checkout\/matchbot\?intent=/),
       },
     ]);
   });

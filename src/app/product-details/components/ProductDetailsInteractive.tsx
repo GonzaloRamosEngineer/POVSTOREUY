@@ -369,6 +369,8 @@ export default function ProductDetailsInteractive({
       name: cartProductName,
       model: product.model,
       price: currentDisplayPrice,
+      cash_price: selectedPack ? selectedPack.cash_price : product.cash_price,
+      card_price: selectedPack ? selectedPack.card_price : product.card_price,
       quantity,
       image: dynamicGallery[0]?.url || product.image_url,
       alt: cartProductName,

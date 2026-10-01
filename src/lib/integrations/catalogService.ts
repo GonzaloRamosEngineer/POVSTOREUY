@@ -5,6 +5,7 @@ import {
   type PackComponentLike,
 } from '@/lib/packs/computePackStock';
 import { searchCatalogRows, type CatalogProductRow } from './catalogSearch';
+import { createMatchbotCheckoutUrl } from './matchbotCheckout';
 
 export type MatchbotCatalogProduct = {
   id: string;
@@ -16,6 +17,7 @@ export type MatchbotCatalogProduct = {
   stock_count: number;
   stock_status: string | null;
   url: string;
+  checkout_url: string;
 };
 
 type CatalogPack = {
@@ -37,6 +39,8 @@ type CatalogSourceRow = CatalogProductRow & {
 
 type SearchableCatalogRow = CatalogProductRow & {
   catalog_url: string;
+  checkout_product_id: string;
+  checkout_pack_id: string | null;
 };
 
 function parsePacks(value: unknown): CatalogPack[] {
@@ -77,7 +81,13 @@ function searchableRows(products: CatalogSourceRow[], siteUrl: string): Searchab
 
   for (const product of products) {
     const productUrl = `${siteUrl}/products/${product.slug || product.id}`;
-    rows.push({ ...product, is_pack: false, catalog_url: productUrl });
+    rows.push({
+      ...product,
+      is_pack: false,
+      catalog_url: productUrl,
+      checkout_product_id: product.id,
+      checkout_pack_id: null,
+    });
 
     for (const pack of parsePacks(product.packs)) {
       const packId = String(pack.id ?? '').trim();
@@ -109,6 +119,8 @@ function searchableRows(products: CatalogSourceRow[], siteUrl: string): Searchab
         is_accessory: product.is_accessory,
         is_pack: true,
         catalog_url: `${productUrl}?pack=${encodeURIComponent(packId)}`,
+        checkout_product_id: product.id,
+        checkout_pack_id: packId,
       });
     }
   }
@@ -136,16 +148,27 @@ export async function queryLiveCatalog(
     process.env.SITE_URL ||
     'https://povstore.uy'
   ).replace(/\/$/, '');
+  const checkoutSecret = process.env.MATCHBOT_CATALOG_SECRET;
+  if (!checkoutSecret) throw new Error('integration_not_configured');
   const candidates = searchableRows((data ?? []) as CatalogSourceRow[], siteUrl);
-  return searchCatalogRows(query, candidates, limit).map((product) => ({
-    id: product.id,
-    name: String(product.name ?? ''),
-    model: product.model ? String(product.model) : null,
-    price: Number(product.price ?? 0),
-    cash_price: product.cash_price == null ? null : Number(product.cash_price),
-    card_price: product.card_price == null ? null : Number(product.card_price),
-    stock_count: Math.max(0, Number(product.stock_count ?? 0)),
-    stock_status: product.stock_status ?? null,
-    url: (product as SearchableCatalogRow).catalog_url,
-  }));
+  return searchCatalogRows(query, candidates, limit).map((product) => {
+    const row = product as SearchableCatalogRow;
+    return {
+      id: product.id,
+      name: String(product.name ?? ''),
+      model: product.model ? String(product.model) : null,
+      price: Number(product.price ?? 0),
+      cash_price: product.cash_price == null ? null : Number(product.cash_price),
+      card_price: product.card_price == null ? null : Number(product.card_price),
+      stock_count: Math.max(0, Number(product.stock_count ?? 0)),
+      stock_status: product.stock_status ?? null,
+      url: row.catalog_url,
+      checkout_url: createMatchbotCheckoutUrl({
+        siteUrl,
+        secret: checkoutSecret,
+        productId: row.checkout_product_id,
+        packId: row.checkout_pack_id,
+      }),
+    };
+  });
 }
